@@ -1,18 +1,17 @@
 /**
  * Drizzle schema. Brief §4.
  *
- * NON-NEGOTIABLES ENCODED HERE (do not "optimise" these away):
- * - Nothing fetched is ever deleted. items.status + dropped_reason mark state.
- *   The dropped set is training data and cannot be rebuilt later.
- * - Roles are never deleted. A person leaving sets roles.last_seen. Historical
- *   roles are often the MOST valuable edges in the graph.
- * - Every graph edge carries source + source_url. An unsourced edge is worse
- *   than no edge.
- * - Tri-state, never boolean, for facts the tool cannot verify:
- *   account_status and sg_match_status.
+ * Four properties the tables encode deliberately:
+ * - Everything fetched is retained; items.status and dropped_reason carry the
+ *   state instead. The dropped set is training data and cannot be rebuilt later.
+ * - A departure sets roles.last_seen rather than removing the row, since a
+ *   historical role is often the most valuable edge in the graph.
+ * - Every graph edge carries source + source_url, so a claim can be checked.
+ * - account_status and sg_match_status are tri-state, because the tool cannot
+ *   verify either and a boolean would hide the third state.
  *
- * DEVIATION 2026-08-21: the `rds` table is removed. Reactions are anonymous;
- * voter_key is a per-browser cookie UUID, NOT a person. See DESIGN_RATIONALE §7a.
+ * There is no `rds` table. Reactions are anonymous and voter_key is a
+ * per-browser cookie UUID rather than a person (DESIGN_RATIONALE §7a).
  */
 import {
   pgTable, serial, text, integer, smallint, boolean, date, timestamp,
@@ -41,8 +40,8 @@ export const companies = pgTable('companies', {
   seedFlags: text('seed_flags').array().default([]),
   valuationEst: numeric('valuation_est'),
   valuationSource: text('valuation_source'),
-  // Tri-state on purpose. 'unknown' is the seed default because whether EDB
-  // holds the account is internal knowledge this tool cannot verify.
+  // Tri-state. 'unknown' is the seed default because whether EDB holds the
+  // account is internal knowledge this tool cannot verify.
   accountStatus: text('account_status').notNull().default('unknown'),
   accountStatusSource: text('account_status_source'),
   accountStatusReviewedAt: timestamp('account_status_reviewed_at', { withTimezone: true }),
@@ -57,14 +56,14 @@ export const companies = pgTable('companies', {
   /**
    * Scope triage from the EDGAR industry group (lib/edgar-industry.ts).
    *   in_scope     — a sector match, or pending the company-level assessment
-   *   out_of_scope — confidently outside the four sectors; PERSISTED, not deleted,
-   *                  so "is the filter wrong?" stays answerable (RATIONALE §15.4)
+   *   out_of_scope — confidently outside the four sectors; the row is kept so
+   *                  "is the filter wrong?" stays answerable (RATIONALE §15.4)
    *   unknown      — seeded companies, which are in scope by construction
-   * Never a boolean: 'pending assessment' is a real third state.
+   * Tri-state, because 'pending assessment' is a real third state.
    */
   scopeStatus: text('scope_status').default('unknown'),
   scopeReason: text('scope_reason'),
-  // RESERVED for EDB-internal account history. Stays empty on personal
+  // Reserved for EDB-internal account history. Stays empty on personal
   // infrastructure — DESIGN_RATIONALE §14.
   notes: text('notes'),
   normalizedName: text('normalized_name'),
@@ -91,7 +90,7 @@ export const organizations = pgTable('organizations', {
   notes: text('notes'),
 }, (t) => [uniqueIndex('organizations_normalized_name_key').on(t.normalizedName)]);
 
-/** person -> company. NEVER deleted; departure sets last_seen. */
+/** person -> company. A departure sets last_seen; the row stays. */
 export const roles = pgTable('roles', {
   id: serial('id').primaryKey(),
   personId: integer('person_id').references(() => people.id),
@@ -104,7 +103,7 @@ export const roles = pgTable('roles', {
   lastSeen: date('last_seen'),
 }, (t) => [uniqueIndex('roles_person_company_role_key').on(t.personId, t.companyId, t.role)]);
 
-/** person -> organization. Requires evidence INDEPENDENT of a Form D. */
+/** person -> organization. Requires evidence independent of a Form D. */
 export const affiliations = pgTable('affiliations', {
   id: serial('id').primaryKey(),
   personId: integer('person_id').references(() => people.id),
@@ -126,10 +125,10 @@ export const investments = pgTable('investments', {
 }, (t) => [uniqueIndex('investments_org_company_round_key').on(t.orgId, t.companyId, t.round)]);
 
 /**
- * Discovery guard list. Discovery MUST check candidates against this table
- * (name + aliases) and tag rather than add — without it, Form D and news
- * discovery re-import exited companies from stale references (~15% stale rate
- * measured in the seed research).
+ * Discovery guard list. Discovery checks candidates against this table (name +
+ * aliases) and tags them rather than adding them. Stale references keep exited
+ * companies circulating — around 15% of the seed research was stale — so
+ * without the check they get re-imported from Form D and news.
  */
 export const excludedCompanies = pgTable('excluded_companies', {
   id: serial('id').primaryKey(),
@@ -142,9 +141,9 @@ export const excludedCompanies = pgTable('excluded_companies', {
 }, (t) => [index('excluded_normalized_name_idx').on(t.normalizedName)]);
 
 /**
- * company -> company. For UNDIRECTED relations store ONE row with
- * from_company_id < to_company_id and query (from = :x OR to = :x).
- * Storing both directions duplicates paths and inflates every warm-path result.
+ * company -> company. An undirected relation is one row with
+ * from_company_id < to_company_id, queried as (from = :x OR to = :x). Storing
+ * both directions duplicates paths and inflates every warm-path result.
  */
 export const companyEdges = pgTable('company_edges', {
   id: serial('id').primaryKey(),
@@ -179,9 +178,9 @@ export const eventParticipants = pgTable('event_participants', {
 
 /**
  * Anything connecting an entity to Singapore.
- * A registration is NOT operational presence: match_status, entity status and
- * incorporation date travel together so a struck-off shelf entity and a live
- * subsidiary are not flattened into sg_entity = true.
+ * A registration is not operational presence, so match_status, entity status
+ * and incorporation date travel together and a struck-off shelf entity stays
+ * distinguishable from a live subsidiary.
  */
 export const sgLinks = pgTable('sg_links', {
   id: serial('id').primaryKey(),
@@ -194,7 +193,7 @@ export const sgLinks = pgTable('sg_links', {
   foundAt: timestamp('found_at', { withTimezone: true }).defaultNow(),
 }, (t) => [index('sg_links_subject_idx').on(t.subjectType, t.subjectId)]);
 
-/** News and signals. Rows are NEVER deleted — filters set status + dropped_reason. */
+/** News and signals. Filters set status + dropped_reason; rows are retained. */
 export const items = pgTable('items', {
   id: serial('id').primaryKey(),
   url: text('url').notNull(),
@@ -216,8 +215,8 @@ export const items = pgTable('items', {
 ]);
 
 /**
- * UNIQUE (item_id, rubric_version) is load-bearing: rescoring under a new
- * rubric PRESERVES old scores. You need both to know whether a change helped.
+ * UNIQUE (item_id, rubric_version) is load-bearing: rescoring under a new rubric
+ * preserves the old scores, and both are needed to tell whether a change helped.
  */
 export const scores = pgTable('scores', {
   id: serial('id').primaryKey(),
@@ -234,7 +233,7 @@ export const scores = pgTable('scores', {
   scoredAt: timestamp('scored_at', { withTimezone: true }).defaultNow(),
 }, (t) => [uniqueIndex('scores_item_rubric_key').on(t.itemId, t.rubricVersion)]);
 
-/** Company-level assessment. Cached per company, refreshed monthly — NOT per item. */
+/** Company-level assessment. Cached per company and refreshed monthly. */
 export const companyAssessments = pgTable('company_assessments', {
   id: serial('id').primaryKey(),
   companyId: integer('company_id').references(() => companies.id),
@@ -272,8 +271,8 @@ export const digests = pgTable('digests', {
 });
 
 /**
- * Anonymous. voter_key is a per-browser cookie UUID, not a person.
- * Dedupes repeat clicks; identity is deliberately not recorded (§7a).
+ * Anonymous. voter_key is a per-browser cookie UUID, not a person: it dedupes
+ * repeat clicks, and identity is deliberately not recorded (§7a).
  */
 export const votes = pgTable('votes', {
   id: serial('id').primaryKey(),
@@ -289,8 +288,8 @@ export const secFilings = pgTable('sec_filings', {
   companyId: integer('company_id').references(() => companies.id),
   formType: text('form_type').notNull(),
   filedAt: date('filed_at'),
-  // As filed. NOT cumulative venture funding — can cover debt, pooled funds and
-  // multi-issuer structures. Never display as "total raised" without security type.
+  // As filed, which can cover debt, pooled funds and multi-issuer structures
+  // rather than cumulative venture funding. Display it with the security type.
   amount: numeric('amount'),
   securityType: text('security_type'),
   accessionNumber: text('accession_number'),
@@ -303,7 +302,7 @@ export const itemCompanies = pgTable('item_companies', {
   role: text('role'),
 }, (t) => [primaryKey({ columns: [t.itemId, t.companyId] })]);
 
-/** Anonymous, as votes. Structured reasons are what make this feedback not noise. */
+/** Anonymous, as votes. The structured reasons are what make this useful. */
 export const dispositions = pgTable('dispositions', {
   id: serial('id').primaryKey(),
   itemId: integer('item_id').references(() => items.id, { onDelete: 'cascade' }),
@@ -329,10 +328,9 @@ export const opportunities = pgTable('opportunities', {
 }, (t) => [index('opportunities_company_idx').on(t.companyId)]);
 
 /**
- * Institutional memory about connections. The point is NOT to tell an RD what
- * they know — it is that the NEXT person who hits the same fund or person sees
- * that someone has confirmed access, and who.
- * An unreviewed path is an ASSOCIATION and must never be shown as a warm intro.
+ * Institutional memory about connections: the next person who hits the same fund
+ * or person sees that someone has already confirmed access, and who.
+ * An unreviewed path is an association, and shows as one.
  */
 export const pathReviews = pgTable('path_reviews', {
   id: serial('id').primaryKey(),
@@ -360,7 +358,7 @@ export const runs = pgTable('runs', {
   error: text('error'),
 }, (t) => [index('runs_stage_started_idx').on(t.stage, t.startedAt)]);
 
-/** Source health. Scrapers fail silently; a source returning zero for three weeks must be visible. */
+/** Source health. Scrapers fail quietly, so a source returning zero for three weeks surfaces here. */
 export const sourceHealth = pgTable('source_health', {
   id: serial('id').primaryKey(),
   source: text('source').notNull(),
@@ -377,9 +375,9 @@ export const sourceHealth = pgTable('source_health', {
  * Entity-merge decisions. Brief §6: automated resolution reaches ~80% and the
  * last 20% needs a human.
  *
- * Both outcomes are recorded, not just merges. A "these are different" decision
- * is as valuable as a merge — it stops the same pair being re-surfaced every
- * week, and it is evidence about where resolution is weak.
+ * Both outcomes are recorded. A "these are different" decision stops the same
+ * pair being re-surfaced every week, and it is evidence about where resolution
+ * is weak.
  */
 export const entityMerges = pgTable('entity_merges', {
   id: serial('id').primaryKey(),
@@ -393,3 +391,51 @@ export const entityMerges = pgTable('entity_merges', {
   decidedBy: text('decided_by'),
   decidedAt: timestamp('decided_at', { withTimezone: true }).defaultNow(),
 }, (t) => [uniqueIndex('entity_merges_pair_key').on(t.entityType, t.keptId, t.mergedId)]);
+
+/**
+ * Weekly ATS job-board snapshots. Brief §5.5, step 10.
+ *
+ * One row per company per run, holding the job count and the APAC/non-US
+ * breakdown. The week-over-week volume trigger needs a prior count to compare
+ * against, which is what this table stores.
+ *
+ * Snapshots are kept so the trailing series distinguishes a genuine hiring ramp
+ * from a one-week blip, and so there is evidence for RATIONALE §15.2, which
+ * flags the APAC-posting hypothesis as untested.
+ */
+export const jobSnapshots = pgTable('job_snapshots', {
+  id: serial('id').primaryKey(),
+  companyId: integer('company_id').references(() => companies.id).notNull(),
+  atsType: text('ats_type').notNull(),
+  atsSlug: text('ats_slug').notNull(),
+  totalJobs: integer('total_jobs').notNull(),
+  nonUsJobs: integer('non_us_jobs').notNull().default(0),
+  apacJobs: integer('apac_jobs').notNull().default(0),
+  snapshotAt: timestamp('snapshot_at', { withTimezone: true }).defaultNow(),
+  runId: integer('run_id'),
+}, (t) => [
+  index('job_snapshots_company_idx').on(t.companyId, t.snapshotAt),
+]);
+
+/**
+ * Individual postings that generated a signal, kept so an RD can check the claim
+ * — brief §15: "graph edges without source_url are worthless". A digest line
+ * saying "posted a Singapore role" links to the posting it came from.
+ */
+export const jobPostings = pgTable('job_postings', {
+  id: serial('id').primaryKey(),
+  companyId: integer('company_id').references(() => companies.id).notNull(),
+  externalId: text('external_id').notNull(),
+  atsType: text('ats_type').notNull(),
+  title: text('title').notNull(),
+  location: text('location'),
+  url: text('url').notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  isNonUs: boolean('is_non_us').default(false),
+  isApac: boolean('is_apac').default(false),
+  firstSeen: timestamp('first_seen', { withTimezone: true }).defaultNow(),
+  lastSeen: timestamp('last_seen', { withTimezone: true }).defaultNow(),
+}, (t) => [
+  uniqueIndex('job_postings_company_external_key').on(t.companyId, t.atsType, t.externalId),
+  index('job_postings_company_idx').on(t.companyId),
+]);
