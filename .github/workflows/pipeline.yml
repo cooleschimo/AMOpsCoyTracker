@@ -18,7 +18,7 @@ on:
         required: true
         default: 'formd'
         type: choice
-        options: [formd, portfolios, people, assess, seed, all]
+        options: [formd, portfolios, people, acra, assess, seed, all]
       days:
         description: 'Form D lookback days'
         required: false
@@ -65,6 +65,13 @@ jobs:
       - name: Company team pages -> people + roles
         if: ${{ github.event.inputs.stage == 'people' || github.event.inputs.stage == 'all' }}
         run: npx tsx scripts/ingest-people.ts --companies --limit 60
+
+      # ACRA refreshes monthly, so a weekly pass is ample. It is a courtesy
+      # service with no key, so the run is deliberately capped rather than
+      # sweeping every portfolio company.
+      - name: ACRA resolution -> sg_links
+        if: ${{ github.event.inputs.stage == 'acra' || github.event.inputs.stage == 'all' || (github.event_name == 'schedule' && fromJSON(steps.dow.outputs.day || '1') == 1) }}
+        run: npx tsx scripts/ingest-acra.ts --limit 300
 
       - name: Company-level assessment
         if: ${{ github.event.inputs.stage == 'assess' || github.event.inputs.stage == 'all' }}
