@@ -1,0 +1,18 @@
+name,aliases,reason,as_of,detail
+Groq,Groq Inc,independence_uncertain,2026-08,NVIDIA licensing deal ~$20B Dec 2025 drained talent; recapitalised at reduced $3.5B val Aug 2026
+Scale AI,Scale,not_independent,2025-06,Meta took 49% stake for $14.3B; founder left to lead Meta superintelligence lab
+Windsurf,Codeium,acquired,2025-07,Team to Google DeepMind; remaining business acquired by Cognition
+Modular,Modular Inc,acquired,2026,Acquired by Qualcomm ~$4B
+Forethought,,acquired,2026,Acquired by Zendesk
+Enfabrica,Enfabrica Corp,acquired,2026,Reported acquired/absorbed by NVIDIA - verify
+Cerebras Systems,Cerebras,went_public,2026-05,IPO May 2026
+Astera Labs,Astera,went_public,2024,NASDAQ ALAB
+Rigetti Computing,Rigetti,went_public,2021,NASDAQ RGTI
+iRhythm Technologies,iRhythm,went_public,2016,NASDAQ IRTC - keep as sector context only
+Grail,GRAIL Inc,went_public,2024,Spun off from Illumina; NASDAQ GRAL
+Hinge Health,Hinge,went_public,2025,IPO 2025
+Zoox,Zoox Inc,not_independent,2020,Amazon subsidiary
+Weights and Biases,W&B|WandB|Weights & Biases,acquired,2025,Acquired by CoreWeave - verify close
+Isomorphic Labs,,non_us_hq,2025,London HQ - fails US screen
+Kelonia Therapeutics,,acquired,2025,Acquired by Eli Lilly up to $7B
+True Anomaly,,non_west_coast_hq,2026,HQ Centennial CO; only a Long Beach factory - watch item not target

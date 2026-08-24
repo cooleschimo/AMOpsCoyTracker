@@ -1,0 +1,49 @@
+# Pipeline scheduler. See BUILD_BRIEF §3a.
+#
+# Vercel Cron was rejected: Hobby is once-per-day (±59min) with a 300s function
+# cap. GitHub Actions gives 6h jobs and arbitrary schedules, and the web app on
+# Vercel does no pipeline work — the two halves share only the Neon database.
+#
+# NOTE: GitHub disables scheduled workflows after 60 days of repo inactivity.
+name: pipeline
+
+on:
+  schedule:
+    # 06:15 UTC daily. GitHub's scheduler can lag 5-15 min under load.
+    - cron: '15 6 * * *'
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'Stage to run'
+        required: true
+        default: 'formd'
+        type: choice
+        options: [formd, seed, all]
+      days:
+        description: 'Form D lookback days'
+        required: false
+        default: '3'
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GROQ_MODEL_SCORING: ${{ vars.GROQ_MODEL_SCORING || 'openai/gpt-oss-120b' }}
+      GROQ_MODEL_DRAFTING: ${{ vars.GROQ_MODEL_DRAFTING || 'openai/gpt-oss-120b' }}
+      SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      DIGEST_TEST_RECIPIENT: ${{ secrets.DIGEST_TEST_RECIPIENT }}
+      DIGEST_TEST_MODE: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Form D ingestion
+        if: ${{ github.event.inputs.stage == 'formd' || github.event.inputs.stage == 'all' || github.event_name == 'schedule' }}
+        run: npx tsx scripts/ingest-formd.ts --days ${{ github.event.inputs.days || 3 }}
