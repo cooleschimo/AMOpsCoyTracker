@@ -2,7 +2,7 @@
  * Preflight: verify every credential and endpoint before a real run.
  * Run: npx tsx scripts/preflight.ts
  */
-import 'dotenv/config';
+import '../lib/loadenv';
 
 async function main() {
   const results: Array<[string, string]> = [];

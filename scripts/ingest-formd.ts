@@ -17,7 +17,7 @@
  * Usage:
  *   npx tsx scripts/ingest-formd.ts --days 3 [--all-states] [--limit 50] [--dry]
  */
-import 'dotenv/config';
+import '../lib/loadenv';
 import { eq, sql, and } from 'drizzle-orm';
 import { getDb } from '../lib/db';
 import { companies, people, roles, secFilings, excludedCompanies, runs, sourceHealth } from '../lib/schema';

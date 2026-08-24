@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './lib/loadenv';
 import type { Config } from 'drizzle-kit';
 
 export default {

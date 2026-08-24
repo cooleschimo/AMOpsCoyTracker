@@ -15,7 +15,7 @@
  *
  * Idempotent: re-running updates rather than duplicating.
  */
-import 'dotenv/config';
+import '../lib/loadenv';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { eq, sql } from 'drizzle-orm';
