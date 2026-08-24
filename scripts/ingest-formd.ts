@@ -4,13 +4,14 @@
  * Writes companies + people + roles + sec_filings, every edge carrying source
  * and source_url.
  *
- * ENFORCED HERE:
- *  - Discovery checks excluded_companies (name + aliases) and TAGS rather than
- *    adds. Without it we re-import exited companies from stale references.
- *  - A Form D director is an ASSOCIATION, not a fund relationship: we write
- *    roles (person->company) and NEVER affiliations (person->fund).
- *  - Amounts land in sec_filings WITH security_type and are never written to
- *    companies.total_raised.
+ * The rules this stage holds to:
+ *  - Discovery checks excluded_companies (name + aliases) and tags a hit, since
+ *    stale references would otherwise re-import companies that have exited.
+ *  - A Form D director is an association with the issuer, so it becomes a role
+ *    (person->company); affiliations (person->fund) are a different claim and
+ *    the filing does not support them.
+ *  - Amounts land in sec_filings alongside security_type, where the instrument
+ *    stays attached to the number; companies.total_raised is left alone.
  *  - Entity "persons" (fund LLCs filing as promoter) do not become people rows.
  *  - Nothing is deleted. Re-seen roles update last_seen.
  *
@@ -54,7 +55,7 @@ async function main() {
 
   const [run] = await db.insert(runs).values({ stage: 'formd' }).returning();
 
-  // Guard list, loaded once. Discovery must TAG rather than add.
+  // Guard list, loaded once. A discovery that hits it is tagged, not added.
   const guard = await db.select().from(excludedCompanies);
   const guardIndex = new Map<string, { name: string; reason: string }>();
   for (const g of guard) {
@@ -85,7 +86,7 @@ async function main() {
   for (const f of filings) {
     const norm = normalizeCompanyName(f.entityName);
 
-    // GUARD: tag, don't add.
+    // Guard hit: tag it and move on.
     const hit = guardIndex.get(norm);
     if (hit) {
       counts.excluded_hits++;
@@ -96,8 +97,8 @@ async function main() {
     if (dry) continue;
 
     // ── Industry routing (lib/edgar-industry.ts) ─────────────────────────
-    // A fund is not a company. Route it to organizations instead, so the graph
-    // gains an investor node rather than a fake company node.
+    // A fund is not a company. Routing it to organizations gives the graph an
+    // investor node with the right shape.
     const routing = routeIndustry(f.industryGroup);
     if (routing.disposition === 'organization') {
       const orgNorm = normalizeOrgName(f.entityName);
@@ -111,7 +112,7 @@ async function main() {
         });
         counts.routed_to_organizations++;
       }
-      continue;   // deliberately NOT written to companies
+      continue;   // stays out of companies
     }
     if (routing.disposition === 'out_of_scope') counts.marked_out_of_scope++;
     else if (routing.sectors.length) counts.sector_matched++;
@@ -135,15 +136,15 @@ async function main() {
         name: f.entityName,
         normalizedName: norm,
         // Sectors come from EDGAR's own Item 4 label where it maps cleanly
-        // (Biotechnology IS biotech). An empty array means genuinely unknown,
-        // and the company-level assessment decides — never a guess here.
+        // (Biotechnology is biotech). An empty array means genuinely unknown,
+        // and the company-level assessment is what resolves it.
         sectors: routing.sectors,
         scopeStatus: routing.disposition,
         scopeReason: routing.reason,
         hqCity: f.city, hqState: f.stateOrCountry, hqRegion: region,
         cik: f.cik,
         foundedYear: f.yearOfInc ? Number(f.yearOfInc) || null : null,
-        accountStatus: 'unknown',        // tri-state; nothing is asserted
+        accountStatus: 'unknown',        // tri-state; nothing asserted yet
         accountStatusSource: 'seed',
         discoveredVia: 'form_d',
         description: f.industryGroup ? `Form D industry group: ${f.industryGroup}` : null,
@@ -152,7 +153,7 @@ async function main() {
       counts.companies_created++;
     }
 
-    // sec_filings: amount stored WITH security type, never as total_raised.
+    // sec_filings: the amount is stored with its security type.
     if (f.filedAt) {
       const dupe = await db.select({ id: secFilings.id }).from(secFilings)
         .where(and(eq(secFilings.companyId, companyId), eq(secFilings.formType, f.formType), eq(secFilings.filedAt, f.filedAt)))
@@ -171,14 +172,14 @@ async function main() {
 
     const madePeople: string[] = [];
     for (const p of f.relatedPersons) {
-      // Entities filing as promoter are NOT people.
+      // Entities filing as promoter are not people.
       if (p.isLikelyEntity) { counts.entity_persons_skipped++; continue; }
 
       const pnorm = normalizePersonName(p.name);
       if (!pnorm) continue;
 
-      // Match within company context first: two different Michael Chens at two
-      // companies must NOT merge (brief §6).
+      // Match within company context first, so two different Michael Chens at
+      // two companies stay separate (brief §6).
       const existingHere = await db.select({ id: people.id }).from(people)
         .innerJoin(roles, eq(roles.personId, people.id))
         .where(and(eq(people.normalizedName, pnorm), eq(roles.companyId, companyId)))
@@ -201,7 +202,7 @@ async function main() {
           .where(and(eq(roles.personId, personId), eq(roles.companyId, companyId), eq(roles.role, role)))
           .limit(1);
         if (existingRole.length) {
-          // NEVER deleted; refresh last_seen only.
+          // Roles persist; refresh last_seen only.
           await db.update(roles).set({ lastSeen: today }).where(eq(roles.id, existingRole[0].id));
           counts.roles_refreshed++;
         } else {

@@ -1,12 +1,12 @@
 /**
  * Entity resolution. Brief §6, DESIGN_RATIONALE §8.
  *
- * STANCE: prefer FALSE SPLITS over FALSE MERGES. A duplicate person is untidy;
- * a wrongly merged one produces a warm path that does not exist, and an RD
- * acting on it looks foolish in front of a founder.
+ * False splits are preferred to false merges: a duplicate person is untidy,
+ * while a wrongly merged one produces a warm path that does not exist, and an
+ * RD acting on it looks foolish in front of a founder.
  *
- * Automated resolution reaches roughly 80%. This module CANDIDATES only — it
- * never merges automatically. /admin/merge is where a human decides.
+ * Automated resolution reaches roughly 80%. This module proposes candidates;
+ * /admin/merge is where a human decides.
  */
 import { normalizeCompanyName, normalizePersonName, normalizeDomain } from './normalize';
 
@@ -52,7 +52,7 @@ export type Candidate = {
   leftId: number; rightId: number;
   leftName: string; rightName: string;
   signals: MatchSignal[];
-  score: number;          // 0-1 confidence that these are the SAME entity
+  score: number;          // 0-1 confidence that these are the same entity
   sharedContext: string | null;
   caution: string | null; // why a human should look twice
 };
@@ -63,8 +63,8 @@ export type CompanyRow = {
 };
 
 /**
- * Company duplicate candidates.
- * Domain is the STRONGEST signal (brief §6); CIK is authoritative.
+ * Company duplicate candidates. Domain is the strongest signal (brief §6), and
+ * CIK is authoritative.
  */
 export function companyCandidates(rows: CompanyRow[]): Candidate[] {
   const out: Candidate[] = [];
@@ -129,12 +129,11 @@ export type PersonRow = {
 };
 
 /**
- * Person duplicate candidates.
- *
- * CRITICAL (brief §6): match within COMPANY CONTEXT first. Two different
- * Michael Chens at two companies must not merge. A shared company is the only
- * strong evidence available from public data; without it, an identical name is
- * WEAK evidence and is surfaced with a caution rather than a high score.
+ * Person duplicate candidates, matched within company context first (brief §6),
+ * so that two different Michael Chens at two companies stay separate. A shared
+ * company is the only strong evidence available from public data; without one,
+ * an identical name is weak evidence and is surfaced with a caution rather than
+ * a high score.
  */
 export function personCandidates(rows: PersonRow[]): Candidate[] {
   const out: Candidate[] = [];
@@ -152,8 +151,9 @@ export function personCandidates(rows: PersonRow[]): Candidate[] {
         const shared = a.companyIds.filter((c) => b.companyIds.includes(c));
         const sharedNames = a.companyNames.filter((n) => b.companyNames.includes(n));
 
-        // Same name AND same company: almost certainly one person recorded twice.
-        // Same name, different companies: probably two people. Prefer the split.
+        // Same name and same company is almost certainly one person recorded
+        // twice; same name at different companies is probably two people, and
+        // the split is preferred.
         const score = shared.length ? 0.9 : 0.25;
         out.push({
           leftId: a.id, rightId: b.id, leftName: a.name, rightName: b.name,

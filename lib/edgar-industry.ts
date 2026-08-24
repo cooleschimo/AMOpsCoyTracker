@@ -1,31 +1,31 @@
 /**
  * EDGAR Form D "Industry Group" (Item 4) -> our sector scope.
  *
- * SOURCE: the full enumeration is printed on the official Form D
- * (https://www.sec.gov/files/formd.pdf, Item 4, extracted 2026-08-21). It is a
- * FIXED list — the filer selects one. This is not fuzzy classification: we are
- * reading a label the SEC already applied.
+ * The full enumeration is printed on the official Form D
+ * (https://www.sec.gov/files/formd.pdf, Item 4). It is a fixed list from which
+ * the filer selects one, so this is a lookup against a label the SEC already
+ * applied rather than fuzzy classification.
  *
- * THREE OUTCOMES, and the distinction matters:
+ * Three outcomes:
  *
- *  'organization'  The filer is a FUND, not an operating company. It belongs in
- *                  `organizations`, not `companies` — a VC fund raising from its
- *                  LPs is not a company raising money. Routing, not filtering.
+ *  'organization'  The filer is a fund, so it belongs in `organizations` rather
+ *                  than `companies` — a VC fund raising from its LPs is not a
+ *                  company raising money. This is routing, not filtering.
  *
  *  'out_of_scope'  Confidently outside deeptech/biotech/defence_tech/ai. Hotels,
- *                  restaurants, retail, insurance. Still PERSISTED and labelled,
- *                  never deleted — DESIGN_RATIONALE §15.4 needs this set to
- *                  answer "is the filter wrong?" later.
+ *                  restaurants, retail, insurance. Persisted and labelled, since
+ *                  DESIGN_RATIONALE §15.4 needs this set to answer "is the
+ *                  filter wrong?" later.
  *
- *  'in_scope'      Either a direct sector match (Biotechnology IS biotech) or a
+ *  'in_scope'      Either a direct sector match (Biotechnology is biotech) or a
  *                  generic technology bucket that needs assessment. `sectors`
  *                  carries the confident mapping; an empty array means the
- *                  company-level assessment (§7a) must decide.
+ *                  company-level assessment (§7a) decides.
  *
- * NOTE ON GENERIC BUCKETS: 'Other Technology' is EDGAR's catch-all and contains
- * both real targets (Standard Cognition — computer vision) and non-targets
- * (Bidbus — used-car auctions). It resolves to in_scope with NO sectors, so the
- * assessment classifies it rather than ingest guessing.
+ * The generic buckets are why an empty `sectors` matters. 'Other Technology' is
+ * EDGAR's catch-all and holds both real targets (Standard Cognition — computer
+ * vision) and non-targets (Bidbus — used-car auctions), so it resolves to
+ * in_scope with no sectors and the assessment classifies it.
  */
 import type { Sector } from './scope';
 
@@ -38,12 +38,12 @@ export type IndustryRouting = {
 };
 
 const M: Record<string, IndustryRouting> = {
-  // ── Funds: route to organizations, never companies ──────────────────────
+  // ── Funds: route to organizations rather than companies ─────────────────
   'Pooled Investment Fund': { disposition: 'organization', sectors: [], reason: 'fund, not an operating company' },
   'Investing':              { disposition: 'organization', sectors: [], reason: 'investing entity' },
   'Investment Banking':     { disposition: 'organization', sectors: [], reason: 'investment bank' },
 
-  // ── Direct sector matches: EDGAR's label IS our sector ──────────────────
+  // ── Direct sector matches: EDGAR's label is our sector ──────────────────
   'Biotechnology':  { disposition: 'in_scope', sectors: ['biotech'], reason: 'EDGAR Biotechnology = biotech' },
   'Pharmaceuticals':{ disposition: 'in_scope', sectors: ['biotech'], reason: 'EDGAR Pharmaceuticals = biotech' },
   'Computers':      { disposition: 'in_scope', sectors: ['deeptech'], reason: 'EDGAR Computers = deeptech; AI tag needs assessment' },
@@ -88,9 +88,9 @@ const M: Record<string, IndustryRouting> = {
 };
 
 /**
- * Unknown values default to in_scope-pending-assessment, NOT out_of_scope.
- * Erring toward keeping is the cheaper mistake: a wrongly kept company is one
- * assessment call, a wrongly dropped one is invisible forever.
+ * Unknown values default to in_scope-pending-assessment. Erring toward keeping
+ * is the cheaper mistake: a wrongly kept company costs one assessment call, and
+ * a wrongly dropped one is invisible forever.
  */
 export function routeIndustry(industryGroup: string | null | undefined): IndustryRouting {
   if (!industryGroup) {

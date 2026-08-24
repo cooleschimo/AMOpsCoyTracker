@@ -1,9 +1,9 @@
 /**
  * Surface entity-resolution candidates for human review. Brief §6.
  *
- * This NEVER merges. It reports candidates ranked by confidence; /admin/merge
- * is where a person decides. Pairs already decided in entity_merges are hidden
- * so the same question is not asked twice.
+ * Read-only: it reports candidates ranked by confidence, and /admin/merge is
+ * where a person decides. Pairs already decided in entity_merges are hidden so
+ * the same question is not asked twice.
  *
  * Usage: npx tsx scripts/find-duplicates.ts [--type company|person|org] [--min 0.5]
  */

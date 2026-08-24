@@ -1,9 +1,9 @@
 /**
  * Merge execution. Brief §6.
  *
- * A merge REPOINTS edges and marks the losing row merged — it does NOT delete.
- * Nothing in this system deletes; and a merge that turns out to be wrong must
- * be diagnosable afterwards, which requires the losing row to still exist.
+ * A merge repoints edges and marks the losing row as merged. The row itself
+ * stays, so a merge that later turns out to be wrong can still be diagnosed
+ * from what it left behind.
  */
 import { eq, and, sql } from 'drizzle-orm';
 import { getDb } from './db';
@@ -68,7 +68,7 @@ export async function recordDecision(input: MergeInput) {
       if (!clash.length) await db.update(affiliations).set({ personId: input.keptId }).where(eq(affiliations.id, a.id));
       repointed++;
     }
-    // Mark, never delete.
+    // Marked rather than removed, so the merge stays traceable.
     await db.update(people)
       .set({ name: sql`${people.name} || ' [merged into #' || ${input.keptId} || ']'` })
       .where(eq(people.id, input.mergedId));

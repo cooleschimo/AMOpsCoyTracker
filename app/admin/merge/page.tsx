@@ -1,9 +1,9 @@
 /**
  * /admin/merge — entity resolution review. Brief §6.
  *
- * Automated resolution reaches ~80%; this is the last 20%. Nothing here merges
- * automatically: every pair is a question, and "different" is a first-class
- * answer that gets recorded so the pair is never asked about again.
+ * Automated resolution reaches ~80%; this is the last 20%. Every pair is put as
+ * a question for a human, and "different" is a first-class answer, recorded so
+ * the pair stops being surfaced.
  */
 import { getDb } from '../../../lib/db';
 import { companies, people, organizations, roles, entityMerges } from '../../../lib/schema';

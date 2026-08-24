@@ -1,26 +1,27 @@
 /**
  * SEC EDGAR Form D client. Brief §5.1.
  *
- * VERIFIED 2026-08-21 against live endpoints:
+ * The endpoints this uses, as they behave live:
  *  - daily-index: https://www.sec.gov/Archives/edgar/daily-index/{YYYY}/QTR{n}/form.{YYYYMMDD}.idx
  *  - primary_doc: https://www.sec.gov/Archives/edgar/data/{cik}/{accession_nodash}/primary_doc.xml
  *  - relatedPersonsList carries names + relationship (Executive Officer/Director/Promoter)
- *  - offeringSalesAmounts.totalAmountSold and typesOfSecuritiesOffered both present
+ *  - offeringSalesAmounts.totalAmountSold and typesOfSecuritiesOffered are both present
  *
- * TWO HONESTY RULES (brief §5.1, DESIGN_RATIONALE §8) enforced by callers:
- *  1. A director's name does NOT establish which fund they represent. Write the
- *     role edge (person->company) from the filing; NEVER infer an affiliation
- *     (person->fund) from it. Until both edges exist from independent sources
- *     the connection is an ASSOCIATION, not a path.
- *  2. "Amount sold" is NOT cumulative venture funding. It can cover debt, pooled
- *     funds and multi-issuer structures. Stored with its security type; never
- *     displayed as "total raised".
+ * Two limits on what a filing proves, which callers enforce (brief §5.1,
+ * DESIGN_RATIONALE §8):
+ *  1. A director's name establishes the role edge (person->company) and nothing
+ *     about which fund they represent. An affiliation edge (person->fund) needs
+ *     its own source; until both edges exist independently the connection is an
+ *     association, not a path.
+ *  2. "Amount sold" covers debt, pooled funds and multi-issuer structures, so it
+ *     is not cumulative venture funding. It is stored with its security type and
+ *     displayed as what it is.
  *
- * Absence of a Form D is NOT evidence of absence of a raise — issuers sometimes
- * fail to file, or file partially.
+ * Issuers sometimes fail to file, or file partially, so a missing Form D says
+ * nothing about whether a raise happened.
  *
- * Rate limit: SEC documents 10 req/s and blocks IPs that exceed it. We throttle
- * to 8/s deliberately.
+ * Rate limit: SEC documents 10 req/s and blocks IPs that exceed it, so this
+ * throttles to 8/s.
  */
 import { env } from './env';
 
@@ -36,7 +37,7 @@ async function secFetch(url: string, tries = 3): Promise<string> {
 
     const res = await fetch(url, {
       headers: {
-        // SEC REQUIRES a descriptive UA of the form "Name email@domain".
+        // SEC requires a descriptive UA of the form "Name email@domain".
         'User-Agent': env.secUserAgent(),
         'Accept-Encoding': 'gzip, deflate',
       },
@@ -68,7 +69,7 @@ export function parseFormIdx(text: string): FormDIndexEntry[] {
   for (const line of text.split('\n')) {
     if (!line.startsWith('D ') && !line.startsWith('D/A ')) continue;
     // Fixed-width-ish: Form Type / Company Name / CIK / Date Filed / File Name.
-    // VERIFIED against a live .idx: the date is YYYYMMDD with NO dashes.
+    // The date arrives as YYYYMMDD, with no dashes.
     const m = line.match(/^(D|D\/A)\s+(.+?)\s+(\d+)\s+(\d{8})\s+(\S+)\s*$/);
     if (!m) continue;
     const [, formType, companyName, cik, rawDate, fileName] = m;
@@ -120,8 +121,8 @@ export type RelatedPerson = {
   stateOrCountry: string | null;
   /**
    * True when the "person" is really an entity (fund LLC, holding company).
-   * Prefer FALSE SPLITS over FALSE MERGES (DESIGN_RATIONALE §8): an entity
-   * wrongly stored as a person would generate warm paths that do not exist.
+   * False splits are the cheaper error here (DESIGN_RATIONALE §8): an entity
+   * stored as a person generates warm paths that do not exist.
    */
   isLikelyEntity: boolean;
 };
@@ -140,7 +141,7 @@ export type FormDFiling = {
   entityType: string | null;
   yearOfInc: string | null;
   industryGroup: string | null;
-  /** As filed. NOT cumulative funding — see honesty rule 2. */
+  /** As filed. Not cumulative funding — see limit 2 in the header. */
   totalOfferingAmount: number | null;
   totalAmountSold: number | null;
   /** equity | debt | pooled_fund | option_warrant_other | other */
@@ -186,8 +187,8 @@ export async function fetchFiling(cik: string, accession: string): Promise<FormD
   for (const b of allBlocks(tag(xml, 'relatedPersonsList') ?? '', 'relatedPersonInfo')) {
     const nameBlock = tag(b, 'relatedPersonName') ?? '';
     // EDGAR uses 'N/A' as a firstName placeholder when the related person is an
-    // ENTITY (a fund LLC filing as promoter), not a human. Strip the placeholder
-    // and flag the row so callers can avoid creating people rows for entities.
+    // entity rather than a human — a fund LLC filing as promoter, say. Strip the
+    // placeholder and flag the row so callers keep entities out of `people`.
     const parts = [tag(nameBlock, 'firstName'), tag(nameBlock, 'middleName'), tag(nameBlock, 'lastName')]
       .filter((p): p is string => !!p && p.length > 0 && p.toUpperCase() !== 'N/A');
     const name = parts.join(' ').replace(/\s+/g, ' ').trim();
