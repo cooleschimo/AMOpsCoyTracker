@@ -98,7 +98,10 @@ export async function tryDomain(domain: string, companyName: string): Promise<Si
   const title = (html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] ?? '').trim() || null;
   const description = meta(html, 'description') ?? meta(html, 'og:description');
   const text = stripHtml(html).slice(0, 4000);
-  const hay = `${title ?? ''} ${description ?? ''} ${text}`.toLowerCase();
+  // Fold accents before matching: darebioscience.com renders "Daré Bioscience",
+  // so a plain lowercase compare missed its own name.
+  const fold = (x: string) => x.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+  const hay = fold(`${title ?? ''} ${description ?? ''} ${text}`);
 
   // Reject obvious dead ends.
   const dead = /^(404|not found|page not found|domain (is )?for sale|buy this domain|coming soon|under construction)/i;
@@ -118,7 +121,7 @@ export async function tryDomain(domain: string, companyName: string): Promise<Si
   }
 
   // Distinctive tokens from the company name (>=4 chars, not generic).
-  const tokens = companyName.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+  const tokens = fold(companyName).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
     .filter((w) => w.length >= 4 && !STOP.has(w));
   if (!tokens.length) {
     return { domain, title, description, text, verified: false, thin: true, verifyReason: 'no distinctive tokens in company name' };
@@ -157,11 +160,46 @@ export async function tryDomain(domain: string, companyName: string): Promise<Si
   };
 }
 
-/** Try candidates in order; return the first VERIFIED hit. */
-export async function resolveWebsite(companyName: string): Promise<SiteResult | null> {
+/**
+ * Words that say what a business DOES. If the company's known industry and the
+ * site's own copy disagree on this, the name match is a coincidence.
+ */
+const INDUSTRY_WORDS: Record<string, RegExp> = {
+  biotech: /\b(biotech|therapeutic|clinical|pharma|drug|patient|medical|diagnos|molecul|gene|cell|trial|disease|health)\b/i,
+  agency: /\b(agency|marketing|branding|advertis|creative studio|web design|seo|social media)\b/i,
+  software: /\b(software|platform|api|saas|app|developer|cloud|data)\b/i,
+  hardware: /\b(hardware|semiconductor|chip|device|sensor|robot|manufactur|materials)\b/i,
+};
+
+/**
+ * Try candidates in order; return the first VERIFIED hit.
+ *
+ * `expectedIndustry` guards against same-name different-company matches. Real
+ * case: AMPLIFICA HOLDINGS GROUP is a biotech (per its Form D industry group),
+ * but amplifica.com is a digital agency. The name matched perfectly and the
+ * page was real, so every other check passed — only the mismatch between
+ * "Biotechnology" and "digital agency" catches it.
+ */
+export async function resolveWebsite(companyName: string, expectedIndustry?: string | null): Promise<SiteResult | null> {
   for (const d of candidateDomains(companyName)) {
     const r = await tryDomain(d, companyName);
-    if (r?.verified) return r;
+    if (r?.verified) {
+      if (expectedIndustry) {
+        const hay = `${r.title ?? ''} ${r.description ?? ''} ${r.text}`;
+        const expectBio = /biotech|health|pharma|medical|life science/i.test(expectedIndustry);
+        // REQUIRE positive corroboration, do not merely check for a contradiction.
+        // Both amplifica.com (a US marketing agency) and amplifica.io (a Chilean
+        // logistics firm) matched the name "AMPLIFICA" perfectly and served real
+        // pages. Only demanding biotech language on the page rejects both. A
+        // generic name will always match SOME company; absence of a wrong signal
+        // is not presence of the right one.
+        if (expectBio && !INDUSTRY_WORDS.biotech.test(hay)) {
+          await new Promise((res) => setTimeout(res, 120));
+          continue;
+        }
+      }
+      return r;
+    }
     await new Promise((res) => setTimeout(res, 120)); // be polite
   }
   return null;

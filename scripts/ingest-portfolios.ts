@@ -44,6 +44,7 @@ const arg = (n: string, d?: string) => {
     funds_attempted: 0, funds_ok: 0, funds_failed: 0, funds_zero_parse: 0,
     names_found: 0, companies_created: 0, companies_matched: 0,
     excluded_hits: 0, investments_created: 0, sg_links_created: 0,
+    domains_found: 0, domains_backfilled: 0,
   };
   const failures: string[] = [];
 
@@ -84,6 +85,7 @@ const arg = (n: string, d?: string) => {
     }
     counts.funds_ok++;
     counts.names_found += res.names.length;
+    counts.domains_found += Object.keys(res.domains).length;
     console.log(`  ✓ ${fund.name}: ${res.names.length} names [${res.strategy}]`);
     if (dry) continue;
 
@@ -107,6 +109,9 @@ const arg = (n: string, d?: string) => {
       orgId = o.id;
     }
 
+    // Domains recovered from the page, keyed by the same name text.
+    const domainFor = (n: string): string | null => res.domains[n] ?? null;
+
     for (const name of res.names) {
       const norm = normalizeCompanyName(name);
       if (!norm) continue;
@@ -114,13 +119,25 @@ const arg = (n: string, d?: string) => {
       const hit = guardIndex.get(norm);
       if (hit) { counts.excluded_hits++; continue; }   // tag, don't add
 
+      const site = domainFor(name);
+
       let companyId: number;
-      const found = await db.select({ id: companies.id }).from(companies)
-        .where(eq(companies.normalizedName, norm)).limit(1);
-      if (found.length) { companyId = found[0].id; counts.companies_matched++; }
+      const found = await db.select({ id: companies.id, website: companies.website })
+        .from(companies).where(eq(companies.normalizedName, norm)).limit(1);
+      if (found.length) {
+        companyId = found[0].id;
+        counts.companies_matched++;
+        // Backfill a website we did not have. Never overwrite an existing one:
+        // a portfolio page can link to a redirect or an acquirer.
+        if (site && !found[0].website) {
+          await db.update(companies).set({ website: site }).where(eq(companies.id, companyId));
+          counts.domains_backfilled++;
+        }
+      }
       else {
         const [c] = await db.insert(companies).values({
           name, normalizedName: norm,
+          website: site,
           // The fund's sector tags describe the FUND, not this company.
           sectors: [],
           accountStatus: 'unknown',
