@@ -1,13 +1,24 @@
 /**
  * Company-level assessment. Brief §7a.
  *
- * Batches 10-15 companies per call (brief §7). Verified Groq free-tier TPM is
- * 8,000, so batch size is capped to stay under it including the system prompt.
+ * Batches 10-15 companies per call (brief §7). The Groq free tier allows 8,000
+ * tokens per minute, so the batch size is capped to stay under that with the
+ * system prompt included.
  *
- * SAFETY: one malformed response must never kill a run. lib/llm.ts returns
- * null rather than throwing; a failed batch is logged and the run continues.
+ * A malformed response costs one batch, not the run: lib/llm.ts returns null
+ * rather than throwing, and the failed batch is logged and skipped.
  *
  * Usage: npx tsx scripts/assess-companies.ts [--limit N] [--batch 12] [--dry] [--force]
+ *        npx tsx scripts/assess-companies.ts --with-signals
+ *
+ * --with-signals targets companies that have a SCORED ITEM at 2 or better and
+ * no assessment yet. This is the set the digest actually needs: brief §7a
+ * places items by a MATRIX of the item score and the company assessment, and
+ * without the second axis a large raise at an out-of-scope company outranks
+ * silence at a strategically important one — the exact failure §7a exists to
+ * prevent. The default targeting (Form D discoveries with no sectors) never
+ * reaches the seed watchlist, so before this flag 1 of 56 companies with a
+ * live signal had an assessment.
  */
 import '../lib/loadenv';
 import { eq, sql, and, isNull, or } from 'drizzle-orm';
@@ -40,17 +51,31 @@ type Assessment = {
   const dry = flag('dry');
   const force = flag('force');
 
-  // Target: in-scope Form D discoveries with no sectors yet — the genuinely
-  // ambiguous set left after the EDGAR industry mapping.
-  const pending = await db.select({
-    id: companies.id, name: companies.name, hqState: companies.hqState,
-    website: companies.website, description: companies.description,
-  }).from(companies)
-    .where(and(
-      eq(companies.discoveredVia, 'form_d'),
-      eq(companies.scopeStatus, 'in_scope'),
-      force ? sql`true` : or(isNull(companies.sectors), sql`array_length(${companies.sectors}, 1) is null`),
-    ));
+  const withSignals = flag('with-signals');
+
+  // Default target: in-scope Form D discoveries with no sectors yet — the
+  // genuinely ambiguous set left after the EDGAR industry mapping.
+  // --with-signals: any company holding a scored item at 2+ and no assessment.
+  const pending = withSignals
+    ? await db.select({
+        id: companies.id, name: companies.name, hqState: companies.hqState,
+        website: companies.website, description: companies.description,
+      }).from(companies)
+        .where(and(
+          sql`exists (select 1 from scores sc join items it on it.id = sc.item_id
+                      where it.company_id = ${companies.id} and sc.score >= 2)`,
+          force ? sql`true` : sql`not exists (select 1 from company_assessments ca
+                      where ca.company_id = ${companies.id})`,
+        ))
+    : await db.select({
+        id: companies.id, name: companies.name, hqState: companies.hqState,
+        website: companies.website, description: companies.description,
+      }).from(companies)
+        .where(and(
+          eq(companies.discoveredVia, 'form_d'),
+          eq(companies.scopeStatus, 'in_scope'),
+          force ? sql`true` : or(isNull(companies.sectors), sql`array_length(${companies.sectors}, 1) is null`),
+        ));
 
   const targets = limit ? pending.slice(0, limit) : pending;
   console.log(`${targets.length} companies pending assessment (batch size ${batchSize})`);
@@ -111,9 +136,9 @@ type Assessment = {
           rationale: a.rationale ?? null,
           model: res.model, rubricVersion: COMPANY_RUBRIC_VERSION,
         });
-        // Only write sectors when the model actually found some. An empty result
-        // means "not in scope", which scope_status records — we do not overwrite
-        // a real classification with silence.
+        // Sectors are written only when the model found some. An empty result
+        // means "not in scope", which scope_status is what records; a real
+        // classification keeps its value rather than being replaced by silence.
         if (sectors.length) {
           await db.update(companies).set({ sectors }).where(eq(companies.id, target.id));
         } else {

@@ -1,9 +1,9 @@
 /**
  * Verify every portfolioUrl in lib/funds.ts, and check robots.txt.
  *
- * funds.ts says the URLs are BEST-EFFORT FROM MEMORY and that a 404 or empty
- * parse must be a source-health event, not a silent skip. This checks them
- * before any scraping is attempted, so failures are known rather than guessed.
+ * The URLs in funds.ts are best-effort from memory, and a 404 or an empty parse
+ * is a source-health event there. Running this before any scraping turns those
+ * failures into a known list rather than a guess.
  *
  * Usage: npx tsx scripts/check-fund-urls.ts
  */

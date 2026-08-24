@@ -1,24 +1,23 @@
 /**
  * ACRA open data (data.gov.sg). Brief §5.3, build step 6.
  *
- * VERIFIED 2026-08-24: the CKAN datastore_search endpoint works and returns
- * uen, entity_name, entity_status_description and registration_incorporation_date.
- * Datasets are split alphabetically by the entity's first character, one
- * dataset per letter, refreshed monthly.
+ * The CKAN datastore_search endpoint returns uen, entity_name,
+ * entity_status_description and registration_incorporation_date. Datasets are
+ * split alphabetically by the entity's first character, one dataset per letter,
+ * refreshed monthly.
  *
- * TWO CONSTRAINTS FROM THE BRIEF, both load-bearing:
+ * Two constraints shape everything below:
  *
- * 1. COMPANY-LEVEL MATCHING ONLY. The published fields are UEN, entity name,
- *    address, activity classification and officer COUNTS — not officer names.
- *    Person-level matching against ACRA is therefore not viable and MUST NOT be
- *    attempted: a name-and-address heuristic would produce noise dressed as
- *    signal (§5.3, DESIGN_RATIONALE §14).
+ * 1. Matching is company-level. The published fields are UEN, entity name,
+ *    address, activity classification and officer counts — officer names are not
+ *    among them, so person-level matching has nothing to match on and a
+ *    name-and-address heuristic would produce noise dressed as signal (§5.3,
+ *    DESIGN_RATIONALE §14).
  *
- * 2. A REGISTRATION IS NOT OPERATIONAL PRESENCE. Every match carries its
- *    match_status (confirmed vs probable), the ACRA entity status, and the
- *    incorporation date, because a struck-off shelf entity and a live operating
- *    subsidiary are different facts and the digest must not flatten them into
- *    sg_entity = true.
+ * 2. A registration is not operational presence. Every match carries its
+ *    match_status (confirmed vs probable), the ACRA entity status and the
+ *    incorporation date, so a struck-off shelf entity and a live operating
+ *    subsidiary stay distinguishable in the digest.
  */
 
 const CKAN = 'https://data.gov.sg/api/action/datastore_search';
@@ -28,10 +27,9 @@ const UA = 'Mozilla/5.0 (compatible; AMOpsCoyTracker/1.0; +research)';
  * Dataset id per leading character. ACRA publishes one file per letter plus an
  * "Others" file for names starting with a digit or symbol.
  *
- * Enumerated 2026-08-24 from collection 2 ("ACRA Information on Corporate
- * Entities"), which lists all 27 child datasets — paginating /datasets does NOT
- * surface them all. Ids are stable, but a 404 must be a source-health event,
- * never a silent skip.
+ * The ids come from collection 2 ("ACRA Information on Corporate Entities"),
+ * which lists all 27 child datasets; paginating /datasets surfaces only some of
+ * them. Ids are stable, and a 404 is recorded as a source-health event.
  */
 export const ACRA_DATASETS: Record<string, string> = {
   A: 'd_8575e84912df3c28995b8e6e0e05205a',
@@ -119,7 +117,7 @@ export function matchStrength(
   companyName: string,
   acraName: string,
   /**
-   * How many DIFFERENT registry entities share this company's identity token.
+   * How many distinct registry entities share this company's identity token.
    * The only trustworthy distinctiveness signal available — see the note on
    * `distinctive` below. Omit when unknown; the caller's ambiguity guard then
    * does the work.
@@ -152,15 +150,14 @@ export function matchStrength(
   /**
    * Is the identity distinctive enough to match on alone?
    *
-   * Length was the first attempt and it fails: "decagon" (7) and "parallel" (8)
-   * are ordinary words, while "figma" (5) is coined. A dictionary check fails
-   * too, in the other direction — "anthropic", "perplexity" and "cognition" are
-   * all real English words that are nonetheless unmistakable company names.
+   * The string itself cannot answer this. Length does not track it: "decagon"
+   * (7) and "parallel" (8) are ordinary words while "figma" (5) is coined. Nor
+   * does a dictionary check, in the other direction — "anthropic", "perplexity"
+   * and "cognition" are all real English words and unmistakable company names.
    *
-   * There is no reliable way to judge this from the STRING. The honest signal
-   * is how many entities in the registry share the identity, which the caller
-   * measures and passes in. Absent that count we fall back to length, and the
-   * caller's ambiguity guard catches what slips through.
+   * The honest signal is how many entities in the registry share the identity,
+   * which the caller measures and passes in. Absent that count this falls back
+   * to length, and the caller's ambiguity guard catches what slips through.
    */
   const distinctive = (id: string) => {
     if (collisions !== undefined) return collisions <= 2;
@@ -171,7 +168,7 @@ export function matchStrength(
   if (cIdc === aIdc) {
     // Did ACRA add descriptive words the company does not use? "DECAGON
     // CONSULTING" vs "Decagon", "TWELVE DATA" vs "Twelve Labs". Both reduce to
-    // the same identity, so this check must come BEFORE declaring a match.
+    // the same identity, so this check comes before declaring a match.
     const cDesc = cTokens.filter((t) => DESCRIPTIVE.test(t));
     const aDesc = aTokens.filter((t) => DESCRIPTIVE.test(t));
     const addedDescriptive = aDesc.filter((d) => !cDesc.includes(d));
@@ -221,10 +218,10 @@ export function matchStrength(
  * Look a company up across ACRA. Tries the dataset for the company's first
  * letter, plus "Others" when the name starts with a digit or symbol.
  *
- * Returns ALL plausible matches with their strength; the caller decides.
- * Deliberately does not pick a winner: a company can legitimately have several
- * Singapore entities (holding, sales, R&D), and collapsing them would lose the
- * distinction between a live subsidiary and a struck-off shell.
+ * Returns every plausible match with its strength and leaves the choice to the
+ * caller. A company can legitimately have several Singapore entities (holding,
+ * sales, R&D), and collapsing them would lose the distinction between a live
+ * subsidiary and a struck-off shell.
  */
 export async function lookupCompany(companyName: string): Promise<Array<AcraEntity & { match: 'confirmed' | 'probable' }>> {
   const fold = (x: string) => x.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
@@ -234,21 +231,20 @@ export async function lookupCompany(companyName: string): Promise<Array<AcraEnti
   const first = cleaned[0].toUpperCase();
   const datasetIds = [ACRA_DATASETS[first], ACRA_DATASETS.Others].filter(Boolean);
 
-  // Query EACH distinctive token separately and merge.
+  // Query each distinctive token separately and merge the results.
   //
-  // Measured 2026-08-24: ACRA's search over-constrains on multi-token queries.
-  // "sambanova systems" returned nothing while "SAMBANOVA" found the entity;
-  // "anduril industries" missed three Anduril entities. But picking a single
-  // token by length also fails — it chose "industries" over "anduril" and
-  // "databricks" lost to nothing at all. Querying each token and filtering the
-  // union with matchStrength() is the only approach that held across all cases.
+  // ACRA's search over-constrains on multi-token queries: "sambanova systems"
+  // returns nothing while "SAMBANOVA" finds the entity, and "anduril
+  // industries" misses three Anduril entities. Picking a single token by length
+  // fails too — it chooses "industries" over "anduril". Querying each token and
+  // filtering the union with matchStrength() is what holds across all cases.
   const SUFFIX = new Set(['inc','llc','ltd','corp','limited','incorporated','company','co','the','group','holdings','technologies','technology','labs','systems','solutions','industries','international','global','ventures','partners','capital','ai','io']);
   const tokens = cleaned.split(/\s+/).filter((t) => t.length >= 4 && !SUFFIX.has(t));
   if (!tokens.length) return [];
 
-  // Gather candidates first, THEN judge. The collision count — how many
+  // Gather candidates first, then judge. The collision count — how many
   // distinct registry entities share this identity — is the only trustworthy
-  // distinctiveness signal, and it can only be known after the fetch.
+  // distinctiveness signal, and it is knowable only after the fetch.
   const candidates: AcraEntity[] = [];
   const seenUen = new Set<string>();
   for (const id of datasetIds) {
@@ -267,12 +263,12 @@ export async function lookupCompany(companyName: string): Promise<Array<AcraEnti
     const m = matchStrength(companyName, e.name, collisions);
     if (m) out.push({ ...e, match: m });
   }
-  // AMBIGUITY GUARD. A short, common-word name matches many unrelated entities:
+  // Ambiguity guard. A short, common-word name matches many unrelated entities:
   // "Harvey" returns HARVEY NORMAN (an Australian retailer), HARVEY
   // CONSTRUCTION, HARVEY BUILDERS. Name-only resolution cannot separate these,
-  // and asserting a Singapore entity that is not the company is exactly the
-  // false fact an RD would repeat to a founder (DESIGN_RATIONALE §8). Better to
-  // return nothing and let a human check.
+  // and a wrongly asserted Singapore entity is the kind of false fact an RD
+  // would repeat to a founder (DESIGN_RATIONALE §8), so this returns nothing and
+  // leaves it to a human.
   if (out.length > 4) {
     const core = cleaned.replace(/\s+/g, '');
     if (core.length < 10) {

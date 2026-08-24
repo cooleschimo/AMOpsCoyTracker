@@ -2,17 +2,17 @@
  * People scraping from fund team pages and company team pages.
  *
  * Two modes:
- *   --funds      fund team pages -> people + AFFILIATIONS (person -> organization)
- *   --companies  company team pages -> people + ROLES (person -> company)
+ *   --funds      fund team pages -> people + affiliations (person -> organization)
+ *   --companies  company team pages -> people + roles (person -> company)
  *
- * WHY FUNDS FIRST: brief §5.1 and DESIGN_RATIONALE §8 are explicit that a Form D
- * director proves a board seat, NOT a fund affiliation — the person->fund edge
- * needs independent evidence, "normally the fund's team page". This script
- * produces exactly that second edge, which is what turns an association into a
+ * Funds come first because a Form D director proves a board seat rather than a
+ * fund affiliation (brief §5.1, DESIGN_RATIONALE §8). The person->fund edge
+ * needs independent evidence, normally the fund's team page, and this script
+ * produces that second edge — the one that turns an association into a
  * checkable path.
  *
- * Every edge carries source and source_url. Nothing is deleted; re-seen people
- * are matched, not duplicated.
+ * Every edge carries source and source_url, and re-seen people are matched
+ * rather than duplicated.
  *
  * Usage:
  *   npx tsx scripts/ingest-people.ts --funds [--limit N]
@@ -32,7 +32,7 @@ const arg = (n: string, d?: string) => {
 };
 const flag = (n: string) => process.argv.includes(`--${n}`);
 
-/** Find a person within a scope, or create. Prefers false splits over merges. */
+/** Find a person within a scope, or create one. False splits beat false merges. */
 async function upsertPerson(name: string): Promise<{ id: number; created: boolean }> {
   const db = getDb();
   const norm = normalizePersonName(name);
@@ -112,7 +112,7 @@ async function doCompanies(limit: number, dry: boolean) {
   const db = getDb();
   const counts = { tried: 0, sites_ok: 0, sites_zero: 0, people_created: 0, people_matched: 0, roles_created: 0 };
 
-  // Only companies that have a website AND no people yet.
+  // Only companies that have a website and no people yet.
   const targets = await withRetry(() => db.select({ id: companies.id, name: companies.name, website: companies.website })
     .from(companies)
     .where(and(

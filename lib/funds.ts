@@ -1,20 +1,20 @@
 /**
  * Seed fund list for portfolio scraping.
  *
- * HOW TO READ THIS FILE:
+ * Reading the fields:
  * - `tier: 'mega'` funds are high-volume, low-signal: they enrich the graph but
  *   their edges get the hub-node degree discount. `tier: 'specialist'` funds are
  *   where discovery value lives — a new name on Lux's page means more than a new
  *   name on a16z's.
  * - `sgLinked: true` funds matter doubly: membership in their portfolio is itself
  *   an sg_link and a warm-path input, not just an investment edge.
- * - portfolioUrl values are BEST-EFFORT FROM MEMORY and sites restructure often.
- *   Verify every URL at build time; the scraper must treat a 404 or empty parse
- *   as a source-health event, not a silent skip.
- * - Check each site's robots.txt / ToS before scraping. Anything that prohibits
- *   it gets `scrape: false` and quarterly manual updates instead.
- * - Expect ~70% of these to be scrapable (clean HTML lists). JS-rendered pages
- *   may need the fetch to fall back to a manual snapshot.
+ * - portfolioUrl values are best-effort and these sites restructure often, so
+ *   each one is worth re-checking at build time. The scraper treats a 404 or an
+ *   empty parse as a source-health event rather than a silent skip.
+ * - `scrape: false` marks the sites whose robots.txt or ToS prohibits it, plus
+ *   the ones that block automated requests; those get quarterly manual updates.
+ * - Around 70% are scrapable as clean HTML lists. JS-rendered pages fall back to
+ *   a manual snapshot.
  */
 
 export type Fund = {
@@ -79,7 +79,7 @@ export const FUNDS: Fund[] = [
     portfolioUrl: 'https://shieldcap.com/portfolio/', scrape: true },
   { name: 'Razor\'s Edge Ventures', aliases: ['Razors Edge'], tier: 'specialist', sectors: ['defence_tech'],
     portfolioUrl: 'https://www.razorsedgeventures.com/portfolio', scrape: false,
-    notes: 'VERIFIED 2026-08-21: DNS/connection failure on both .com variants. scrape:false - see BLOCKERS.md.' },
+    notes: 'DNS/connection failure on both .com variants, so scrape:false - see BLOCKERS.md.' },
   { name: 'In-Q-Tel', aliases: ['IQT'], tier: 'specialist', sectors: ['defence_tech', 'deeptech'],
     portfolioUrl: 'https://www.iqt.org/portfolio/', scrape: true,
     notes: 'US intelligence-community strategic investor. An IQT edge is a strong ITAR/EAR flag: check export-control exposure before any outreach effort.' },
@@ -99,7 +99,7 @@ export const FUNDS: Fund[] = [
   // ── AI specialists ────────────────────────────────────────────────────────
   { name: 'Conviction', aliases: ['Conviction Partners'], tier: 'specialist', sectors: ['ai'],
     portfolioUrl: 'https://www.conviction.com/companies', scrape: false,
-    notes: 'VERIFIED 2026-08-21: 404, and no portfolio path found from the homepage. scrape:false until a working URL is confirmed - see BLOCKERS.md.' },
+    notes: '404, and no portfolio path found from the homepage. scrape:false until a working URL is confirmed - see BLOCKERS.md.' },
   { name: 'Basis Set Ventures', aliases: ['Basis Set'], tier: 'specialist', sectors: ['ai'],
     portfolioUrl: 'https://www.basisset.com/portfolio', scrape: true },
   { name: 'Radical Ventures', aliases: ['Radical'], tier: 'specialist', sectors: ['ai'],
@@ -115,7 +115,7 @@ export const FUNDS: Fund[] = [
   // ── Singapore-linked (portfolio membership feeds sg_links directly) ───────
   { name: 'EDBI', aliases: [], tier: 'specialist', sectors: ['generalist', 'deeptech', 'biotech'],
     portfolioUrl: 'https://www.edbi.com/portfolio', sgLinked: true, scrape: false,
-    notes: 'VERIFIED 2026-08-21: returns 403 to automated requests (all paths). scrape:false; needs a manual quarterly snapshot - and it matters most, being the warmest sg_link. See BLOCKERS.md. EDB\'s own investment arm. A US company in this portfolio already has a Singapore relationship — the warmest sg_link there is. Populate first.' },
+    notes: 'EDB\'s own investment arm, and the warmest sg_link available: a US company in this portfolio already has a Singapore relationship. Populate first. All paths return 403 to automated requests, so scrape:false and it needs a manual quarterly snapshot - see BLOCKERS.md.' },
   { name: 'Vertex Ventures US', aliases: ['Vertex US', 'Vertex Ventures'], tier: 'specialist',
     sectors: ['ai', 'deeptech'], portfolioUrl: 'https://vvus.com/portfolio/', sgLinked: true, scrape: true,
     notes: 'Temasek-anchored Vertex family. URL especially uncertain — verify.' },
@@ -126,23 +126,21 @@ export const FUNDS: Fund[] = [
     portfolioUrl: 'https://b.capital/portfolio/', sgLinked: true, scrape: true,
     notes: 'US–Asia crossover fund with Singapore presence.' },
 
-  // ── Singapore state investors (added 2026-08-24) ─────────────────────────
-  // These are the strongest Singapore signals in the system and previously
-  // existed only as incidental sg_apac tokens from the seed CSV, which made
-  // their graph degree misleadingly small (see lib/paths.ts degreeCoverage).
+  // ── Singapore state investors ─────────────────────────────────────────────
+  // The strongest Singapore signals in the system. They are listed as
+  // first-class organizations carrying sgPresence, which is what drives the
+  // warm-path base score; as bare sg_apac tokens from the seed CSV their graph
+  // degree comes out misleadingly small (see lib/paths.ts degreeCoverage).
   //
-  // Neither can be scraped, for a reason worth recording: they are sovereign
-  // funds, not VCs, and do not publish company-level portfolio lists.
-  // VERIFIED 2026-08-24: gic.com.sg/portfolio returns 200 but contains only
-  // navigation; temasek.com.sg returns 403 (Cloudflare). They are listed here
-  // so they exist as first-class organizations carrying sgPresence, which is
-  // what actually drives the warm-path base score.
+  // Neither is scrapable. They are sovereign funds rather than VCs and publish
+  // no company-level portfolio list: gic.com.sg/portfolio returns 200 with only
+  // navigation on it, and temasek.com.sg returns 403 from Cloudflare.
   { name: 'GIC', aliases: ['GIC Private Limited', 'Government of Singapore Investment Corporation'],
     tier: 'mega', sectors: ['generalist', 'ai', 'deeptech', 'biotech'],
     portfolioUrl: 'https://www.gic.com.sg/portfolio/', sgLinked: true, scrape: false,
-    notes: 'Singapore sovereign wealth fund. No company-level portfolio page (verified 2026-08-24: nav only). Edges arrive from seed research and news. A GIC edge is a genuine Singapore relationship.' },
+    notes: 'Singapore sovereign wealth fund. The site carries no company-level portfolio page, only nav, so edges arrive from seed research and news. A GIC edge is a genuine Singapore relationship.' },
   { name: 'Temasek', aliases: ['Temasek Holdings', 'Temasek International'],
     tier: 'mega', sectors: ['generalist', 'ai', 'deeptech', 'biotech'],
     portfolioUrl: 'https://www.temasek.com.sg/en/our-portfolio/our-investments', sgLinked: true, scrape: false,
-    notes: 'Singapore state investor. Site returns 403 to automated requests (verified 2026-08-24). Edges arrive from seed research and news. Among the warmest sg_links available.' },
+    notes: 'Singapore state investor. The site returns 403 to automated requests, so edges arrive from seed research and news. Among the warmest sg_links available.' },
 ];

@@ -1,27 +1,26 @@
 /**
  * Web search via Purili (https://puri.li/developer).
  *
- * WHY THIS ONE, chosen 2026-08-24 after testing the alternatives:
- *  - No API key, no credit card, no signup. Brave's free tier now requires a
- *    card; Tavily/Serper/Exa all require keys; SerpAPI and DataForSEO are paid.
- *  - 403M pages indexed, and it resolved the exact obscure private companies
- *    where domain construction failed (rapidflare.ai, emberlifesciences.com,
- *    bidbus.com).
- *  - Google/Bing scraping and headless-browser SERP access stay excluded: ToS,
- *    consistent with the LinkedIn exclusion in DESIGN_RATIONALE §14.
+ * It wins on access and on coverage of the long tail. There is no API key, no
+ * credit card and no signup, where Brave's free tier now requires a card,
+ * Tavily/Serper/Exa all require keys, and SerpAPI and DataForSEO are paid. Its
+ * 403M-page index resolved the obscure private companies where domain
+ * construction failed — rapidflare.ai, emberlifesciences.com, bidbus.com.
+ * Google/Bing scraping and headless-browser SERP access stay excluded on ToS
+ * grounds, consistent with the LinkedIn exclusion in DESIGN_RATIONALE §14.
  *
- * KNOWN LIMITS, measured not assumed:
+ * Measured limits:
  *  - The `site:` operator returns nothing, so this cannot verify a specific
  *    domain. Verification stays with lib/enrich.ts, which fetches the page.
- *  - `total` reports the same number (640) across unrelated queries — do not
- *    read it as a result count.
- *  - It is an unversioned experimental preview by a single developer. Treat it
- *    as a CONVENIENCE that improves coverage, never as something the pipeline's
- *    correctness depends on. Every call is wrapped so a failure degrades
- *    enrichment rather than breaking a run, and health is tracked so a quiet
+ *  - `total` reports the same number (640) across unrelated queries, so it is
+ *    not a result count.
+ *  - It is an unversioned experimental preview by a single developer, so it is a
+ *    convenience that improves coverage rather than something the pipeline's
+ *    correctness rests on. Every call is wrapped so a failure degrades
+ *    enrichment instead of breaking a run, and health is tracked so a quiet
  *    death shows up on /admin/sources.
  *
- * ORDER OF PREFERENCE for finding a company website (cheapest first):
+ * Finding a company website goes cheapest first:
  *   1. the fund's portfolio page, which usually links out  (free, no request)
  *   2. domain construction + verification (lib/enrich.ts)  (free, ~1 request)
  *   3. this                                                (1 request)
@@ -33,7 +32,7 @@ const UA = 'AMOpsCoyTracker/1.0 (research; contact via repo)';
 export type SearchHit = { title: string; url: string; displayUrl: string; description: string; host: string };
 
 let lastCall = 0;
-const MIN_GAP_MS = 700;   // deliberate politeness: the docs ask for light use
+const MIN_GAP_MS = 700;   // the docs ask for light use
 
 async function polite() {
   const wait = MIN_GAP_MS - (Date.now() - lastCall);
@@ -79,15 +78,14 @@ const NON_COMPANY = /(wikipedia|linkedin|crunchbase|pitchbook|bloomberg|reuters|
  * Find a company's own website.
  *
  * Conservative by design (DESIGN_RATIONALE §8: prefer no website to a wrong
- * one). A hit only counts when the HOST itself resembles the company name —
+ * one). A hit only counts when the host itself resembles the company name, since
  * a page merely mentioning the company is not its website.
  */
 export async function findCompanyWebsite(companyName: string): Promise<{ host: string; why: string } | null> {
-  // Query with the BARE name. Measured 2026-08-24: appending "official site"
-  // and keeping the legal suffix wrecks this index — "Rapidflare, Inc. official
-  // site" returned internationalwatchman.com and sierragamers.com, while plain
-  // "Rapidflare" returned rapidflare.ai first. Keyword search over a small
-  // index rewards fewer, rarer terms.
+  // Query with the bare name. Keyword search over a small index rewards fewer,
+  // rarer terms: "Rapidflare, Inc. official site" returns internationalwatchman
+  // .com and sierragamers.com, while plain "Rapidflare" returns rapidflare.ai
+  // first.
   const bare = companyName
     .replace(/,?\s+(inc|incorporated|llc|l\.l\.c|ltd|limited|corp|corporation|co|pbc|plc|lp|llp)\.?$/i, '')
     .trim();
@@ -122,13 +120,13 @@ export type CompanyResearch = {
   query: string;
   /** The company's own site, if a host matched the name. */
   website: { host: string; why: string } | null;
-  /** Pages that MENTION the company: news, investor pages, directories. */
+  /** Pages that mention the company: news, investor pages, directories. */
   mentions: SearchHit[];
   /** Hosts that look like investors (a fund's portfolio or "why we invested"). */
   investorHosts: SearchHit[];
   /** Concatenated descriptions, for feeding an LLM as context. */
   context: string;
-  /** True when results look unrelated - a generic name the index cannot resolve. */
+  /** True when the results look unrelated — a generic name the index cannot resolve. */
   looksAmbiguous: boolean;
 };
 
@@ -139,16 +137,15 @@ const NEWS_HINT = /(news|techcrunch|venturebeat|axios|forbes|businesswire|prnews
  * Broad research on a company: not just its website, but everything the index
  * knows that mentions it.
  *
- * This is the general-purpose retrieval the product owner asked for. The most
- * valuable results are often NOT the company's own site — searching
- * "Rapidflare" surfaced upekkha.io and struckcapital.com ("Why We Invested"),
- * i.e. two investors absent from lib/funds.ts, plus a PYMNTS article for
- * Bidbus. Those feed the graph directly.
+ * The most valuable results are often somewhere other than the company's own
+ * site. Searching "Rapidflare" surfaces upekkha.io and struckcapital.com ("Why
+ * We Invested") — two investors absent from lib/funds.ts — plus a PYMNTS article
+ * for Bidbus. Those feed the graph directly.
  *
- * AMBIGUITY IS REPORTED, NOT HIDDEN. A small index cannot disambiguate common-
- * word names: "Spectrum Effect" returns Caltech physics theses and After
- * Effects tutorials. When nothing references the company, looksAmbiguous is
- * true and callers must not treat the context as being about this company.
+ * Ambiguity is reported rather than hidden. A small index cannot disambiguate
+ * common-word names: "Spectrum Effect" returns Caltech physics theses and After
+ * Effects tutorials. When nothing references the company, looksAmbiguous is true
+ * and the context is not about this company.
  */
 export async function researchCompany(companyName: string): Promise<CompanyResearch> {
   const bare = companyName
@@ -182,10 +179,10 @@ export async function researchCompany(companyName: string): Promise<CompanyResea
   const investorHosts = mentions.filter((h) =>
     INVESTOR_HINT.test(h.host) || /invest/i.test(h.title) || /portfolio/i.test(h.url));
 
-  // A literal phrase match is NOT proof the page is about this company.
-  // Measured: "Spectrum Effect" matched After Effects tutorials and stock-photo
-  // pages, because the words appear verbatim. Require corroboration — either a
-  // host that resembles the name, or business language near the mention.
+  // A literal phrase match is not proof the page is about this company:
+  // "Spectrum Effect" matches After Effects tutorials and stock-photo pages,
+  // because the words appear verbatim. Corroboration is required — either a host
+  // that resembles the name, or business language near the mention.
   const BUSINESS_HINT = /\b(compan(y|ies)|startup|founded|headquarter|raise[ds]?|funding|round|seed|series [a-h]|investor|customers?|platform|technolog|inc\.|corp\.|llc)\b/i;
   const corroborated = onTopic.filter((h) => {
     const hostCompact = h.host.replace(/\.[a-z.]+$/, '').replace(/[^a-z0-9]/g, '');
@@ -198,8 +195,8 @@ export async function researchCompany(companyName: string): Promise<CompanyResea
     mentions,
     investorHosts,
     context: corroborated.map((h) => `${h.title} — ${h.description}`).join('\n').slice(0, 2000),
-    // Ambiguous when nothing corroborates that these pages concern a COMPANY of
-    // this name. Callers must not feed an ambiguous context to the assessment.
+    // Ambiguous when nothing corroborates that these pages concern a company of
+    // this name. An ambiguous context does not go to the assessment.
     looksAmbiguous: corroborated.length === 0,
   };
 }

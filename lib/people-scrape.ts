@@ -1,23 +1,22 @@
 /**
  * Person extraction from fund team pages and company about/team pages.
  *
- * WHY THIS EXISTS: Form D is currently the ONLY source of named people, so
- * 2,585 portfolio companies and 112 seed companies have zero people attached.
- * That guts the feature DESIGN_RATIONALE §8 says matters most — person-mediated
- * paths outrank organisation-mediated ones, because "Partner X sits on both
- * boards" is actionable while "both took money from the same fund" is not.
+ * Form D is the only other source of named people, and it leaves 2,585 portfolio
+ * companies and 112 seed companies with nobody attached. That costs the feature
+ * DESIGN_RATIONALE §8 rates highest — person-mediated paths outrank
+ * organisation-mediated ones, because "Partner X sits on both boards" is
+ * actionable where "both took money from the same fund" is not.
  *
- * WHAT THIS IS NOT: there is no free, reliable source of named people for
- * arbitrary private companies. LinkedIn is excluded in any form (§14, and
- * hiQ lost on breach of the user agreement). Crunchbase and PitchBook are
- * licensed. So this reads what companies and funds publish about THEMSELVES,
- * which is public, intended for reading, and robots-checked. Coverage will be
- * partial and that is expected — a fund team page is high-yield, a startup
- * with no /team page yields nothing.
+ * There is no free, reliable source of named people for arbitrary private
+ * companies. LinkedIn is excluded in any form (§14; hiQ lost on breach of the
+ * user agreement), and Crunchbase and PitchBook are licensed. So this reads what
+ * companies and funds publish about themselves: public, intended for reading,
+ * and robots-checked. Coverage is partial by nature — a fund team page is
+ * high-yield, a startup with no /team page yields nothing.
  *
- * FALSE-POSITIVE STANCE (§8): prefer missing a person to inventing one. A
- * fabricated person produces a warm path that does not exist. Every extracted
- * name must look like a human name AND sit near a role word.
+ * Missing a person costs less than inventing one (§8), since a fabricated person
+ * produces a warm path that does not exist. Every extracted name has to look
+ * like a human name and sit near a role word.
  */
 
 const UA = 'Mozilla/5.0 (compatible; AMOpsCoyTracker/1.0; +research)';
@@ -52,9 +51,9 @@ export function roleFromContext(ctx: string): { role: string; raw: string } | nu
 }
 
 /**
- * Title words. A candidate whose every word is a title word is a JOB TITLE, not
- * a name — "Executive Assistant" and "National Security" both passed the shape
- * test in testing (two capitalised words) and had to be excluded explicitly.
+ * Title words. A candidate made entirely of title words is a job title rather
+ * than a name: "Executive Assistant" and "National Security" both have the shape
+ * of a name (two capitalised words), so they need excluding by vocabulary.
  */
 const TITLE_WORDS = new Set([
   'executive','assistant','national','security','chief','officer','president','vice',
@@ -65,7 +64,7 @@ const TITLE_WORDS = new Set([
   'talent','people','platform','communications','legal','counsel','advisor','advisory',
   'board','member','emeritus','fellow','scientist','engineer','analyst','manager','intern',
   'human','resources','information','data','product','program','project','affairs','relations',
-  // Seen slipping through in testing 2026-08-24:
+  // Seen slipping through the shape test:
   'our','the','team','advisors','activist','environmental','entrepreneur','investor',
   'operator','builder','leader','expert','specialist','consultant','professor','author',
   'former','current','retired','co','and','of','at','in','for',
@@ -92,9 +91,9 @@ export function looksLikePersonName(raw: string): boolean {
   if (/\b(inc|llc|ltd|corp|corporation|company|capital|ventures|partners|fund|group|labs|technologies|holdings)\b/i.test(s)) return false;
   const words = s.split(' ');
   if (words.length < 2 || words.length > 4) return false;
-  // ANY title word disqualifies a 2-word candidate ("Our Advisors",
-  // "Environmental Activist"), because a real 2-word name contains neither.
-  // Longer names may legitimately contain a particle, so only require that the
+  // A single title word disqualifies a 2-word candidate ("Our Advisors",
+  // "Environmental Activist"), since a real 2-word name contains none. Longer
+  // names can legitimately carry a particle, so there the test is only that the
   // majority are not title words.
   const titleCount = words.filter((w) => TITLE_WORDS.has(w.toLowerCase().replace(/[^a-z]/g, ''))).length;
   if (words.length <= 2 ? titleCount > 0 : titleCount >= words.length - 1) return false;
@@ -150,19 +149,17 @@ export function extractPeople(html: string): { people: ScrapedPerson[]; rejected
     }
   }
 
-  // STRUCTURAL PASS: profile links.
+  // Structural pass: profile links.
   //
-  // This is far more reliable than any text heuristic, and was found by
-  // inspecting real markup: Khosla Ventures renders each partner as
+  // A link whose path sits under /team/, /people/, /our-team/ and so on is a
+  // person profile by construction, which makes this the most reliable signal
+  // available — Khosla Ventures, for instance, renders each partner as
   //   <a href="/team/vinod-khosla"><img alt="Vinod Khosla">
-  // A link whose PATH sits under /team/, /people/, /our-team/ etc. is a person
-  // profile by construction — no guessing about nearby role words. The name
-  // comes from the link text, the image alt, or the slug itself.
+  // The name comes from the link text, the image alt, or the slug itself.
   //
-  // Text heuristics kept failing here for a structural reason: marketing pages
-  // interleave nav labels ("Research Hub", "Focus Areas") with names in the
-  // same visual block, and no amount of stopword tuning separates them
-  // reliably. The URL path does.
+  // The path is doing work no text heuristic can: marketing pages interleave nav
+  // labels ("Research Hub", "Focus Areas") with names in the same visual block,
+  // and stopword tuning does not separate the two reliably.
   const profileLinks = [...clean.matchAll(
     /<a\s[^>]*href=["']([^"']*\/(?:team|people|our-team|leadership|partners|staff|founders)\/[^"'?#]+)["'][^>]*>([\s\S]{0,300}?)<\/a>/gi,
   )];

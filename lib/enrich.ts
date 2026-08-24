@@ -1,22 +1,22 @@
 /**
  * Website resolution and content extraction for companies with no public profile.
  *
- * WHY THIS EXISTS: Form D carries no website, SIC code or description (verified
- * against data.sec.gov — those fields populate only for public reporting
- * companies). Without a website the assessment is judging a name and a city,
- * and it correctly answers 'unknown'.
+ * Form D carries no website, SIC code or description — on data.sec.gov those
+ * fields populate only for public reporting companies. With no website the
+ * assessment is judging a name and a city, and it correctly answers 'unknown'.
  *
- * WHY NOT A SEARCH API: tested 2026-08-21 — DuckDuckGo's HTML endpoint blocks
- * automation ('anomaly' page), its Instant Answer API returns empty for private
- * companies, Mojeek 403s, and public SearXNG instances disable JSON output.
- * Google/Bing/Brave all require paid keys. Domain construction plus verification
- * needs no key, no quota and no ToS risk, and is MORE reliable for this specific
- * task because these companies have near-zero search presence anyway.
+ * Resolution works by constructing candidate domains and verifying them rather
+ * than by searching. The free search paths are all closed: DuckDuckGo's HTML
+ * endpoint blocks automation with an 'anomaly' page, its Instant Answer API
+ * returns empty for private companies, Mojeek 403s, public SearXNG instances
+ * disable JSON output, and Google, Bing and Brave all require paid keys. Domain
+ * construction needs no key, no quota and no ToS risk, and suits these companies
+ * particularly well because they have near-zero search presence anyway.
  *
- * FALSE-POSITIVE STANCE (DESIGN_RATIONALE §8): a wrong website is worse than no
- * website, because it feeds a confident wrong assessment. Every candidate must
- * pass verification (the page must actually reference the company) before it is
- * accepted, and every accepted domain records how it was found.
+ * A wrong website is worse than no website, since it feeds a confident wrong
+ * assessment (DESIGN_RATIONALE §8). Every candidate has to pass verification —
+ * the page must actually reference the company — before it is accepted, and
+ * every accepted domain records how it was found.
  */
 
 const STOP = new Set(['inc', 'corp', 'corporation', 'llc', 'ltd', 'limited', 'lp', 'llp',
@@ -76,8 +76,8 @@ const meta = (html: string, name: string): string | null => {
 
 /**
  * Fetch a candidate and decide whether it really belongs to this company.
- * Verification: a distinctive token from the company name must appear in the
- * page, OR the page title must contain it. Parked pages and 404s are rejected.
+ * Verification takes a distinctive token from the company name appearing in the
+ * page, or the page title containing it. Parked pages and 404s are rejected.
  */
 export async function tryDomain(domain: string, companyName: string): Promise<SiteResult | null> {
   let html: string;
@@ -99,7 +99,7 @@ export async function tryDomain(domain: string, companyName: string): Promise<Si
   const description = meta(html, 'description') ?? meta(html, 'og:description');
   const text = stripHtml(html).slice(0, 4000);
   // Fold accents before matching: darebioscience.com renders "Daré Bioscience",
-  // so a plain lowercase compare missed its own name.
+  // which a plain lowercase compare will not match against its own name.
   const fold = (x: string) => x.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
   const hay = fold(`${title ?? ''} ${description ?? ''} ${text}`);
 
@@ -110,8 +110,8 @@ export async function tryDomain(domain: string, companyName: string): Promise<Si
   }
 
   // Parked / domain-broker pages. These pass a naive name check because the
-  // broker echoes the domain back at you. Caught in testing: aevos.com sold
-  // 'Premium domains add authority to your site' as if it were company copy.
+  // broker echoes the domain back at you — aevos.com serves 'Premium domains
+  // add authority to your site', which reads exactly like company copy.
   const parked = /(premium domains?|domain (is )?for sale|buy this domain|whois privacy|make an offer|this domain is available|godaddy|sedo|dan\.com|afternic|hugedomains|namecheap market)/i;
   if (parked.test(`${title ?? ''} ${description ?? ''} ${text.slice(0, 800)}`)) {
     return { domain, title, description, text, verified: false, thin: true, verifyReason: 'parked / domain-for-sale page' };
@@ -128,10 +128,10 @@ export async function tryDomain(domain: string, companyName: string): Promise<Si
   }
   const hits = tokens.filter((t) => hay.includes(t));
 
-  // ALL distinctive tokens must appear. One-token overlap is how
-  // "Standard Cognition" matched standard.com (an insurance company) in
-  // testing — a single generic word is not evidence of identity, and a wrong
-  // website feeds a confident wrong assessment (DESIGN_RATIONALE §8).
+  // Every distinctive token has to appear. A single generic word is not
+  // evidence of identity — one-token overlap is enough to match "Standard
+  // Cognition" to standard.com, an insurance company — and a wrong website
+  // feeds a confident wrong assessment (DESIGN_RATIONALE §8).
   const allPresent = hits.length === tokens.length;
 
   // The full name appearing contiguously is the strongest signal available.
@@ -140,12 +140,9 @@ export async function tryDomain(domain: string, companyName: string): Promise<Si
 
   const verified = allPresent || contiguous;
 
-  // A verified name match is NOT proof of a useful page. Two distinct cases the
-  // caller must be able to tell apart, both found in testing:
+  // A verified name match still leaves two cases the caller has to tell apart:
   //  - contentful : real company copy the assessment can judge
-  //  - thin       : the domain exists and echoes the name, but says nothing
-  //                 (universalgrapheneproducts.com: title = the domain, no
-  //                 description, body just repeats the name). Verified, useless.
+  //  - thin       : the domain exists and echoes the name but says nothing.
   const uniqueWords = new Set(text.toLowerCase().split(/\s+/).filter((w) => w.length > 3));
   const thin = !description && uniqueWords.size < 40;
 
@@ -161,8 +158,8 @@ export async function tryDomain(domain: string, companyName: string): Promise<Si
 }
 
 /**
- * Words that say what a business DOES. If the company's known industry and the
- * site's own copy disagree on this, the name match is a coincidence.
+ * Words that say what a business does. Where the company's known industry and
+ * the site's own copy disagree on this, the name match is a coincidence.
  */
 const INDUSTRY_WORDS: Record<string, RegExp> = {
   biotech: /\b(biotech|therapeutic|clinical|pharma|drug|patient|medical|diagnos|molecul|gene|cell|trial|disease|health)\b/i,
@@ -172,13 +169,13 @@ const INDUSTRY_WORDS: Record<string, RegExp> = {
 };
 
 /**
- * Try candidates in order; return the first VERIFIED hit.
+ * Try candidates in order and return the first verified hit.
  *
- * `expectedIndustry` guards against same-name different-company matches. Real
- * case: AMPLIFICA HOLDINGS GROUP is a biotech (per its Form D industry group),
- * but amplifica.com is a digital agency. The name matched perfectly and the
- * page was real, so every other check passed — only the mismatch between
- * "Biotechnology" and "digital agency" catches it.
+ * `expectedIndustry` guards against same-name different-company matches.
+ * AMPLIFICA HOLDINGS GROUP files as a biotech, while amplifica.com is a digital
+ * agency: the name matches perfectly and the page is real, so every other check
+ * passes and only the mismatch between "Biotechnology" and "digital agency"
+ * catches it.
  */
 export async function resolveWebsite(companyName: string, expectedIndustry?: string | null): Promise<SiteResult | null> {
   for (const d of candidateDomains(companyName)) {
@@ -187,12 +184,11 @@ export async function resolveWebsite(companyName: string, expectedIndustry?: str
       if (expectedIndustry) {
         const hay = `${r.title ?? ''} ${r.description ?? ''} ${r.text}`;
         const expectBio = /biotech|health|pharma|medical|life science/i.test(expectedIndustry);
-        // REQUIRE positive corroboration, do not merely check for a contradiction.
-        // Both amplifica.com (a US marketing agency) and amplifica.io (a Chilean
-        // logistics firm) matched the name "AMPLIFICA" perfectly and served real
-        // pages. Only demanding biotech language on the page rejects both. A
-        // generic name will always match SOME company; absence of a wrong signal
-        // is not presence of the right one.
+        // The test is positive corroboration rather than absence of a
+        // contradiction. A generic name will always match some company:
+        // amplifica.com (a US marketing agency) and amplifica.io (a Chilean
+        // logistics firm) both match "AMPLIFICA" perfectly and serve real
+        // pages, and only demanding biotech language on the page rejects them.
         if (expectBio && !INDUSTRY_WORDS.biotech.test(hay)) {
           await new Promise((res) => setTimeout(res, 120));
           continue;

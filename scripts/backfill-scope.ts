@@ -1,9 +1,9 @@
 /**
  * Reclassify already-ingested Form D companies through lib/edgar-industry.ts.
  *
- * Companies routed to 'organization' are MOVED, not deleted: an organizations
- * row is created and the company row is marked scope_status='moved_to_org' so
- * nothing disappears and the decision stays auditable.
+ * Companies routed to 'organization' are moved: an organizations row is created
+ * and the company row is marked scope_status='moved_to_org', which keeps the
+ * decision auditable and the original row intact.
  */
 import '../lib/loadenv';
 import { eq } from 'drizzle-orm';

@@ -1,18 +1,17 @@
 /**
  * VC portfolio page scraping. Brief §5.2.
  *
- * TWO PAYOFFS:
+ * Two payoffs:
  *  - Discovery: new names on a portfolio page are new investments, often before
  *    announcement.
- *  - The REVERSE INDEX: inverting investor -> company answers the question that
+ *  - The reverse index: inverting investor -> company answers the question that
  *    matters — which funds touch this company, and where else do those funds
  *    appear in our world.
  *
- * Portfolio pages are unstructured marketing HTML with no common schema, so
- * this extracts candidate company names heuristically and is deliberately
- * conservative: a wrong company on a fund's page creates a false investment
- * edge, which produces a false warm path. Rejected names are counted, not
- * silently dropped.
+ * Portfolio pages are unstructured marketing HTML with no common schema, so this
+ * extracts candidate company names heuristically, and conservatively: a wrong
+ * company on a fund's page creates a false investment edge and from there a
+ * false warm path. Rejected names are counted rather than silently dropped.
  */
 
 const UA = 'Mozilla/5.0 (compatible; AMOpsCoyTracker/1.0; +research)';
@@ -30,7 +29,7 @@ const CHROME = new Set([
   'founders','founder','partners','partnership','platform','resources','events',
   'stories','perspectives','media','reports','research','podcast','videos',
   'exits','ipo','acquired','current','former','active','sitemap','accessibility',
-  // Seen in live pages 2026-08-21:
+  // Seen in live pages:
   'visit','loading...','loading','company','bio','exited','milestones','industries',
   'global navigation','site navigation','skip to content','overview','more','details',
   'website','learn','explore','discover','view','open','select','toggle','expand',
@@ -40,7 +39,7 @@ const CHROME = new Set([
   'computer science','electronics','manufacturing','security','defense','defence',
   'health','healthcare','fintech','software','hardware','space','climate','enterprise',
   'consumer','data','semiconductors','materials','agriculture','transportation',
-  // Nav chrome seen on real fund sites 2026-08-21
+  // Nav chrome seen on real fund sites
   'ideas','principles','roadmap','lp portal','investor disclosure','investors',
   'back to top','link','[emailprotected]','disclosures','our approach','our focus',
   'why us','join us','apply','pitch us','submit a pitch','portfolio companies',
@@ -82,9 +81,10 @@ export type ScrapeResult = {
    * name -> company domain, where the page linked out to it.
    *
    * Portfolio pages almost always link each company to its own site, and that
-   * domain is the STRONGEST entity-resolution signal (brief §6) as well as the
-   * input the company team-page scraper needs. Discarding it was leaving 2,585
-   * companies with no website and therefore unreachable for people scraping.
+   * domain is the strongest entity-resolution signal available (brief §6) as
+   * well as the input the company team-page scraper needs. Capturing it here is
+   * what gives ~2,585 companies a website to work from, and without a website
+   * people scraping cannot reach them at all.
    */
   domains: Record<string, string>;
   rejected: number;
@@ -106,11 +106,11 @@ export function extractDomains(html: string, pageUrl: string): Record<string, st
   let selfHost = '';
   try { selfHost = new URL(pageUrl).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
 
-  // CARD PASS. Portfolio grids often put the name and the outbound link in
-  // SIBLING elements rather than one anchor, so an anchor-only pass finds
-  // nothing. 8VC renders each card as:
+  // Card pass. Portfolio grids often put the name and the outbound link in
+  // sibling elements rather than in one anchor, which an anchor-only pass misses
+  // entirely. 8VC renders each card as:
   //   <div fs-cmsfilter-field="name">Addepar</div> ... <a href="https://addepar.com/">
-  // Split the page into card-sized chunks and pair the first company-looking
+  // So split the page into card-sized chunks and pair the first company-looking
   // name with the first external link in the same chunk.
   const chunks = html.split(/<div[^>]*class=["'][^"']*(?:card|cms-item|w-dyn-item|grid-item|portfolio-item)[^"']*["']/i);
   for (const chunk of chunks) {
@@ -218,20 +218,21 @@ export function extractNames(html: string): { names: string[]; rejected: number;
   });
 
   // Prefer yield, but penalise a strategy that rejects most of what it finds:
-  // that means it is reading nav and sector chrome rather than a company list.
-  // Lux's class-matched containers scored 80 kept / 93 rejected (precision 0.46)
-  // while its logo alt text was clean - without this, the noisier one won.
+  // that is the signature of reading nav and sector chrome rather than a company
+  // list. On Lux, class-matched containers score 80 kept / 93 rejected
+  // (precision 0.46) while the logo alt text comes back clean.
   const ranked = scored
     .filter((s) => s.names.length > 0)
     .sort((a, b) => (b.names.length * Math.max(b.precision, 0.15)) - (a.names.length * Math.max(a.precision, 0.15)));
 
   const best = ranked[0] ?? { names: [], rejected: 0, strategy: 'none', precision: 0 };
 
-  // A LOW-YIELD, LOW-PRECISION result is navigation chrome, not a portfolio.
-  // Prime Movers Lab returned 6 names at precision 0.25 - all of them nav
-  // ("Ideas", "Principles", "LP Portal"). A high-yield low-precision result is
-  // different: Basis Set scored 0.32 but its 61 names were all real companies,
-  // because card layouts interleave metadata. Gate on the combination.
+  // Low yield at low precision is navigation chrome rather than a portfolio:
+  // Prime Movers Lab returns 6 names at precision 0.25, all of them nav
+  // ("Ideas", "Principles", "LP Portal"). High yield at low precision is a
+  // different case — Basis Set scores 0.32 and its 61 names are all real
+  // companies, because card layouts interleave metadata — so the gate is on the
+  // combination.
   if (best.names.length < 15 && best.precision < 0.55) {
     return { names: [], rejected: best.rejected + best.names.length, strategy: `${best.strategy} REJECTED: low yield (${best.names.length}) at low precision (${best.precision.toFixed(2)}) - reads as navigation chrome` };
   }
@@ -256,7 +257,7 @@ export async function scrapePortfolio(url: string): Promise<ScrapeResult> {
     return {
       url, ok: true, httpStatus: res.status, names, domains, rejected,
       bytes: html.length, strategy,
-      // An empty parse is a SOURCE-HEALTH EVENT, not a silent skip (funds.ts).
+      // An empty parse surfaces as a source-health event (funds.ts).
       error: names.length === 0 ? 'parsed zero names — page shape may have changed or is JS-rendered' : null,
     };
   } catch (e) {

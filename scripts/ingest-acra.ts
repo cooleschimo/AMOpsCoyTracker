@@ -4,14 +4,14 @@
  * Answers the two questions §5.3 names: does this company already have a
  * Singapore entity, and do its investors?
  *
- * ENFORCED HERE:
- *  - COMPANY-LEVEL ONLY. ACRA publishes officer COUNTS, not officer names, so
- *    person-level matching is not attempted. Doing so would be noise dressed
- *    as signal.
- *  - A REGISTRATION IS NOT OPERATIONAL PRESENCE. Every sg_link records the ACRA
- *    entity status and incorporation date, and companies.sg_entity is only set
- *    true when a LIVE entity is confirmed - a struck-off shell never sets it.
- *  - Probable matches are flagged probable, never promoted.
+ * Matching is company-level. ACRA publishes officer counts rather than officer
+ * names, so there is nothing to match a person against; anything person-level
+ * here would be noise dressed as signal.
+ *
+ * A registration is not operational presence, so every sg_link records the ACRA
+ * entity status and incorporation date, and companies.sg_entity is set true only
+ * for a confirmed live entity — a struck-off shell leaves it null. Probable
+ * matches stay flagged probable.
  *
  * Usage: npx tsx scripts/ingest-acra.ts [--limit N] [--dry] [--all]
  */
@@ -34,7 +34,7 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
 
   // Default to companies worth resolving: seeded, Form D discoveries, or those
   // already carrying an sg signal. --all covers every portfolio company too,
-  // which is thousands of ACRA calls against a courtesy service.
+  // which is thousands of calls against a courtesy service.
   const targets = await withRetry(() => db.select({ id: companies.id, name: companies.name })
     .from(companies)
     .where(flag('all') ? sql`true` : sql`${companies.discoveredVia} in ('seed','form_d')`)
@@ -82,8 +82,8 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
       if (m.match === 'confirmed') counts.confirmed++; else counts.probable++;
     }
 
-    // sg_entity is set ONLY by a live, confirmed entity. A struck-off shell and
-    // a probable name match are both insufficient - that distinction is the
+    // Only a live, confirmed entity sets sg_entity. A struck-off shell and a
+    // probable name match each fall short of it, and holding that line is the
     // whole point of §5.3.
     const decisive = matches.find((m) => m.match === 'confirmed' && isLiveStatus(m.status));
     await withRetry(() => db.update(companies).set({

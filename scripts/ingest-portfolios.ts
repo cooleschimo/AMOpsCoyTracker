@@ -1,18 +1,19 @@
 /**
  * VC portfolio ingestion. Brief §5.2, build step 5.
  *
- * Builds the REVERSE INDEX: organizations -> investments -> companies, so the
- * question "which funds touch this company, and where else do those funds
- * appear in our world" becomes one query.
+ * Builds the reverse index — organizations -> investments -> companies — so the
+ * question "which funds touch this company, and where else do those funds appear
+ * in our world" becomes one query.
  *
- * RULES ENFORCED:
+ * The rules this stage holds to:
  *  - Every investment edge carries source='portfolio_page' and the source_url.
- *  - Discovery checks excluded_companies and TAGS rather than adds.
+ *  - Discovery checks excluded_companies and tags a hit rather than adding it.
  *  - A fund from an sgLinked house creates an sg_link on the company: portfolio
  *    membership is itself a Singapore signal (funds.ts).
- *  - An empty parse is a SOURCE-HEALTH event, never a silent skip.
- *  - New companies from a portfolio page get discovered_via='portfolio' and NO
- *    sectors — the fund's own sector tags describe the FUND, not the company.
+ *  - An empty parse is recorded as a source-health event, since a silent skip
+ *    looks identical to a fund with no portfolio.
+ *  - New companies from a portfolio page get discovered_via='portfolio' and no
+ *    sectors — the fund's own sector tags describe the fund, not the company.
  *
  * Usage: npx tsx scripts/ingest-portfolios.ts [--limit N] [--fund "Lux"] [--dry]
  */
@@ -117,7 +118,7 @@ const arg = (n: string, d?: string) => {
       if (!norm) continue;
 
       const hit = guardIndex.get(norm);
-      if (hit) { counts.excluded_hits++; continue; }   // tag, don't add
+      if (hit) { counts.excluded_hits++; continue; }   // tagged, not added
 
       const site = domainFor(name);
 
@@ -127,8 +128,8 @@ const arg = (n: string, d?: string) => {
       if (found.length) {
         companyId = found[0].id;
         counts.companies_matched++;
-        // Backfill a website we did not have. Never overwrite an existing one:
-        // a portfolio page can link to a redirect or an acquirer.
+        // Backfill a website we did not have. An existing one stands: a
+        // portfolio page can link to a redirect or an acquirer.
         if (site && !found[0].website) {
           await db.update(companies).set({ website: site }).where(eq(companies.id, companyId));
           counts.domains_backfilled++;
@@ -138,7 +139,7 @@ const arg = (n: string, d?: string) => {
         const [c] = await db.insert(companies).values({
           name, normalizedName: norm,
           website: site,
-          // The fund's sector tags describe the FUND, not this company.
+          // The fund's sector tags describe the fund, not this company.
           sectors: [],
           accountStatus: 'unknown',
           discoveredVia: 'portfolio',

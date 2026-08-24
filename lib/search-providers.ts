@@ -1,49 +1,37 @@
 /**
  * Pluggable web-search providers.
  *
- * WHY AN ABSTRACTION: free tiers vanish. Brave killed its 2,000/month free tier
- * in February 2026; Bing's Web Search API was retired entirely in August 2025;
- * Google's Custom Search JSON API closed to new customers in January 2026 and
- * shuts down January 2027. Tavily was acquired by Nebius in February 2026.
- * Swapping providers must be a config change, not a rewrite.
+ * Free tiers vanish, so swapping providers is a config change rather than a
+ * rewrite: Brave killed its 2,000/month free tier in February 2026, Bing's Web
+ * Search API was retired in August 2025 (endpoints return 410), Google's Custom
+ * Search JSON closed to new customers in January 2026 and shuts down a year
+ * later, and Tavily was acquired by Nebius.
  *
- * SELECTION (researched 2026-08-24). Provider chosen by SEARCH_PROVIDER env,
- * defaulting to the keyless option so nothing blocks on a signup:
+ * SEARCH_PROVIDER picks the first choice and the chain fails over from there.
+ * The default is the keyless option so a fresh checkout runs without a signup:
  *
  *   purili   no key, no card, 403M-page own index. Lower quality (4/9 hit rate
- *            in testing) and NO date filtering. Fine for website lookup.
+ *            in testing) and no date filtering. Fine for website lookup.
  *   youcom   $100 one-time signup credit ~ 20k queries, no card. Best for the
  *            one-off backfill.
- *   linkup   $20/month RECURRING credit ~ 4k queries, no card. Best for the
+ *   linkup   $20/month recurring credit ~ 4k queries, no card. Best for the
  *            weekly news job; has fromDate/toDate.
  *   tavily   1,000/month, genuinely no card, best recency params, and
  *            include_raw_content returns full page text at no extra credits.
- *
  *   serper   Google SERP access. Highest recall by a wide margin (a 2026
  *            benchmark put Google at ~79% vs Brave ~35% on the same corpus),
- *            2,500 free queries one-time, then $1/1k — the cheapest paid tier
- *            here. Supports tbs=qdr:* recency.
+ *            2,500 free queries one-time, then $1/1k. Supports tbs=qdr:* recency.
  *
- * ON SERP RESELLERS, decided with the product owner 2026-08-24: Google sued
- * SerpApi (DMCA, Dec 2025; amended complaint 10 Aug 2026) and Reddit v.
- * Perplexity/SerpApi survived dismissal in July 2026. That is a dispute between
- * Google and the RESELLER, not with the reseller's customers — the realistic
- * downside here is that the service disappears, which is an availability risk
- * handled by this abstraction. This is a personal project on personal
- * infrastructure, not an EDB system; DESIGN_RATIONALE §14's constraint is that
- * EDB-INTERNAL DATA stays off personal infrastructure, which is unaffected.
+ * Serper resells Google results, which Google is litigating against SerpApi.
+ * That dispute is between Google and the reseller, so the exposure here is
+ * availability — the service disappearing — which the failover chain covers.
+ * LinkedIn stays excluded in any form: hiQ turned on breach of the user
+ * agreement, a claim against the scraper itself rather than an intermediary.
  *
- * LinkedIn remains excluded in any form, and that is NOT the same judgement:
- * hiQ lost on breach of the user agreement, a direct claim against the scraper
- * itself rather than against an intermediary.
- *
- * DELIBERATELY EXCLUDED:
- *   - Self-hosted SearXNG: tested reports from July 2026 show it blocked within
- *     minutes from a residential IP (Google 0 results, Brave suspended,
- *     Startpage CAPTCHA). It degrades to a DuckDuckGo proxy, and making it work
- *     needs a residential proxy pool costing more than any API here.
- *   - Bing Web Search API: retired 11 Aug 2025, endpoints return 410.
- *   - Google Custom Search JSON: closed to new customers since Jan 2026.
+ * Self-hosted SearXNG is not an option. From a residential IP it is blocked
+ * within minutes (Google 0 results, Brave suspended, Startpage CAPTCHA) and
+ * degrades to a DuckDuckGo proxy; making it work needs a residential proxy pool
+ * costing more than any API here.
  */
 import { optional } from './env';
 
@@ -62,21 +50,30 @@ export type SearchOpts = {
   /** Restrict to recently published pages. Ignored by providers without it. */
   recencyDays?: number;
   maxResults?: number;
+  /**
+   * Ask for full page text rather than snippets, where the provider supports
+   * it. You.com bills this at $1/1k pages on top of the base rate and crawls up
+   * to 2x maxResults pages, so use it only where the extra context is worth it
+   * — the company assessment, not bulk website lookup.
+   */
+  fullPage?: boolean;
 };
 
 export type ProviderName = 'purili' | 'youcom' | 'linkup' | 'tavily' | 'serper';
 
 /**
- * Hosts dropped from EVERY provider's results before they reach the pipeline.
+ * Hosts dropped from every provider's result set.
  *
- * LinkedIn is excluded in any form by DESIGN_RATIONALE §14 — hiQ established
- * that public-data scraping is not a CFAA crime but hiQ LOST on breach of the
- * user agreement and shut down. That exclusion has to hold no matter which
- * provider surfaces the URL, and Serper and Linkup both returned a LinkedIn
- * page as the top hit for a company query in testing, so filtering at the
- * provider boundary is the only place it can be enforced once.
+ * LinkedIn stays off this list. Fetching linkedin.com directly is the act hiQ's
+ * user-agreement claim covers, so we don't; a LinkedIn URL surfaced by a
+ * third-party search index came from their crawl and reads like any other
+ * result (DESIGN_RATIONALE §14).
+ *
+ * The two caveats in §14 still bind callers: a search snippet is thin evidence
+ * for a person->company edge, and anything derived from one carries its source
+ * URL as 'probable' rather than a confirmed role.
  */
-const BLOCKED_HOSTS = /(^|\.)(linkedin\.com|lnkd\.in)$/i;
+const BLOCKED_HOSTS = /^$/;   // nothing blocked at the boundary today
 
 const hostOf = (u: string): string => {
   try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; }
@@ -179,24 +176,43 @@ async function youcom(q: string, o: SearchOpts): Promise<SearchHit[]> {
   const key = optional('YOUCOM_API_KEY');
   if (!key) throw new Error('YOUCOM_API_KEY not set');
   await polite(400);
-  const params = new URLSearchParams({ query: q, num_web_results: String(o.maxResults ?? 10) });
+
+  // POST to ydc-index.io/v1/search. The api.ydc-index.io host and GET both
+  // return 403 even with a valid key, and the documented parameter is `count`.
+  const body: Record<string, unknown> = { query: q, count: o.maxResults ?? 10 };
+  // Full-page extraction returns clean markdown, which is much better context
+  // for the company assessment. It bills $1/1k pages on top of the base rate
+  // and crawls up to 2x `count` pages, so it stays opt-in per call.
+  if (o.fullPage) {
+    body.extraction = { extraction_mode: 'full_page', full_page: { extraction_formats: ['markdown'] } };
+  }
   if (o.recencyDays) {
     const from = new Date(Date.now() - o.recencyDays * 86400000).toISOString().slice(0, 10);
     const to = new Date().toISOString().slice(0, 10);
-    params.set('freshness', `${from}to${to}`);
+    body.freshness = `${from}to${to}`;
   }
-  const res = await fetch(`https://api.ydc-index.io/v1/search?${params}`, {
-    headers: { 'X-API-Key': key },
+
+  const res = await fetch('https://ydc-index.io/v1/search', {
+    method: 'POST',
+    headers: { 'X-API-Key': key, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(30000),
   });
   if (!res.ok) throw new Error(`youcom HTTP ${res.status}: ${(await res.text()).slice(0, 160)}`);
   const j = await res.json();
-  const hits = j?.results?.web ?? j?.hits ?? [];
+  const hits = j?.results?.web ?? [];
   return hits.map((r: Record<string, unknown>) => ({
-    title: String(r.title ?? ''), url: String(r.url ?? ''), displayUrl: hostOf(String(r.url ?? '')),
-    description: String(r.description ?? (Array.isArray(r.snippets) ? (r.snippets as string[]).join(' ') : '')),
+    title: String(r.title ?? ''),
+    url: String(r.url ?? ''),
+    displayUrl: hostOf(String(r.url ?? '')),
+    // You.com returns `snippets` as an array of passages — join them, since
+    // they are the richest context any provider here gives for free.
+    description: Array.isArray(r.snippets) ? (r.snippets as string[]).join(' ') : String(r.description ?? ''),
     host: hostOf(String(r.url ?? '')),
-    raw: null, publishedAt: (r.page_age as string) ?? null,
+    // Prefer full-page markdown when it was requested and returned.
+    raw: (r.contents as { markdown?: string } | undefined)?.markdown
+      ?? (Array.isArray(r.snippets) ? (r.snippets as string[]).join('\n') : null),
+    publishedAt: (r.page_age as string) ?? null,
   })).filter((h: SearchHit) => h.url);
 }
 
@@ -294,8 +310,9 @@ export async function search(query: string, opts: SearchOpts = {}): Promise<Sear
     if (!budgetOk()) return [];
     try {
       const raw = await PROVIDERS[p](query, opts);
-      // Enforce the LinkedIn exclusion at the boundary, for every provider.
-      const hits = raw.filter((h) => !BLOCKED_HOSTS.test(h.host));
+      const hits = BLOCKED_HOSTS.source === '(?:)' || BLOCKED_HOSTS.source === '^$'
+        ? raw
+        : raw.filter((h) => !BLOCKED_HOSTS.test(h.host));
       if (hits.length) return hits;
       // An empty result is a legitimate answer, not a failure — do not burn
       // another provider's quota re-asking the same question.

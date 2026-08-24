@@ -1,20 +1,20 @@
 /**
  * Company-level assessment. Brief §7a, DESIGN_RATIONALE §6.
  *
- * THIS FILE IS THE PRODUCT. Brief §15: "lib/rubric.ts and lib/valueprops.ts are
+ * This file is the product. Brief §15: "lib/rubric.ts and lib/valueprops.ts are
  * the product. Everything else is plumbing." Edit this to change judgment.
  *
- * It answers a DIFFERENT question from the 0-3 item rubric. The item rubric asks
+ * It answers a different question from the 0-3 item rubric. The item rubric asks
  * "is something happening now?"; this asks "should EDB care about this company
- * at all?" Collapsing them produces a predictable failure: a large raise at an
- * out-of-scope company outranks silence at a strategically important one.
+ * at all?" Kept apart, because a single score would let a large raise at an
+ * out-of-scope company outrank silence at a strategically important one.
  *
- * Cached per company and refreshed monthly or on a major event — NOT per item.
- * The question is stable; re-answering it weekly would burn the token budget.
+ * Cached per company and refreshed monthly or on a major event. The question is
+ * stable, and re-answering it weekly would burn the token budget.
  *
- * VERSIONED: company_assessments is queried by rubric_version, so re-assessing
- * under a new version preserves the old judgments. You need both to know whether
- * a change helped.
+ * company_assessments is queried by rubric_version, so re-assessing under a new
+ * version preserves the old judgments and both are available to tell whether a
+ * change helped.
  */
 export const COMPANY_RUBRIC_VERSION = 'company-v1';
 

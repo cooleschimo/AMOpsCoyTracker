@@ -1,10 +1,10 @@
 /**
  * Resolve websites for companies that have none, so the company assessment has
- * something real to judge. See lib/enrich.ts for why this is domain
- * construction rather than a search API.
+ * something real to judge. lib/enrich.ts explains why this leans on domain
+ * construction ahead of a search API.
  *
- * Writes companies.website only on a VERIFIED match. A wrong website is worse
- * than none: it feeds a confident wrong assessment.
+ * companies.website is written only on a verified match. A wrong website is
+ * worse than none, because it feeds a confident wrong assessment.
  *
  * Usage: npx tsx scripts/enrich-websites.ts [--limit N] [--dry]
  */
@@ -47,9 +47,10 @@ const arg = (n: string, d?: string) => {
     let r = await resolveWebsite(c.name, knownIndustry);
     let searchNote = '';
 
-    // 2. Fall back to web search, which also returns MENTIONS - news, investor
-    //    pages, directories - not just the company's own site. Those are graph
-    //    material in their own right (an investor host absent from funds.ts).
+    // 2. Fall back to web search, which returns mentions as well as the
+    //    company's own site - news, investor pages, directories. Those are
+    //    graph material in their own right (an investor host absent from
+    //    funds.ts).
     if (!r) {
       const research = await researchCompany(c.name);
       if (research.looksAmbiguous) {
@@ -76,7 +77,7 @@ const arg = (n: string, d?: string) => {
       console.log(`      ${(r.description ?? r.title ?? '').slice(0, 100)}`);
       if (!dry) {
         // Store the site description so the assessment reads real copy rather
-        // than a name. Prefixed so its provenance is obvious.
+        // than a bare name. The prefix keeps its provenance visible.
         const blurb = [r.title, r.description].filter(Boolean).join(' — ').slice(0, 500);
         await db.update(companies).set({
           website: r.domain,
