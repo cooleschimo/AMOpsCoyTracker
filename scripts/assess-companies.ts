@@ -64,8 +64,13 @@ type Assessment = {
         .where(and(
           sql`exists (select 1 from scores sc join items it on it.id = sc.item_id
                       where it.company_id = ${companies.id} and sc.score >= 2)`,
+          // Not assessed AT THE CURRENT RUBRIC VERSION. company_assessments is
+          // queried by version, so re-assessing under a new version preserves
+          // the old judgments and both are available to tell whether a change
+          // helped — the same contract as scores.rubric_version.
           force ? sql`true` : sql`not exists (select 1 from company_assessments ca
-                      where ca.company_id = ${companies.id})`,
+                      where ca.company_id = ${companies.id}
+                        and ca.rubric_version = ${COMPANY_RUBRIC_VERSION})`,
         ))
     : await db.select({
         id: companies.id, name: companies.name, hqState: companies.hqState,
