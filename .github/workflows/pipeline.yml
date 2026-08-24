@@ -18,7 +18,7 @@ on:
         required: true
         default: 'formd'
         type: choice
-        options: [formd, seed, all]
+        options: [formd, portfolios, people, assess, seed, all]
       days:
         description: 'Form D lookback days'
         required: false
@@ -44,6 +44,28 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - id: dow
+        name: Day of week (1=Monday)
+        run: echo "day=$(date -u +%u)" >> "$GITHUB_OUTPUT"
       - name: Form D ingestion
         if: ${{ github.event.inputs.stage == 'formd' || github.event.inputs.stage == 'all' || github.event_name == 'schedule' }}
         run: npx tsx scripts/ingest-formd.ts --days ${{ github.event.inputs.days || 3 }}
+
+      # Portfolio and team pages change slowly, so these run weekly (Mondays)
+      # rather than daily. Both are idempotent: re-running matches rather than
+      # duplicating, so an extra run is harmless.
+      - name: VC portfolio scraping
+        if: ${{ github.event.inputs.stage == 'portfolios' || github.event.inputs.stage == 'all' || (github.event_name == 'schedule' && fromJSON(steps.dow.outputs.day || '1') == 1) }}
+        run: npx tsx scripts/ingest-portfolios.ts
+
+      - name: Fund team pages -> people + affiliations
+        if: ${{ github.event.inputs.stage == 'people' || github.event.inputs.stage == 'all' || (github.event_name == 'schedule' && fromJSON(steps.dow.outputs.day || '1') == 1) }}
+        run: npx tsx scripts/ingest-people.ts --funds
+
+      - name: Company team pages -> people + roles
+        if: ${{ github.event.inputs.stage == 'people' || github.event.inputs.stage == 'all' }}
+        run: npx tsx scripts/ingest-people.ts --companies --limit 60
+
+      - name: Company-level assessment
+        if: ${{ github.event.inputs.stage == 'assess' || github.event.inputs.stage == 'all' }}
+        run: npx tsx scripts/assess-companies.ts

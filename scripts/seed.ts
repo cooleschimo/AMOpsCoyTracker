@@ -188,7 +188,11 @@ async function main() {
           await db.insert(sgLinks).values({
             subjectType: 'company', subjectId: companyId,
             linkType: 'portfolio_co_in_sg', matchStatus, detail: linkDetail,
-            sourceUrl: null, // seed research; no per-token URL available
+            // No per-token URL exists in the CSV. Record the provenance
+            // explicitly rather than leaving null: brief §4 says an unsourced
+            // edge is worse than no edge, so it must at least say where it
+            // came from and that it is unverified.
+            sourceUrl: 'seed:data/companies.csv#sg_apac (research-verified Aug 2026, no per-token URL)',
           });
           counts.sg_links_created++;
           if (matchStatus === 'confirmed') counts.sg_links_confirmed++; else counts.sg_links_probable++;
@@ -205,7 +209,7 @@ async function main() {
               orgId, companyId, round: roundLabel,
               isLead: role === 'investor_lead',
               source: 'seed',
-              sourceUrl: null,
+              sourceUrl: 'seed:data/companies.csv#sg_apac (research-verified Aug 2026, no per-token URL)',
             });
             counts.investments_created++;
           }
