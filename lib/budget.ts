@@ -1,13 +1,11 @@
 /**
  * Token budget guard. Brief §7.
  *
- * VERIFIED 2026-08-21 (Groq free tier, openai/gpt-oss-120b):
- *   30 RPM · 8K TPM · 1K RPD · 200K TPD
+ * The Groq free tier (openai/gpt-oss-120b) allows 30 RPM · 8K TPM · 1K RPD ·
+ * 200K TPD. The daily token cap is what binds, and 8K TPM constrains batch
+ * size: a 10-15 item batch stays under 8K tokens including the system prompt.
  *
- * The daily TOKEN cap is what binds, and 8K TPM constrains batch size — a
- * 10-15 item batch must stay under 8K tokens including the system prompt.
- *
- * This halts CLEANLY and resumes: it never throws mid-run. A halted stage
+ * Halting is clean and resumable rather than thrown mid-run. A halted stage
  * records progress in runs.counts and the next invocation continues.
  */
 export const LIMITS = {
@@ -30,7 +28,7 @@ export class Budget {
 
   get total() { return this.priorTokensToday + this.tokensIn + this.tokensOut; }
 
-  /** Check BEFORE a call. False means stop cleanly — caller must not throw. */
+  /** Checked before a call. False means the caller stops cleanly. */
   canSpend(estimatedTokens: number): boolean {
     if (this.halted) return false;
     if (this.requests >= LIMITS.rpd) {

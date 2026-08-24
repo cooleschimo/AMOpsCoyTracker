@@ -17,14 +17,32 @@ async function main() {
     return `OK - ${rows[0].n} tables in public schema`;
   });
 
-  await check('GROQ_API_KEY + model', async () => {
+  await check('LLM provider chain', async () => {
+    const { llmProviders } = await import('../lib/env');
+    const labels = llmProviders().map((p) => p.label ?? p.name);
+    return labels.length ? `OK - ${labels.join(' -> ')}` : 'WARN - no LLM providers configured';
+  });
+
+  await check('Groq key(s) + model', async () => {
     const { listModels } = await import('../lib/llm');
-    const { env } = await import('../lib/env');
-    const models = await listModels();
+    const { env, llmProviders } = await import('../lib/env');
     const want = env.groqModelScoring();
-    return models.includes(want)
-      ? `OK - ${models.length} models; '${want}' available`
-      : `WARN - '${want}' NOT in account list. Available: ${models.slice(0, 8).join(', ')}`;
+    const groqProviders = llmProviders().filter((p) => p.name === 'groq');
+    if (!groqProviders.length) throw new Error('No Groq key configured');
+
+    const summaries = await Promise.all(groqProviders.map(async (p) => {
+      const models = await listModels(p);
+      const label = p.label ?? p.name;
+      const ok = models.includes(want);
+      return {
+        ok,
+        message: ok
+          ? `${label}: ${models.length} models; '${want}' available`
+          : `${label}: '${want}' NOT in account list. Available: ${models.slice(0, 8).join(', ')}`,
+      };
+    }));
+    const prefix = summaries.every((s) => s.ok) ? 'OK' : 'WARN';
+    return `${prefix} - ${summaries.map((s) => s.message).join('; ')}`;
   });
 
   await check('SEC EDGAR', async () => {

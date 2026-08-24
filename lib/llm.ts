@@ -1,23 +1,19 @@
 /**
- * Single entry point for EVERY model call. Brief §3.
+ * Single entry point for every model call. Brief §3.
  *
- * Must handle (all required by the brief):
- *  - model + base URL from env
- *  - per-run token budget tracked in `runs`
- *  - RPM throttling
- *  - 429 retry with backoff
- *  - JSON parse failure retried ONCE with a stricter instruction, then logged
- *    and skipped
+ * Handles model and base URL from env, the per-run token budget tracked in
+ * `runs`, RPM throttling, 429 retry with backoff, and one stricter retry on a
+ * JSON parse failure before the batch is logged and skipped.
  *
- * THE HARD RULE: one bad response must NEVER kill a run. Every failure path
- * here returns null and records why; nothing throws to the caller.
+ * One bad response leaves the rest of the run intact: every failure path here
+ * returns null and records why, and nothing throws to the caller.
  *
  * Groq gotchas (brief §7, both real):
- *  - Groq expects ALL properties listed under `required` in a JSON schema.
+ *  - Groq expects all properties listed under `required` in a JSON schema.
  *  - Agent-framework wrappers forcing tool_choice: json_tool_call return HTTP
- *    400 — so this calls the endpoint directly with fetch.
+ *    400, so this calls the endpoint directly with fetch.
  */
-import { env } from './env';
+import { env, llmProviders, type LlmProvider } from './env';
 import { Budget, estimateTokens, LIMITS } from './budget';
 
 export type LlmResult<T> = {
@@ -32,7 +28,7 @@ export type LlmResult<T> = {
 
 let lastCallTimes: number[] = [];
 
-/** RPM throttle: never more than LIMITS.rpm calls in any rolling 60s. */
+/** RPM throttle: at most LIMITS.rpm calls in any rolling 60s. */
 async function throttle() {
   const now = Date.now();
   lastCallTimes = lastCallTimes.filter((t) => now - t < 60_000);
@@ -76,11 +72,25 @@ type CallOpts = {
   schema?: Record<string, unknown>;
   maxRetries?: number;
   temperature?: number;
+  /**
+   * gpt-oss models emit internal reasoning before the answer, and it is billed.
+   * MEASURED 2026-08-24: on a trivial call, reasoning fell 40 -> 17 tokens at
+   * 'low'. On the real scoring run output was 43% of all tokens (3,545 per
+   * 12-item batch), which is what exhausted a 200K daily cap at 204 items.
+   * Classification against a fixed rubric does not need deep reasoning.
+   * Groq accepts only low | medium | high — 'none' is a 400.
+   */
+  reasoningEffort?: 'low' | 'medium' | 'high';
 };
 
-async function rawCall(opts: CallOpts, stricter: boolean): Promise<{ text: string; inTok: number; outTok: number } | { error: string }> {
-  const model = opts.model ?? env.groqModelScoring();
-  const url = `${env.groqBaseUrl()}/chat/completions`;
+type RawOk = { text: string; inTok: number; outTok: number; model: string };
+type RawErr = { error: string; exhausted?: boolean };
+
+async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider): Promise<RawOk | RawErr> {
+  // opts.model only overrides within the PRIMARY provider; a fallback provider
+  // uses its own model, since a Groq model id is meaningless to Gemini.
+  const model = provider.name === 'groq' ? (opts.model ?? provider.model) : provider.model;
+  const url = `${provider.baseUrl}/chat/completions`;
   const maxRetries = opts.maxRetries ?? 3;
 
   const system = stricter
@@ -93,6 +103,8 @@ async function rawCall(opts: CallOpts, stricter: boolean): Promise<{ text: strin
     temperature: opts.temperature ?? 0.2,
   };
   if (opts.schema) body.response_format = { type: 'json_object' };
+  // Only the gpt-oss family accepts this parameter; sending it elsewhere 400s.
+  if (opts.reasoningEffort && /gpt-oss/i.test(model)) body.reasoning_effort = opts.reasoningEffort;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     await throttle();
@@ -100,17 +112,44 @@ async function rawCall(opts: CallOpts, stricter: boolean): Promise<{ text: strin
       const res = await fetch(url, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${env.groqApiKey()}`,
+          Authorization: `Bearer ${provider.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
       });
 
       if (res.status === 429) {
-        // Respect Retry-After when present; otherwise exponential backoff.
+        const detail = await res.text().catch(() => '');
+        // A DAILY cap is not a rate limit: backing off cannot clear it, so the
+        // caller moves to the next provider. A PER-MINUTE limit is the
+        // opposite — waiting is exactly right.
+        //
+        // NEITHER the prose NOR the retry delay distinguishes them reliably:
+        //  - matching the word 'quota' misreads every Google 429 (their
+        //    per-minute message also says "Quota exceeded");
+        //  - Google returns a SHORT retryDelay (~21s) even on a DAILY quota,
+        //    so a small delay does not mean "wait and it clears".
+        // The machine-readable discriminator is the structured quotaId, e.g.
+        //   GenerateRequestsPerDayPerProjectPerModel-FreeTier   (daily)
+        //   GenerateRequestsPerMinutePerProjectPerModel-FreeTier (per-minute)
+        // VERIFIED 2026-08-24: gemini-3.6-flash free tier is TWENTY requests
+        // PER DAY per project, not per minute — ~240 items/key/day at 12 per
+        // request. Do not assume a Flash model carries the 9,000 RPD figure
+        // published for older Flash models.
+        const quotaIds = [...detail.matchAll(/"quotaId":\s*"([^"]+)"/g)].map((m) => m[1]);
+        const perDayQuota = quotaIds.some((q) => /PerDay/i.test(q));
+        const perMinuteQuota = quotaIds.some((q) => /PerMinute/i.test(q));
+        const perDayProse = /per day|\bdaily\b|\bTPD\b|\bRPD\b|tokens per day/i.test(detail);
+
+        if (perDayQuota || (!perMinuteQuota && perDayProse)) {
+          return {
+            error: `daily cap on ${provider.label ?? provider.name}: ${(quotaIds[0] ?? detail.slice(0, 120))}`,
+            exhausted: true,
+          };
+        }
         const ra = Number(res.headers.get('retry-after'));
         const waitMs = Number.isFinite(ra) && ra > 0 ? ra * 1000 : Math.min(60_000, 2 ** attempt * 2_000);
-        console.warn(`[llm] 429 (attempt ${attempt + 1}/${maxRetries + 1}); backing off ${Math.round(waitMs / 1000)}s`);
+        console.warn(`[llm] ${provider.label ?? provider.name} 429 (attempt ${attempt + 1}/${maxRetries + 1}); backing off ${Math.round(waitMs / 1000)}s`);
         await sleep(waitMs);
         continue;
       }
@@ -129,22 +168,47 @@ async function rawCall(opts: CallOpts, stricter: boolean): Promise<{ text: strin
       const text: string = json?.choices?.[0]?.message?.content ?? '';
       const inTok: number = json?.usage?.prompt_tokens ?? estimateTokens(system + opts.user);
       const outTok: number = json?.usage?.completion_tokens ?? estimateTokens(text);
-      return { text, inTok, outTok };
+      return { text, inTok, outTok, model };
     } catch (e) {
       const waitMs = Math.min(30_000, 2 ** attempt * 1_000);
-      console.warn(`[llm] network error: ${(e as Error).message}; retrying in ${waitMs}ms`);
+      console.warn(`[llm] ${provider.label ?? provider.name} network error: ${(e as Error).message}; retrying in ${waitMs}ms`);
       await sleep(waitMs);
     }
   }
-  return { error: `exhausted ${maxRetries + 1} attempts` };
+  return { error: `exhausted ${maxRetries + 1} attempts on ${provider.label ?? provider.name}`, exhausted: true };
 }
 
 /**
- * Call the model and parse JSON.
- * Never throws. On any failure returns ok:false with the reason recorded.
+ * Try each configured provider in turn. FAILOVER IS FOR CAPACITY EXHAUSTION
+ * ONLY — a malformed response or a bad request is not retried elsewhere,
+ * because a second provider would fail the same way.
+ *
+ * Every result carries the model that produced it, and callers persist it
+ * (scores.model). Rows from one run can therefore differ in model, which is
+ * recorded rather than hidden: scores from different models are not strictly
+ * comparable, and the column is what makes that visible.
+ */
+async function callWithFailover(opts: CallOpts, stricter: boolean): Promise<RawOk | RawErr> {
+  const providers = llmProviders();
+  if (!providers.length) return { error: 'no LLM provider configured (set GROQ_API_KEY or another provider key)' };
+
+  let last: RawErr = { error: 'no provider attempted' };
+  for (const p of providers) {
+    const res = await rawCall(opts, stricter, p);
+    if (!('error' in res)) return res;
+    last = res;
+    if (!res.exhausted) return res;   // a real error: do not mask it by retrying elsewhere
+    if (providers.length > 1) console.warn(`[llm] ${p.label ?? p.name} exhausted; trying next provider`);
+  }
+  return last;
+}
+
+/**
+ * Call the model and parse JSON. Any failure returns ok:false with the reason
+ * recorded rather than throwing.
  */
 export async function callJson<T = unknown>(opts: CallOpts): Promise<LlmResult<T>> {
-  const model = opts.model ?? env.groqModelScoring();
+  let model = opts.model ?? env.groqModelScoring();
   const budget = opts.budget;
   const est = estimateTokens(opts.system + opts.user) + 800;
 
@@ -153,11 +217,12 @@ export async function callJson<T = unknown>(opts: CallOpts): Promise<LlmResult<T
   }
 
   // Attempt 1
-  let res = await rawCall(opts, false);
+  let res = await callWithFailover(opts, false);
   if ('error' in res) {
     return { ok: false, data: null, raw: null, error: res.error, tokensIn: 0, tokensOut: 0, model };
   }
   budget?.record(res.inTok, res.outTok);
+  model = res.model;
 
   let candidate = extractJson(res.text);
   if (candidate) {
@@ -166,16 +231,17 @@ export async function callJson<T = unknown>(opts: CallOpts): Promise<LlmResult<T
     } catch { /* fall through to the single stricter retry */ }
   }
 
-  // Attempt 2: retried ONCE with a stricter instruction, per the brief.
+  // Attempt 2: one stricter instruction, per the brief.
   console.warn('[llm] JSON parse failed; one stricter retry');
   if (budget && !budget.canSpend(est)) {
     return { ok: false, data: null, raw: res.text, error: 'malformed JSON; budget halted before retry', tokensIn: res.inTok, tokensOut: res.outTok, model };
   }
-  const res2 = await rawCall(opts, true);
+  const res2 = await callWithFailover(opts, true);
   if ('error' in res2) {
     return { ok: false, data: null, raw: res.text, error: `malformed JSON; retry failed: ${res2.error}`, tokensIn: res.inTok, tokensOut: res.outTok, model };
   }
   budget?.record(res2.inTok, res2.outTok);
+  model = res2.model;
 
   candidate = extractJson(res2.text);
   if (candidate) {
@@ -194,9 +260,9 @@ export async function callJson<T = unknown>(opts: CallOpts): Promise<LlmResult<T
 }
 
 /** Connectivity + model availability probe. Used by scripts/check-llm.ts. */
-export async function listModels(): Promise<string[]> {
-  const res = await fetch(`${env.groqBaseUrl()}/models`, {
-    headers: { Authorization: `Bearer ${env.groqApiKey()}` },
+export async function listModels(provider?: Pick<LlmProvider, 'apiKey' | 'baseUrl'>): Promise<string[]> {
+  const res = await fetch(`${provider?.baseUrl ?? env.groqBaseUrl()}/models`, {
+    headers: { Authorization: `Bearer ${provider?.apiKey ?? env.groqApiKey()}` },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const j = await res.json();

@@ -30,9 +30,16 @@ jobs:
     timeout-minutes: 60
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      LLM_CHAIN: gemini,gemini2,groq,openrouter,groq2
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.6-flash' }}
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
       GROQ_MODEL_SCORING: ${{ vars.GROQ_MODEL_SCORING || 'openai/gpt-oss-120b' }}
       GROQ_MODEL_DRAFTING: ${{ vars.GROQ_MODEL_DRAFTING || 'openai/gpt-oss-120b' }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'openrouter/free' }}
       SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       DIGEST_TEST_RECIPIENT: ${{ secrets.DIGEST_TEST_RECIPIENT }}
