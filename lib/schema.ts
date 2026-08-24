@@ -54,6 +54,16 @@ export const companies = pgTable('companies', {
   atsType: text('ats_type'),
   atsSlug: text('ats_slug'),
   discoveredVia: text('discovered_via'),
+  /**
+   * Scope triage from the EDGAR industry group (lib/edgar-industry.ts).
+   *   in_scope     — a sector match, or pending the company-level assessment
+   *   out_of_scope — confidently outside the four sectors; PERSISTED, not deleted,
+   *                  so "is the filter wrong?" stays answerable (RATIONALE §15.4)
+   *   unknown      — seeded companies, which are in scope by construction
+   * Never a boolean: 'pending assessment' is a real third state.
+   */
+  scopeStatus: text('scope_status').default('unknown'),
+  scopeReason: text('scope_reason'),
   // RESERVED for EDB-internal account history. Stays empty on personal
   // infrastructure — DESIGN_RATIONALE §14.
   notes: text('notes'),

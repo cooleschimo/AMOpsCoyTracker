@@ -20,12 +20,13 @@
 import '../lib/loadenv';
 import { eq, sql, and } from 'drizzle-orm';
 import { getDb } from '../lib/db';
-import { companies, people, roles, secFilings, excludedCompanies, runs, sourceHealth } from '../lib/schema';
+import { companies, people, roles, secFilings, excludedCompanies, runs, sourceHealth, organizations } from '../lib/schema';
 import {
   fetchDailyIndex, fetchFiling, mapRole, TARGET_STATES, regionForState, refineCaRegion,
   type FormDFiling,
 } from '../lib/edgar';
-import { normalizeCompanyName, normalizePersonName } from '../lib/normalize';
+import { normalizeCompanyName, normalizePersonName, normalizeOrgName } from '../lib/normalize';
+import { routeIndustry } from '../lib/edgar-industry';
 
 const arg = (name: string, fallback?: string) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -43,6 +44,8 @@ async function main() {
   const counts = {
     index_entries: 0, in_scope_state: 0, filings_fetched: 0, fetch_failed: 0,
     excluded_hits: 0, companies_created: 0, companies_matched: 0,
+    routed_to_organizations: 0, marked_out_of_scope: 0,
+    sector_matched: 0, pending_assessment: 0,
     people_created: 0, people_matched: 0, entity_persons_skipped: 0,
     roles_created: 0, roles_refreshed: 0, filings_recorded: 0,
   };
@@ -92,6 +95,28 @@ async function main() {
 
     if (dry) continue;
 
+    // ── Industry routing (lib/edgar-industry.ts) ─────────────────────────
+    // A fund is not a company. Route it to organizations instead, so the graph
+    // gains an investor node rather than a fake company node.
+    const routing = routeIndustry(f.industryGroup);
+    if (routing.disposition === 'organization') {
+      const orgNorm = normalizeOrgName(f.entityName);
+      const existingOrg = await db.select({ id: organizations.id }).from(organizations)
+        .where(eq(organizations.normalizedName, orgNorm)).limit(1);
+      if (!existingOrg.length) {
+        await db.insert(organizations).values({
+          name: f.entityName, normalizedName: orgNorm,
+          orgType: 'vc',
+          notes: `Form D ${f.accession} (${f.industryGroup}); ${f.url}`,
+        });
+        counts.routed_to_organizations++;
+      }
+      continue;   // deliberately NOT written to companies
+    }
+    if (routing.disposition === 'out_of_scope') counts.marked_out_of_scope++;
+    else if (routing.sectors.length) counts.sector_matched++;
+    else counts.pending_assessment++;
+
     // Company resolution: CIK first (strongest), then normalized name.
     let companyId: number;
     const byCik = f.cik
@@ -109,9 +134,12 @@ async function main() {
       const [ins] = await db.insert(companies).values({
         name: f.entityName,
         normalizedName: norm,
-        // Sector is UNKNOWN from a Form D. Empty array, not a guess — the
-        // company-level assessment fills this in later.
-        sectors: [],
+        // Sectors come from EDGAR's own Item 4 label where it maps cleanly
+        // (Biotechnology IS biotech). An empty array means genuinely unknown,
+        // and the company-level assessment decides — never a guess here.
+        sectors: routing.sectors,
+        scopeStatus: routing.disposition,
+        scopeReason: routing.reason,
         hqCity: f.city, hqState: f.stateOrCountry, hqRegion: region,
         cik: f.cik,
         foundedYear: f.yearOfInc ? Number(f.yearOfInc) || null : null,
