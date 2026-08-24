@@ -3,3 +3,15 @@ node_modules/
 .env
 .env.local
 *.log
+
+# Next.js
+/.next/
+/out/
+/build
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# Env
+.env
+.env*.local
