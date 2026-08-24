@@ -372,3 +372,24 @@ export const sourceHealth = pgTable('source_health', {
   status: text('status'),
   note: text('note'),
 }, (t) => [uniqueIndex('source_health_source_key').on(t.source)]);
+
+/**
+ * Entity-merge decisions. Brief §6: automated resolution reaches ~80% and the
+ * last 20% needs a human.
+ *
+ * Both outcomes are recorded, not just merges. A "these are different" decision
+ * is as valuable as a merge — it stops the same pair being re-surfaced every
+ * week, and it is evidence about where resolution is weak.
+ */
+export const entityMerges = pgTable('entity_merges', {
+  id: serial('id').primaryKey(),
+  entityType: text('entity_type').notNull(),      // company | person | organization
+  keptId: integer('kept_id').notNull(),
+  mergedId: integer('merged_id').notNull(),
+  decision: text('decision').notNull(),           // merged | distinct | unsure
+  signals: text('signals').array().default([]),
+  score: numeric('score'),
+  note: text('note'),
+  decidedBy: text('decided_by'),
+  decidedAt: timestamp('decided_at', { withTimezone: true }).defaultNow(),
+}, (t) => [uniqueIndex('entity_merges_pair_key').on(t.entityType, t.keptId, t.mergedId)]);
