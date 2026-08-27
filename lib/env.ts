@@ -41,11 +41,16 @@ export const env = {
   secUserAgent: () => required('SEC_USER_AGENT'),
   digestTestRecipient: () => required('DIGEST_TEST_RECIPIENT'),
   fewshotEnabled: () => optional('FEWSHOT_ENABLED', 'false').toLowerCase() === 'true',
+  // Corporate registries. Absent keys leave those sources unavailable rather
+  // than failing a run: EDGAR full-text, ClinicalTrials, USASpending and GLEIF
+  // need no key and cover most of what these add.
+  openCorporatesKey: () => optional('OPENCORPORATES_API_KEY'),
+  usptoKey: () => optional('USPTO_API_KEY'),
 };
 
 /**
  * Additional LLM providers and keys, used as FAILOVER when the primary halts
- * on its daily cap. Added 2026-08-24: Groq's 200K/day halted a scoring run at
+ * on its daily cap. Groq's 200K/day halts a long scoring run at
  * 204 of 651 items, and waiting a day for the reset is the only alternative.
  *
  * Treat every configured key as its own credential with its own terms and
@@ -117,8 +122,8 @@ export function llmProviders(): LlmProvider[] {
       name: 'gemini' as const,
       apiKey,
       baseUrl: optional('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai'),
-      // VERIFIED 2026-08-24: gemini-2.5-flash is closed to new users and 404s
-      // with a pointer to this id. gemini-3.5-flash also works.
+      // gemini-2.5-flash is closed to new users and 404s with a pointer to
+      // this id. gemini-3.5-flash also works.
       model: optional('GEMINI_MODEL', 'gemini-3.6-flash'),
       // NOT 'gemini#2': '#' starts a comment in .env parsing, so a chain
       // string containing it is silently truncated.

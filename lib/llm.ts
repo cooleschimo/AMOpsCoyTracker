@@ -74,10 +74,10 @@ type CallOpts = {
   temperature?: number;
   /**
    * gpt-oss models emit internal reasoning before the answer, and it is billed.
-   * MEASURED 2026-08-24: on a trivial call, reasoning fell 40 -> 17 tokens at
-   * 'low'. On the real scoring run output was 43% of all tokens (3,545 per
-   * 12-item batch), which is what exhausted a 200K daily cap at 204 items.
-   * Classification against a fixed rubric does not need deep reasoning.
+   * Reasoning runs roughly 40% of all output tokens at the default setting and
+   * about half that at 'low', which is the difference between a 200K daily cap
+   * covering a few hundred items and a few thousand. Classification against a
+   * fixed rubric does not need deep reasoning.
    * Groq accepts only low | medium | high — 'none' is a 400.
    */
   reasoningEffort?: 'low' | 'medium' | 'high';
@@ -132,10 +132,9 @@ async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider)
         // The machine-readable discriminator is the structured quotaId, e.g.
         //   GenerateRequestsPerDayPerProjectPerModel-FreeTier   (daily)
         //   GenerateRequestsPerMinutePerProjectPerModel-FreeTier (per-minute)
-        // VERIFIED 2026-08-24: gemini-3.6-flash free tier is TWENTY requests
-        // PER DAY per project, not per minute — ~240 items/key/day at 12 per
-        // request. Do not assume a Flash model carries the 9,000 RPD figure
-        // published for older Flash models.
+        // gemini-3.6-flash's free tier is TWENTY requests PER DAY per project,
+        // not per minute — ~240 items/key/day at 12 per request. A newer Flash
+        // model does not carry the 9,000 RPD figure published for older ones.
         const quotaIds = [...detail.matchAll(/"quotaId":\s*"([^"]+)"/g)].map((m) => m[1]);
         const perDayQuota = quotaIds.some((q) => /PerDay/i.test(q));
         const perMinuteQuota = quotaIds.some((q) => /PerMinute/i.test(q));
@@ -168,6 +167,7 @@ async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider)
       const text: string = json?.choices?.[0]?.message?.content ?? '';
       const inTok: number = json?.usage?.prompt_tokens ?? estimateTokens(system + opts.user);
       const outTok: number = json?.usage?.completion_tokens ?? estimateTokens(text);
+      opts.budget?.record(inTok, outTok, provider.label ?? provider.name);
       return { text, inTok, outTok, model };
     } catch (e) {
       const waitMs = Math.min(30_000, 2 ** attempt * 1_000);
@@ -192,13 +192,23 @@ async function callWithFailover(opts: CallOpts, stricter: boolean): Promise<RawO
   const providers = llmProviders();
   if (!providers.length) return { error: 'no LLM provider configured (set GROQ_API_KEY or another provider key)' };
 
+  const names = providers.map((p) => p.label ?? p.name);
   let last: RawErr = { error: 'no provider attempted' };
   for (const p of providers) {
+    const who = p.label ?? p.name;
+    // Skip a provider already spent, and one whose own allowance this call
+    // would exceed — both are reasons to move down the chain, not to stop.
+    if (opts.budget?.exhausted(who)) continue;
+    if (opts.budget && !opts.budget.canSpend(estimateTokens(opts.system + opts.user) + 800, who)) continue;
     const res = await rawCall(opts, stricter, p);
     if (!('error' in res)) return res;
     last = res;
     if (!res.exhausted) return res;   // a real error: do not mask it by retrying elsewhere
-    if (providers.length > 1) console.warn(`[llm] ${p.label ?? p.name} exhausted; trying next provider`);
+    if (providers.length > 1) console.warn(`[llm] ${who} exhausted; trying next provider`);
+  }
+  // Only now is the run genuinely out of capacity.
+  if (opts.budget?.allExhausted(names)) {
+    opts.budget.halt(`every provider exhausted: ${names.join(', ')}`);
   }
   return last;
 }
@@ -210,9 +220,11 @@ async function callWithFailover(opts: CallOpts, stricter: boolean): Promise<RawO
 export async function callJson<T = unknown>(opts: CallOpts): Promise<LlmResult<T>> {
   let model = opts.model ?? env.groqModelScoring();
   const budget = opts.budget;
-  const est = estimateTokens(opts.system + opts.user) + 800;
 
-  if (budget && !budget.canSpend(est)) {
+  // No pre-emptive gate here: whether capacity exists is a per-provider
+  // question that callWithFailover answers as it walks the chain. A single
+  // check against one provider's cap is what halted runs while others had room.
+  if (budget?.halted) {
     return { ok: false, data: null, raw: null, error: `budget halted: ${budget.haltReason}`, tokensIn: 0, tokensOut: 0, model };
   }
 
@@ -221,7 +233,6 @@ export async function callJson<T = unknown>(opts: CallOpts): Promise<LlmResult<T
   if ('error' in res) {
     return { ok: false, data: null, raw: null, error: res.error, tokensIn: 0, tokensOut: 0, model };
   }
-  budget?.record(res.inTok, res.outTok);
   model = res.model;
 
   let candidate = extractJson(res.text);
@@ -233,14 +244,13 @@ export async function callJson<T = unknown>(opts: CallOpts): Promise<LlmResult<T
 
   // Attempt 2: one stricter instruction, per the brief.
   console.warn('[llm] JSON parse failed; one stricter retry');
-  if (budget && !budget.canSpend(est)) {
+  if (budget?.halted) {
     return { ok: false, data: null, raw: res.text, error: 'malformed JSON; budget halted before retry', tokensIn: res.inTok, tokensOut: res.outTok, model };
   }
   const res2 = await callWithFailover(opts, true);
   if ('error' in res2) {
     return { ok: false, data: null, raw: res.text, error: `malformed JSON; retry failed: ${res2.error}`, tokensIn: res.inTok, tokensOut: res.outTok, model };
   }
-  budget?.record(res2.inTok, res2.outTok);
   model = res2.model;
 
   candidate = extractJson(res2.text);
