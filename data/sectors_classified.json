@@ -1,0 +1,2199 @@
+{
+  "results": [
+    {
+      "name": "Actio Biosciences",
+      "sector": "health",
+      "subsector": "therapeutics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells precision therapies for genetic diseases"
+    },
+    {
+      "name": "Ambi Robotics",
+      "sector": "industrial",
+      "subsector": "robotics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells parcel-sorting robots"
+    },
+    {
+      "name": "Anduril Industries",
+      "sector": "defence",
+      "subsector": "defence_systems",
+      "tags": [
+        "defence_software"
+      ],
+      "confidence": "high",
+      "why": "sells autonomous defence systems and Lattice software"
+    },
+    {
+      "name": "Anthropic",
+      "sector": "ai",
+      "subsector": "ai_models",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells frontier foundation model access"
+    },
+    {
+      "name": "Anysphere",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells an AI coding assistant"
+    },
+    {
+      "name": "Applied Intuition",
+      "sector": "defence",
+      "subsector": "defence_software",
+      "tags": [
+        "robotics",
+        "ai_software"
+      ],
+      "confidence": "medium",
+      "why": "sells dual-use autonomy and vehicle software"
+    },
+    {
+      "name": "Baseten",
+      "sector": "ai",
+      "subsector": "ai_infrastructure",
+      "tags": [
+        "ai_software"
+      ],
+      "confidence": "high",
+      "why": "sells model inference infrastructure"
+    },
+    {
+      "name": "Braintrust",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells AI evaluation and observability software"
+    },
+    {
+      "name": "Bright Machines",
+      "sector": "industrial",
+      "subsector": "advanced_manufacturing",
+      "tags": [
+        "robotics"
+      ],
+      "confidence": "high",
+      "why": "sells robotic factory automation systems"
+    },
+    {
+      "name": "CHAOS Industries",
+      "sector": "defence",
+      "subsector": "defence_systems",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells radar systems for air and missile defence"
+    },
+    {
+      "name": "Castelion",
+      "sector": "defence",
+      "subsector": "defence_systems",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells hypersonic strike weapons"
+    },
+    {
+      "name": "Chai Discovery",
+      "sector": "ai",
+      "subsector": "ai_models",
+      "tags": [
+        "therapeutics"
+      ],
+      "confidence": "high",
+      "why": "sells molecular design foundation models"
+    },
+    {
+      "name": "Chroma",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells a vector database for AI applications"
+    },
+    {
+      "name": "Cognition AI",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells an autonomous coding agent"
+    },
+    {
+      "name": "Collaborative Robotics",
+      "sector": "industrial",
+      "subsector": "robotics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells collaborative mobile robots"
+    },
+    {
+      "name": "Crusoe",
+      "sector": "ai",
+      "subsector": "ai_infrastructure",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells AI data centers and cloud capacity"
+    },
+    {
+      "name": "Dare Bioscience, Inc.",
+      "sector": "health",
+      "subsector": "therapeutics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells women's health therapies"
+    },
+    {
+      "name": "Databricks",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells data and AI platform software"
+    },
+    {
+      "name": "Decagon",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells AI customer-support agents"
+    },
+    {
+      "name": "Deepgram",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells speech recognition APIs"
+    },
+    {
+      "name": "Dexterity",
+      "sector": "industrial",
+      "subsector": "robotics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells warehouse manipulation robots"
+    },
+    {
+      "name": "ElevenLabs",
+      "sector": "ai",
+      "subsector": "ai_models",
+      "tags": [
+        "ai_software"
+      ],
+      "confidence": "high",
+      "why": "sells voice and audio generation models"
+    },
+    {
+      "name": "Epicrispr Biotechnologies",
+      "sector": "health",
+      "subsector": "therapeutics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells epigenetic editing therapeutics"
+    },
+    {
+      "name": "Etched",
+      "sector": "compute",
+      "subsector": "semiconductors",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells transformer inference ASICs"
+    },
+    {
+      "name": "Field AI",
+      "sector": "industrial",
+      "subsector": "robotics",
+      "tags": [
+        "ai_software"
+      ],
+      "confidence": "high",
+      "why": "sells autonomy software for field robots"
+    },
+    {
+      "name": "Fireworks AI",
+      "sector": "ai",
+      "subsector": "ai_infrastructure",
+      "tags": [
+        "ai_software"
+      ],
+      "confidence": "high",
+      "why": "sells generative AI inference infrastructure"
+    },
+    {
+      "name": "Freenome",
+      "sector": "health",
+      "subsector": "medtech_devices",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells blood-based cancer screening diagnostics"
+    },
+    {
+      "name": "Genspark",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells an AI agent workspace"
+    },
+    {
+      "name": "Glean",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells enterprise AI search and agents"
+    },
+    {
+      "name": "Hadrian",
+      "sector": "industrial",
+      "subsector": "advanced_manufacturing",
+      "tags": [
+        "defence_systems"
+      ],
+      "confidence": "high",
+      "why": "sells automated precision-parts factories"
+    },
+    {
+      "name": "Harvey",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells legal AI platform software"
+    },
+    {
+      "name": "Hippocratic AI",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [
+        "digital_health"
+      ],
+      "confidence": "high",
+      "why": "sells healthcare AI agents for patient calls"
+    },
+    {
+      "name": "Kinetic Technologies",
+      "sector": "compute",
+      "subsector": "semiconductors",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells automotive and power semiconductors"
+    },
+    {
+      "name": "Lambda",
+      "sector": "ai",
+      "subsector": "ai_infrastructure",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells GPU cloud capacity"
+    },
+    {
+      "name": "LangChain",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells agent orchestration developer tools"
+    },
+    {
+      "name": "Lightmatter",
+      "sector": "compute",
+      "subsector": "photonics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells photonic interconnects for AI systems"
+    },
+    {
+      "name": "Luma AI",
+      "sector": "ai",
+      "subsector": "ai_models",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells multimodal image and video generation models"
+    },
+    {
+      "name": "Lumotive",
+      "sector": "compute",
+      "subsector": "photonics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells optical beam-steering chips"
+    },
+    {
+      "name": "MatX",
+      "sector": "compute",
+      "subsector": "semiconductors",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells LLM-optimized AI chips"
+    },
+    {
+      "name": "Matic",
+      "sector": "industrial",
+      "subsector": "robotics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells autonomous home robots"
+    },
+    {
+      "name": "Mercor",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells an AI talent and data marketplace"
+    },
+    {
+      "name": "Moon Surgical",
+      "sector": "health",
+      "subsector": "medtech_devices",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells surgical assistance robots"
+    },
+    {
+      "name": "Neros Technologies",
+      "sector": "defence",
+      "subsector": "defence_systems",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells NDAA-compliant FPV drones"
+    },
+    {
+      "name": "Neuralink",
+      "sector": "health",
+      "subsector": "medtech_devices",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells brain-computer interface implants"
+    },
+    {
+      "name": "Nexthop AI",
+      "sector": "ai",
+      "subsector": "ai_infrastructure",
+      "tags": [],
+      "confidence": "medium",
+      "why": "sells networking infrastructure for AI clusters"
+    },
+    {
+      "name": "Noah Medical",
+      "sector": "health",
+      "subsector": "medtech_devices",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells bronchoscopy surgical robotics"
+    },
+    {
+      "name": "Parallel",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells web infrastructure for AI agents"
+    },
+    {
+      "name": "Perplexity",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells an AI answer engine"
+    },
+    {
+      "name": "Physical Intelligence",
+      "sector": "ai",
+      "subsector": "ai_models",
+      "tags": [
+        "robotics"
+      ],
+      "confidence": "high",
+      "why": "sells robot foundation models"
+    },
+    {
+      "name": "PsiQuantum",
+      "sector": "compute",
+      "subsector": "quantum",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells fault-tolerant quantum computers"
+    },
+    {
+      "name": "Quilter",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells automated PCB design software"
+    },
+    {
+      "name": "Replicate",
+      "sector": "ai",
+      "subsector": "ai_infrastructure",
+      "tags": [
+        "ai_software"
+      ],
+      "confidence": "high",
+      "why": "sells hosted model deployment APIs"
+    },
+    {
+      "name": "SambaNova Systems",
+      "sector": "compute",
+      "subsector": "semiconductors",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells dataflow AI chips and systems"
+    },
+    {
+      "name": "SandboxAQ",
+      "sector": "compute",
+      "subsector": "quantum",
+      "tags": [
+        "ai_software"
+      ],
+      "confidence": "high",
+      "why": "sells quantum security and sensing software"
+    },
+    {
+      "name": "Shield AI",
+      "sector": "defence",
+      "subsector": "defence_systems",
+      "tags": [
+        "defence_software"
+      ],
+      "confidence": "high",
+      "why": "sells autonomous defence aircraft and pilot software"
+    },
+    {
+      "name": "SiFive",
+      "sector": "compute",
+      "subsector": "semiconductors",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells RISC-V processor IP"
+    },
+    {
+      "name": "Sierra",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells enterprise conversational AI agents"
+    },
+    {
+      "name": "Sila Nanotechnologies",
+      "sector": "industrial",
+      "subsector": "materials_energy",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells silicon anode battery materials"
+    },
+    {
+      "name": "Skild AI",
+      "sector": "ai",
+      "subsector": "ai_models",
+      "tags": [
+        "robotics"
+      ],
+      "confidence": "high",
+      "why": "sells robot foundation models"
+    },
+    {
+      "name": "Skydio",
+      "sector": "defence",
+      "subsector": "defence_systems",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells drones to defence and public safety"
+    },
+    {
+      "name": "Temporal",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells durable agent orchestration software"
+    },
+    {
+      "name": "Tenstorrent",
+      "sector": "compute",
+      "subsector": "semiconductors",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells RISC-V and chiplet AI compute"
+    },
+    {
+      "name": "Together AI",
+      "sector": "ai",
+      "subsector": "ai_infrastructure",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells cloud infrastructure for AI models"
+    },
+    {
+      "name": "Twelve Labs",
+      "sector": "ai",
+      "subsector": "ai_models",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells video-understanding AI models"
+    },
+    {
+      "name": "Zipline",
+      "sector": "industrial",
+      "subsector": "robotics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells civil drone delivery systems"
+    },
+    {
+      "name": "d-Matrix",
+      "sector": "compute",
+      "subsector": "semiconductors",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells in-memory AI inference chips"
+    },
+    {
+      "name": "137 Holdings ISII, LLC",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "37360NSR-AZ, LLC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells commercial real estate interests"
+    },
+    {
+      "name": "5596OSH-NY, LLC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells commercial real estate interests"
+    },
+    {
+      "name": "ADELANTO LANDOWNER TWO, LLC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells commercial real estate interests"
+    },
+    {
+      "name": "AE-0722 Fund I, a series of Roll Up Vehicles, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "AH Drinkwater Holdings, LLC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells lodging investment interests"
+    },
+    {
+      "name": "AIX Ventures Fund III, L.P.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "AMPLIFICA HOLDINGS GROUP, INC.",
+      "sector": "other",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "biotechnology label too broad to classify"
+    },
+    {
+      "name": "ANTR-5, a series of ALEXTAR VC, LLC",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "ARCADIA OUTPATIENT SURGERY CENTER LP",
+      "sector": "health",
+      "subsector": "healthcare_services",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells outpatient surgery services"
+    },
+    {
+      "name": "Abridge",
+      "sector": "health",
+      "subsector": "digital_health",
+      "tags": [
+        "ai_software"
+      ],
+      "confidence": "high",
+      "why": "sells clinical documentation workflow software"
+    },
+    {
+      "name": "Acequia Capital OCN LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Acrylic Explorer Fund LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Aequim Arbitrage Fund LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Aevos AI Inc.",
+      "sector": "ai",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "sells AI computer product, specifics unverified"
+    },
+    {
+      "name": "Affirm",
+      "sector": "finance",
+      "subsector": "fintech",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells point-of-sale installment payments"
+    },
+    {
+      "name": "Aledade",
+      "sector": "health",
+      "subsector": "digital_health",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells primary care practice support services"
+    },
+    {
+      "name": "Alpha-9 Oncology",
+      "sector": "health",
+      "subsector": "therapeutics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells radiopharmaceutical cancer therapies"
+    },
+    {
+      "name": "Altos Labs",
+      "sector": "health",
+      "subsector": "therapeutics",
+      "tags": [],
+      "confidence": "medium",
+      "why": "develops cell rejuvenation therapies"
+    },
+    {
+      "name": "Amp Robotics",
+      "sector": "industrial",
+      "subsector": "robotics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells recycling sorting robots"
+    },
+    {
+      "name": "Ampersand Biomedicines",
+      "sector": "health",
+      "subsector": "biotech_platforms",
+      "tags": [
+        "therapeutics"
+      ],
+      "confidence": "medium",
+      "why": "sells an addressed biologics platform"
+    },
+    {
+      "name": "Anello Photonics",
+      "sector": "compute",
+      "subsector": "photonics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells silicon-photonic optical gyroscopes"
+    },
+    {
+      "name": "Apex Space",
+      "sector": "aerospace",
+      "subsector": "space",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells satellite bus platforms"
+    },
+    {
+      "name": "Apron",
+      "sector": "finance",
+      "subsector": "fintech",
+      "tags": [],
+      "confidence": "medium",
+      "why": "sells invoice and payroll automation"
+    },
+    {
+      "name": "Array Labs",
+      "sector": "aerospace",
+      "subsector": "space",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells radar-imaging satellite constellations"
+    },
+    {
+      "name": "Arrcus",
+      "sector": "digital",
+      "subsector": "networking_connectivity",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells datacenter and telecom routing software"
+    },
+    {
+      "name": "Asana",
+      "sector": "digital",
+      "subsector": "software_platforms",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells enterprise work management software"
+    },
+    {
+      "name": "AspenView Technology Partners, Inc.",
+      "sector": "other",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "SEC label too broad to classify"
+    },
+    {
+      "name": "Assort Health",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [
+        "digital_health"
+      ],
+      "confidence": "high",
+      "why": "sells healthcare voice AI agents"
+    },
+    {
+      "name": "Asterism Books &amp; Distribution Co",
+      "sector": "commerce",
+      "subsector": "commerce_marketplaces",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells book distribution services"
+    },
+    {
+      "name": "Atom Computing",
+      "sector": "compute",
+      "subsector": "quantum",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells neutral-atom quantum computers"
+    },
+    {
+      "name": "AuthZed",
+      "sector": "digital",
+      "subsector": "cybersecurity",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells permissions infrastructure software"
+    },
+    {
+      "name": "Aviatrix",
+      "sector": "digital",
+      "subsector": "networking_connectivity",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells multi-cloud networking software"
+    },
+    {
+      "name": "Axonius",
+      "sector": "digital",
+      "subsector": "cybersecurity",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells cyber asset management software"
+    },
+    {
+      "name": "Ayar Labs",
+      "sector": "compute",
+      "subsector": "photonics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells optical I/O chiplets"
+    },
+    {
+      "name": "BAILARD REAL ESTATE INVESTMENT TRUST, INC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells real estate investment interests"
+    },
+    {
+      "name": "BE FUND III, LLC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells real estate investment interests"
+    },
+    {
+      "name": "BE MEZZ FUND, LLC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells real estate investment interests"
+    },
+    {
+      "name": "Berry Health",
+      "sector": "health",
+      "subsector": "digital_health",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells online care and medication delivery"
+    },
+    {
+      "name": "Bexorg",
+      "sector": "health",
+      "subsector": "biotech_platforms",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells whole-brain perfusion discovery platforms"
+    },
+    {
+      "name": "Bidbus, Inc.",
+      "sector": "other",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "SEC technology label too broad to classify"
+    },
+    {
+      "name": "Biobot Analytics",
+      "sector": "health",
+      "subsector": "digital_health",
+      "tags": [
+        "medtech_devices"
+      ],
+      "confidence": "high",
+      "why": "sells wastewater public health surveillance"
+    },
+    {
+      "name": "BuyerCaddy, Inc.",
+      "sector": "other",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "SEC label too broad to classify"
+    },
+    {
+      "name": "CAPU FUEL ACCESS FUND FIM 100 FUND QC",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "CAPU FUEL ACCESS FUND FIM 100 FUND QP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "CRA-ATH ASC, LLC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells real estate investment interests"
+    },
+    {
+      "name": "CSS Solutions LLC",
+      "sector": "other",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "SEC technology label too broad to classify"
+    },
+    {
+      "name": "CSVCAP LTD",
+      "sector": "finance",
+      "subsector": "financial_services",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells financial services, not technology"
+    },
+    {
+      "name": "CX2",
+      "sector": "defence",
+      "subsector": "defence_systems",
+      "tags": [
+        "defence_software"
+      ],
+      "confidence": "high",
+      "why": "sells electronic warfare systems"
+    },
+    {
+      "name": "Cala Health",
+      "sector": "health",
+      "subsector": "medtech_devices",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells wearable neuromodulation devices"
+    },
+    {
+      "name": "Canva",
+      "sector": "digital",
+      "subsector": "software_platforms",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells online visual design software"
+    },
+    {
+      "name": "Capstan Medical",
+      "sector": "health",
+      "subsector": "medtech_devices",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells heart-valve surgical robots"
+    },
+    {
+      "name": "Cartesia",
+      "sector": "ai",
+      "subsector": "ai_models",
+      "tags": [
+        "ai_software"
+      ],
+      "confidence": "high",
+      "why": "sells streaming text-to-speech models"
+    },
+    {
+      "name": "Cascade Alpine LLC",
+      "sector": "other",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "SEC label too broad to classify"
+    },
+    {
+      "name": "Celestial AI",
+      "sector": "compute",
+      "subsector": "photonics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells photonic memory interconnect systems"
+    },
+    {
+      "name": "Cellanome",
+      "sector": "health",
+      "subsector": "biotech_platforms",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells single-cell analysis platforms"
+    },
+    {
+      "name": "Chainguard",
+      "sector": "digital",
+      "subsector": "cybersecurity",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells software supply-chain security"
+    },
+    {
+      "name": "Character Biosciences",
+      "sector": "health",
+      "subsector": "therapeutics",
+      "tags": [
+        "ai_models"
+      ],
+      "confidence": "high",
+      "why": "sells genetics-driven therapeutics"
+    },
+    {
+      "name": "Chef Robotics",
+      "sector": "industrial",
+      "subsector": "robotics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells food assembly robots"
+    },
+    {
+      "name": "Clearlake Credit Perpetual Feeder Fund A, L.P.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "ClickHouse",
+      "sector": "digital",
+      "subsector": "software_platforms",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells database software for analytics"
+    },
+    {
+      "name": "Cohere Technologies",
+      "sector": "digital",
+      "subsector": "networking_connectivity",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells mobile network spectrum software"
+    },
+    {
+      "name": "Colonial Strategic Income Fund, LLC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells real estate investment interests"
+    },
+    {
+      "name": "Cordillera Environmental Assets Fund, LLC",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Cordillera Investment Fund IV, L.P.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Cordillera Investment Fund IV-B, L.P.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Crystalys Therapeutics",
+      "sector": "health",
+      "subsector": "therapeutics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells urate-lowering therapeutics"
+    },
+    {
+      "name": "DATAH, L.P.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "DREAM U.S. INDUSTRIAL FUND LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [
+        "real_estate"
+      ],
+      "confidence": "high",
+      "why": "sells industrial property fund interests"
+    },
+    {
+      "name": "DataHub",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "medium",
+      "why": "sells data governance software for AI"
+    },
+    {
+      "name": "DeepL",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells language AI translation software"
+    },
+    {
+      "name": "Delphi Interactive Inc",
+      "sector": "other",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "SEC technology label too broad to classify"
+    },
+    {
+      "name": "Diamond Art Club Investment, LLC",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Diffusion V2, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Discipulus Fund II Aggregator, LLC",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Discord",
+      "sector": "digital",
+      "subsector": "software_platforms",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells community voice and text chat"
+    },
+    {
+      "name": "Dream SPV Atomic LLC",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "DreamBig Semiconductor",
+      "sector": "compute",
+      "subsector": "semiconductors",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells chiplet and SmartNIC-DPU silicon"
+    },
+    {
+      "name": "DroneDeploy",
+      "sector": "industrial",
+      "subsector": "robotics",
+      "tags": [],
+      "confidence": "medium",
+      "why": "sells drone and robot reality-capture software"
+    },
+    {
+      "name": "Eliyan",
+      "sector": "compute",
+      "subsector": "semiconductors",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells chiplet interconnect PHY"
+    },
+    {
+      "name": "Ember LifeSciences, Inc.",
+      "sector": "commerce",
+      "subsector": "logistics_supply_chain",
+      "tags": [
+        "healthcare_services"
+      ],
+      "confidence": "medium",
+      "why": "sells cold-chain shipping systems for medicines"
+    },
+    {
+      "name": "EnCharge AI",
+      "sector": "compute",
+      "subsector": "semiconductors",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells analog AI accelerators"
+    },
+    {
+      "name": "Enlitic",
+      "sector": "health",
+      "subsector": "digital_health",
+      "tags": [
+        "ai_software"
+      ],
+      "confidence": "high",
+      "why": "sells medical imaging data workflow software"
+    },
+    {
+      "name": "Ensysce Biosciences, Inc.",
+      "sector": "health",
+      "subsector": "therapeutics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells abuse-deterrent pain therapeutics"
+    },
+    {
+      "name": "Epirus",
+      "sector": "defence",
+      "subsector": "defence_systems",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells high-power microwave counter-UAS systems"
+    },
+    {
+      "name": "Etched SPV, LLC",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "EvenUp",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells AI legal case workflow software"
+    },
+    {
+      "name": "EvolutionaryScale",
+      "sector": "ai",
+      "subsector": "ai_models",
+      "tags": [
+        "biotech_platforms"
+      ],
+      "confidence": "high",
+      "why": "sells protein-design foundation models"
+    },
+    {
+      "name": "ExchangeRight Essential Income 13 DST",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells commercial real estate interests"
+    },
+    {
+      "name": "FP VIII Amethyst Co-Invest, L.P.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Factual",
+      "sector": "digital",
+      "subsector": "software_platforms",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells location data platform software"
+    },
+    {
+      "name": "Faire",
+      "sector": "commerce",
+      "subsector": "commerce_marketplaces",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells wholesale marketplace software"
+    },
+    {
+      "name": "Farther",
+      "sector": "finance",
+      "subsector": "fintech",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells technology-led wealth management"
+    },
+    {
+      "name": "Fieldguide",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells AI audit automation software"
+    },
+    {
+      "name": "Figma",
+      "sector": "digital",
+      "subsector": "software_platforms",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells collaborative design software"
+    },
+    {
+      "name": "Figure AI",
+      "sector": "industrial",
+      "subsector": "robotics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells humanoid robots"
+    },
+    {
+      "name": "Firestorm Labs",
+      "sector": "defence",
+      "subsector": "defence_systems",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells expeditionary modular drones"
+    },
+    {
+      "name": "Fund II, a series of Mishpacha Fund, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "GC&amp;H INVESTMENTS, LLC",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "HA-0806 Fund I, a series of Platform Funds 2026, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "HCM-SOF II, LLC",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "HI-0701 Fund II, a series of SaxeCap, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "HI-1126 Fund II, a series of AX-RN-Funds, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "HOPE Ventures I, LLC",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "HU-0707 Fund II, a series of DVC, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Hebbia",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells AI document search software"
+    },
+    {
+      "name": "Hopkins Bannock LLC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells commercial real estate interests"
+    },
+    {
+      "name": "Hopkins Capital Fund, L.L.C.",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells real estate investment interests"
+    },
+    {
+      "name": "Hopkins Weaver Springs, LLC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells real estate investment interests"
+    },
+    {
+      "name": "IN-06091 Fund I, a series of Roll Up Vehicles, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "IWF MDR Hotel II, LLC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells hotel real estate interests"
+    },
+    {
+      "name": "Iambic Therapeutics",
+      "sector": "health",
+      "subsector": "therapeutics",
+      "tags": [
+        "ai_models"
+      ],
+      "confidence": "high",
+      "why": "sells AI-designed drug candidates"
+    },
+    {
+      "name": "K2 Space",
+      "sector": "aerospace",
+      "subsector": "space",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells mega-class satellite buses"
+    },
+    {
+      "name": "KIMAMI, INC",
+      "sector": "other",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "manufacturing label too broad to classify"
+    },
+    {
+      "name": "KKR Global Credit Opportunities Feeder II L.P.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "KKR Global Credit Opportunities Fund (Overseas) L.P.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "KKR Global Credit Opportunities Fund L.P.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "KR Investment Partners IV, LLC",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Kamal Ravikant Capital, LP - F3",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Karl-LU-0714 Fund I, a series of Platform Funds 2026, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Kera Ventures IX, LLC",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "LGF I - Allocate Access, L.P.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "LIONHEART LUCID SPV I, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Lake Como Funding Issuer, L.P.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Latitude Health, Inc.",
+      "sector": "health",
+      "subsector": "digital_health",
+      "tags": [
+        "ai_software"
+      ],
+      "confidence": "high",
+      "why": "sells AI utilization-management workflow software"
+    },
+    {
+      "name": "M1 Loan Fund, LLC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells real estate investment interests"
+    },
+    {
+      "name": "MA-0622 Fund I, a series of Sajid Rahman Angel Funds, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "METABODY AI INC.",
+      "sector": "other",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "SEC technology label too broad to classify"
+    },
+    {
+      "name": "MVP Ventures III AI LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "MVP Ventures III QP LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Mach Industries",
+      "sector": "defence",
+      "subsector": "defence_systems",
+      "tags": [
+        "advanced_manufacturing"
+      ],
+      "confidence": "high",
+      "why": "sells vertically integrated defence manufacturing"
+    },
+    {
+      "name": "Marea Therapeutics",
+      "sector": "health",
+      "subsector": "therapeutics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells cardiometabolic therapeutics"
+    },
+    {
+      "name": "Matt-WI-0615 Fund I, a series of Platform Funds 2026, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "NZS Global Growth Fund LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Neomorph",
+      "sector": "health",
+      "subsector": "therapeutics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells molecular-glue degrader therapeutics"
+    },
+    {
+      "name": "Nominal",
+      "sector": "finance",
+      "subsector": "fintech",
+      "tags": [],
+      "confidence": "medium",
+      "why": "sells finance and accounting automation software"
+    },
+    {
+      "name": "Noria Energy, Inc.",
+      "sector": "industrial",
+      "subsector": "materials_energy",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells floating solar energy systems"
+    },
+    {
+      "name": "Nuro",
+      "sector": "industrial",
+      "subsector": "robotics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells autonomous delivery vehicles and licensing"
+    },
+    {
+      "name": "OBSIDIAN PRIME INC",
+      "sector": "other",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "SEC technology label too broad to classify"
+    },
+    {
+      "name": "OM-0715 Fund I, a series of LMNT Ventures I, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Ocean Park Ventures VI, LLC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells commercial investment interests"
+    },
+    {
+      "name": "One Fin Capital LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Orca Bio",
+      "sector": "health",
+      "subsector": "therapeutics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells allogeneic cell therapies"
+    },
+    {
+      "name": "Overland AI",
+      "sector": "defence",
+      "subsector": "defence_software",
+      "tags": [
+        "robotics"
+      ],
+      "confidence": "medium",
+      "why": "sells off-road autonomy software for ground vehicles"
+    },
+    {
+      "name": "PACIFIC TOXICOLOGY LABORATORIES",
+      "sector": "health",
+      "subsector": "medtech_devices",
+      "tags": [],
+      "confidence": "medium",
+      "why": "sells toxicology laboratory testing services"
+    },
+    {
+      "name": "PFD MANAGEMENT FUND 1006, LLC",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [
+        "financial_services"
+      ],
+      "confidence": "high",
+      "why": "sells financial services investment products"
+    },
+    {
+      "name": "PFD MANAGEMENT FUND 1008, LLC",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [
+        "financial_services"
+      ],
+      "confidence": "high",
+      "why": "sells financial services investment products"
+    },
+    {
+      "name": "PFD Management Opportunity Fund 3001, LLC",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [
+        "financial_services"
+      ],
+      "confidence": "high",
+      "why": "sells financial services investment products"
+    },
+    {
+      "name": "PL-0529 Fund II, a series of Roll Up Vehicles, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Pathway Private Equity Fund III-Co, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Picogrid",
+      "sector": "defence",
+      "subsector": "defence_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells defence command-and-control software"
+    },
+    {
+      "name": "Point2 Technology",
+      "sector": "compute",
+      "subsector": "semiconductors",
+      "tags": [],
+      "confidence": "medium",
+      "why": "sells RF interconnect chips for AI datacenters"
+    },
+    {
+      "name": "Pontiac Street Industrial, LLC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells commercial real estate interests"
+    },
+    {
+      "name": "Positron AI",
+      "sector": "compute",
+      "subsector": "semiconductors",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells transformer inference accelerators"
+    },
+    {
+      "name": "Powerlaw Corp.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "ProjectButterfly2, PBC",
+      "sector": "finance",
+      "subsector": "financial_services",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells financial services products"
+    },
+    {
+      "name": "Prospect Title Insurance Agency, LLC",
+      "sector": "finance",
+      "subsector": "financial_services",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells title insurance services"
+    },
+    {
+      "name": "RE-0611 Fund I, a series of Jolt VC, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Ramp",
+      "sector": "finance",
+      "subsector": "fintech",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells corporate cards and spend management"
+    },
+    {
+      "name": "Rapidflare, Inc.",
+      "sector": "other",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "SEC technology label too broad to classify"
+    },
+    {
+      "name": "RayThera",
+      "sector": "health",
+      "subsector": "therapeutics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells small-molecule immunology therapeutics"
+    },
+    {
+      "name": "Relational Capital I, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Retym",
+      "sector": "compute",
+      "subsector": "semiconductors",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells datacenter connectivity DSP silicon"
+    },
+    {
+      "name": "Rivos",
+      "sector": "compute",
+      "subsector": "semiconductors",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells RISC-V server silicon"
+    },
+    {
+      "name": "Robbins Capital I, L.P.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "S26, a series of Latitude Fund, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "SSFGP27 LLC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells real estate investment interests"
+    },
+    {
+      "name": "Saronic",
+      "sector": "defence",
+      "subsector": "defence_systems",
+      "tags": [
+        "robotics"
+      ],
+      "confidence": "high",
+      "why": "sells autonomous defence surface vessels"
+    },
+    {
+      "name": "Science Corporation",
+      "sector": "health",
+      "subsector": "medtech_devices",
+      "tags": [
+        "biotech_platforms"
+      ],
+      "confidence": "high",
+      "why": "sells neural interface devices"
+    },
+    {
+      "name": "Sentinel KES Fund, LP",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells real estate investment interests"
+    },
+    {
+      "name": "Sidewinder Therapeutics",
+      "sector": "health",
+      "subsector": "therapeutics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells bispecific antibody-drug conjugates"
+    },
+    {
+      "name": "Spectrum Effect, Inc.",
+      "sector": "other",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "SEC technology label too broad to classify"
+    },
+    {
+      "name": "Sprinter Health",
+      "sector": "health",
+      "subsector": "digital_health",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells in-home care delivery services"
+    },
+    {
+      "name": "Standard Bots",
+      "sector": "industrial",
+      "subsector": "robotics",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells six-axis robotic arms"
+    },
+    {
+      "name": "Standard Cognition, Corp.",
+      "sector": "ai",
+      "subsector": "ai_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells AI checkout systems for retailers"
+    },
+    {
+      "name": "Stonepeak Claremont Holdings LP",
+      "sector": "other",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "SEC technology label too broad to classify"
+    },
+    {
+      "name": "Stripe",
+      "sector": "finance",
+      "subsector": "fintech",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells payment processing and financial infrastructure"
+    },
+    {
+      "name": "TCW EM Local Currency Absolute Return Fund, L.P.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "TCW Emerging Markets Income Focus Fund, L.P.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "TCW Securitized Opportunities, L.P.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "TCW Sepulveda Focused Value Fund, L.P.",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "TCW Sepulveda Long/Short Equity Fund I LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "TCW Sepulveda Long/Short Equity Fund II LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "TH-0201 Fund I, a series of Roll Up Vehicles, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "TH-0805 Fund II, a series of Roll Up Vehicles, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Terray Therapeutics",
+      "sector": "health",
+      "subsector": "therapeutics",
+      "tags": [
+        "ai_models"
+      ],
+      "confidence": "high",
+      "why": "sells AI-designed small-molecule drugs"
+    },
+    {
+      "name": "Unconventional AI",
+      "sector": "compute",
+      "subsector": "semiconductors",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells analog energy-efficient AI compute"
+    },
+    {
+      "name": "Universal Graphene Products, Inc.",
+      "sector": "other",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "placeholder page gives no product detail"
+    },
+    {
+      "name": "VA-0515 Fund I, a series of InvestInData, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "VM-1229 Fund II, a series of Roll Up Vehicles, LP",
+      "sector": "finance",
+      "subsector": "investment_funds",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells investment fund interests"
+    },
+    {
+      "name": "Vannevar Labs",
+      "sector": "defence",
+      "subsector": "defence_software",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells national-security intelligence software"
+    },
+    {
+      "name": "Varda Space Industries",
+      "sector": "aerospace",
+      "subsector": "space",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells in-space manufacturing and reentry capsules"
+    },
+    {
+      "name": "Vellora, Inc.",
+      "sector": "other",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "SEC technology label too broad to classify"
+    },
+    {
+      "name": "Ventana Micro Systems",
+      "sector": "compute",
+      "subsector": "semiconductors",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells RISC-V datacenter CPUs"
+    },
+    {
+      "name": "Virtual Incision",
+      "sector": "health",
+      "subsector": "medtech_devices",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells miniaturized surgical robots"
+    },
+    {
+      "name": "XCath",
+      "sector": "health",
+      "subsector": "medtech_devices",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells neurovascular surgical robots"
+    },
+    {
+      "name": "Xaira Therapeutics",
+      "sector": "health",
+      "subsector": "therapeutics",
+      "tags": [
+        "ai_models"
+      ],
+      "confidence": "high",
+      "why": "sells AI-designed therapeutics"
+    },
+    {
+      "name": "Yellowstone Funding LLC",
+      "sector": "finance",
+      "subsector": "real_estate",
+      "tags": [],
+      "confidence": "high",
+      "why": "sells real estate investment interests"
+    },
+    {
+      "name": "iodyne, Inc.",
+      "sector": "other",
+      "subsector": "",
+      "tags": [],
+      "confidence": "low",
+      "why": "SEC technology label too broad to classify"
+    }
+  ]
+}
