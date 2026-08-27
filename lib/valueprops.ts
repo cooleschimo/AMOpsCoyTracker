@@ -310,29 +310,45 @@ export const VALUE_PROPS: ValueProp[] = [
     ask: 'Establish which functions would sit here — engineering or operations, not sales alone.',
   },
   {
-    id: 'quantum',
-    title: 'Quantum computing and sensing',
-    status: 'committed',
-    sectors: ['deeptech'],
+    id: 'organised_demand',
+    title: 'Access to organised demand — public sector, national programmes, regional enterprise',
+    status: 'established',
+    sectors: ['deeptech', 'biotech', 'defence_tech', 'ai', 'cross_sector'],
     description:
-      'Quantum is a named national priority with a dedicated strategy, a national office, and ' +
-      'operating hardware on the ground. The community is small, which cuts both ways: limited ' +
-      'talent depth, but unusually easy access to the people who matter and to national ' +
-      'programme decision-makers.',
+      'Where Singapore buyers are already adopting, they are unusually reachable: public ' +
+      'agencies, hospital clusters, port and logistics operators, banks and utilities are a ' +
+      'small number of large customers, and one deployment can reach a national footprint. ' +
+      'This is frequently the ENTRY to the engagement EDB actually wants — a company will not ' +
+      'staff a research collaboration that pays for nothing, and a credible route to revenue ' +
+      'is what makes the R&D worth its time. Said plainly rather than disguised: a ' +
+      'proposition that hides its commercial half falls apart in the second meeting.\n\n' +
+      'THE FAILURE MODE IS PROMISING DEMAND THAT DOES NOT EXIST YET. Reachable is not the ' +
+      'same as ready. An offer to convene end users in a field where local operators are ' +
+      'still watching rather than buying produces a pilot that never starts, and it burns ' +
+      'the relationship — the company staffed against a market that was not there. Name the ' +
+      'buyers and say what they are already doing, or do not make this offer.',
     evidence: [
-      'National Quantum Strategy announced 2024 with a national quantum office and computing hub',
-      'Quantinuum bringing its Helios system plus an R&D and operations centre in 2026',
-      'Quantum named as a pillar in the RIE2030 plan',
+      'Public healthcare runs as a small number of large clusters, so one deployment reaches a national footprint',
+      'Port, aviation and utilities operators are concentrated and accessible to a company with a working product',
+      'National programmes aggregate demand in their named sectors rather than leaving it to individual procurement',
     ],
     fits: [
-      'quantum computing, sensing, networking or enabling components',
-      'needs access to a national programme rather than a single customer',
-      'looking for research collaboration and early-adopter users',
+      'Singapore operators in this field are ALREADY deploying comparable technology — not evaluating it',
+      'a specific institutional buyer can be named, with something it is already doing',
+      'product needs reference customers or a regulated-sector proving ground',
+      'commercial case must be made before any R&D or engineering commitment',
+      'wants a small, high-quality deployment rather than a large market',
     ],
     avoidWhen: [
-      'needs a large existing quantum talent pool — the base is small',
+      'the local buyer base is early — interested in principle, not yet procuring. This is the ' +
+        'common failure: demand has to be seeded before it can be offered, and a convening ' +
+        'promise made too early produces a pilot that never starts',
+      'no specific buyer can be named, only a category of institution',
+      'purely consumer product with no institutional buyer',
+      'the company wants market size above all — Singapore is small by design and Indonesia or India is the answer',
+      'no product ready to deploy, so there is nothing for a buyer to buy yet',
     ],
-    ask: 'Introduce national programme counterparts; scope a research or deployment engagement.',
+    ask: 'Name the two or three end users already active in this area, and what they would need to see.',
   },
 ];
 

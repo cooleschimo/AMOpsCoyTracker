@@ -17,12 +17,12 @@
  * without the second axis a large raise at an out-of-scope company outranks
  * silence at a strategically important one — the exact failure §7a exists to
  * prevent. The default targeting (Form D discoveries with no sectors) never
- * reaches the seed watchlist, so before this flag 1 of 56 companies with a
+ * reaches the seed list, so before this flag 1 of 56 companies with a
  * live signal had an assessment.
  */
 import '../lib/loadenv';
 import { eq, sql, and, isNull, or } from 'drizzle-orm';
-import { getDb } from '../lib/db';
+import { getDb, getSql } from '../lib/db';
 import { companies, companyAssessments, runs } from '../lib/schema';
 import { callJson } from '../lib/llm';
 import { Budget } from '../lib/budget';
@@ -31,6 +31,7 @@ import {
   COMPANY_ASSESSMENT_SYSTEM, COMPANY_RUBRIC_VERSION, buildAssessmentPrompt, isBand,
 } from '../lib/company-rubric';
 import { isSector } from '../lib/scope';
+import { CONTRIBUTION_DRIVERS } from '../lib/company-rubric';
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -41,11 +42,16 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
 type Assessment = {
   name: string; sectors: string[];
   target_priority: string; singapore_fit: string;
-  potential_contribution: string; confidence: string; rationale: string;
+  potential_contribution: string; contribution_drivers?: string[];
+  apac_footprint?: string; apac_footprint_detail?: string;
+  prior_expansions?: string; prior_expansions_detail?: string;
+  financial_health?: string; financial_health_detail?: string;
+  confidence: string; rationale: string; revision_note?: string;
 };
 
 (async () => {
   const db = getDb();
+  const sqlc = getSql();
   const batchSize = Number(arg('batch', '11'));
   const limit = Number(arg('limit', '0'));
   const dry = flag('dry');
@@ -93,10 +99,55 @@ type Assessment = {
 
   for (let i = 0; i < targets.length; i += batchSize) {
     const batch = targets.slice(i, i + batchSize);
+    // The standing judgment and what has been learned since. Each run revises
+    // rather than replaces, so a band moves on accumulated evidence and a quiet
+    // week leaves it where it was.
+    const priors = new Map<number, any>();
+    const evidence = new Map<number, string[]>();
+    for (const c of batch) {
+      const [p]: any = await sqlc`
+        select target_priority, singapore_fit, potential_contribution,
+               apac_footprint, prior_expansions, financial_health,
+               confidence, rationale, assessed_at
+        from company_assessments where company_id = ${c.id}
+        order by assessed_at desc limit 1`;
+      if (p) priors.set(c.id, p);
+
+      const sig: any = await sqlc`
+        select why, expansion, momentum, partnership, week_of
+        from company_signals where company_id = ${c.id}
+        order by week_of desc limit 4`;
+      const jobs: any = await sqlc`
+        select total_jobs, non_us_jobs, apac_jobs, snapshot_at
+        from job_snapshots where company_id = ${c.id}
+        order by snapshot_at desc limit 1`;
+
+      const ev: string[] = [];
+      for (const x of sig) {
+        ev.push(`week of ${x.week_of}: expansion ${x.expansion}, momentum ${x.momentum}, partnership ${x.partnership} — ${String(x.why).split(' · ').join('; ')}`);
+      }
+      if (jobs[0]) {
+        ev.push(`hiring: ${jobs[0].total_jobs} open roles, ${jobs[0].non_us_jobs} outside the US, ${jobs[0].apac_jobs} in APAC`);
+      }
+      if (ev.length) evidence.set(c.id, ev);
+    }
+
     const user = buildAssessmentPrompt(batch.map((c) => ({
       name: c.name,
       industry: (c.description ?? '').replace('Form D industry group: ', '') || null,
       state: c.hqState, website: c.website,
+      prior: priors.get(c.id) ? {
+        targetPriority: priors.get(c.id).target_priority,
+        singaporeFit: priors.get(c.id).singapore_fit,
+        potentialContribution: priors.get(c.id).potential_contribution,
+        apacFootprint: priors.get(c.id).apac_footprint,
+        priorExpansions: priors.get(c.id).prior_expansions,
+        financialHealth: priors.get(c.id).financial_health,
+        confidence: priors.get(c.id).confidence,
+        rationale: priors.get(c.id).rationale,
+        assessedAt: priors.get(c.id).assessed_at ? new Date(priors.get(c.id).assessed_at) : null,
+      } : null,
+      evidence: evidence.get(c.id) ?? [],
     })));
 
     counts.batches++;
@@ -128,6 +179,22 @@ type Assessment = {
         targetPriority: isBand(a.target_priority) ? a.target_priority : 'unknown',
         singaporeFit: isBand(a.singapore_fit) ? a.singapore_fit : 'unknown',
         potentialContribution: isBand(a.potential_contribution) ? a.potential_contribution : 'unknown',
+        // 'none' is a finding for footprint, distinct from 'unknown'.
+        apacFootprint: (isBand(a.apac_footprint) || a.apac_footprint === 'none') ? a.apac_footprint : 'unknown',
+        apacFootprintDetail: (a.apac_footprint_detail ?? '').slice(0, 200) || null,
+        priorExpansions: isBand(a.prior_expansions) ? a.prior_expansions : 'unknown',
+        priorExpansionsDetail: (a.prior_expansions_detail ?? '').slice(0, 200) || null,
+        financialHealth: isBand(a.financial_health) ? a.financial_health : 'unknown',
+        financialHealthDetail: (a.financial_health_detail ?? '').slice(0, 200) || null,
+        revisionNote: (a.revision_note ?? '').slice(0, 300) || null,
+        // Which dimensions drive the band. Constrained to the known set so the
+        // stats page can count them; anything else the model invents is dropped.
+        contributionDrivers: Array.isArray(a.contribution_drivers)
+          ? a.contribution_drivers
+              .filter((d): d is string => typeof d === 'string')
+              .filter((d) => CONTRIBUTION_DRIVERS.includes(d as never))
+              .slice(0, 2)
+          : [],
         confidence: isBand(a.confidence) ? a.confidence : 'low',
       };
 
