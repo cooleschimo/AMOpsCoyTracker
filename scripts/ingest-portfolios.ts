@@ -143,8 +143,13 @@ const arg = (n: string, d?: string) => {
           sectors: [],
           accountStatus: 'unknown',
           discoveredVia: 'portfolio',
-          scopeStatus: 'in_scope',
-          scopeReason: `found on ${fund.name} portfolio page; sectors pending assessment`,
+          // Nothing has judged this company. Portfolio scraping populates the
+          // graph so §5.2's reverse index can answer which funds touch a
+          // company — it is not a discovery route, and these are never fetched
+          // for news or scored. 'unknown' is the honest value; 'in_scope' read
+          // as an assessment that never happened.
+          scopeStatus: 'unknown',
+          scopeReason: `found on ${fund.name} portfolio page; graph only, not assessed`,
         }).returning({ id: companies.id });
         companyId = c.id;
         counts.companies_created++;

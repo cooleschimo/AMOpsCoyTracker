@@ -20,10 +20,11 @@
  */
 import '../lib/loadenv';
 import { eq, and, isNotNull, sql } from 'drizzle-orm';
-import { getDb, withRetry } from '../lib/db';
+import { getDb, getSql, withRetry } from '../lib/db';
 import { people, roles, affiliations, organizations, companies, runs, sourceHealth } from '../lib/schema';
 import { FUNDS } from '../lib/funds';
-import { scrapeTeamPage, TEAM_PATHS } from '../lib/people-scrape';
+import { scrapeTeamPage, findTeamPageUrl, TEAM_PATHS } from '../lib/people-scrape';
+import { search } from '../lib/search-providers';
 import { normalizePersonName, normalizeOrgName, normalizeDomain } from '../lib/normalize';
 
 const arg = (n: string, d?: string) => {
@@ -110,18 +111,26 @@ async function doFunds(limit: number, dry: boolean) {
 
 async function doCompanies(limit: number, dry: boolean) {
   const db = getDb();
-  const counts = { tried: 0, sites_ok: 0, sites_zero: 0, people_created: 0, people_matched: 0, roles_created: 0 };
+  const counts = { tried: 0, sites_ok: 0, sites_zero: 0, found_by_search: 0, people_created: 0, people_matched: 0, roles_created: 0 };
 
-  // Only companies that have a website and no people yet.
-  const targets = await withRetry(() => db.select({ id: companies.id, name: companies.name, website: companies.website })
-    .from(companies)
-    .where(and(
-      isNotNull(companies.website),
-      sql`not exists (select 1 from ${roles} r where r.company_id = ${companies.id})`,
-    ))
-    .limit(limit || 40));
+  /**
+   * Companies with a website and no people, strongest signal first.
+   *
+   * Without an order a limited run picks arbitrarily, and the companies that
+   * matter are the ones surfacing in the digest — a warm path is only worth
+   * having for a company somebody is about to approach.
+   */
+  const targets: any = await getSql()`
+    select c.id, c.name, c.website,
+           coalesce((select max(greatest(cs.expansion, cs.partnership))
+                       from company_signals cs where cs.company_id = c.id), 0) as signal
+    from companies c
+    where c.website is not null
+      and not exists (select 1 from roles r where r.company_id = c.id)
+    order by signal desc, c.discovered_via = 'seed' desc, c.name
+    limit ${limit || 40}`;
 
-  console.log(`${targets.length} companies with a website and no people`);
+  console.log(`${targets.length} companies with a website and no people, strongest signal first`);
   for (const c of targets) {
     counts.tried++;
     const domain = normalizeDomain(c.website);
@@ -133,6 +142,16 @@ async function doCompanies(limit: number, dry: boolean) {
       if (r.ok && r.people.length > (best?.people.length ?? 0)) { best = r; bestUrl = `https://${domain}${path}`; }
       if ((best?.people.length ?? 0) >= 5) break;
       await new Promise((s) => setTimeout(s, 150));
+    }
+
+    // The path guesses miss a company that puts its people somewhere else.
+    // Search finds the page it actually published, at one request.
+    if (!(best?.people.length)) {
+      const found = await findTeamPageUrl(domain, c.name, search);
+      if (found) {
+        const r = await scrapeTeamPage(found);
+        if (r.ok && r.people.length) { best = r; bestUrl = found; counts.found_by_search++; }
+      }
     }
     const n = best?.people.length ?? 0;
     if (!n || !best) { counts.sites_zero++; continue; }

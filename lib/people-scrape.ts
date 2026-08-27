@@ -213,3 +213,46 @@ export async function scrapeTeamPage(url: string): Promise<{ ok: boolean; people
 
 /** Common team-page paths, most likely first. */
 export const TEAM_PATHS = ['/team', '/people', '/our-team', '/about/team', '/team/', '/about-us', '/about', '/leadership', '/founders'];
+
+
+/**
+ * Find a team page by search when the conventional paths miss.
+ *
+ * The path list catches companies that use /team or /about; one that puts its
+ * people at /company/leadership or renders them in JavaScript is invisible to
+ * it. A site-restricted search finds the page the company actually published,
+ * and the result is still a page it published about itself.
+ *
+ * Used as a fallback rather than the first move: the path guesses cost nothing
+ * and succeed often enough to be worth trying first.
+ */
+export async function findTeamPageUrl(
+  domain: string,
+  companyName: string,
+  search: (q: string, o?: { maxResults?: number }) => Promise<Array<{ url: string; title: string }>>,
+): Promise<string | null> {
+  try {
+    const hits = await search(
+      `site:${domain} (team OR leadership OR founders OR "about us" OR people)`,
+      { maxResults: 6 },
+    );
+    // Prefer a url whose path looks like a team page over the homepage, which
+    // ranks first for a site: query and rarely lists anyone.
+    const ranked = hits
+      .filter((h) => {
+        try { return new URL(h.url).hostname.replace(/^www\./, '').endsWith(domain); }
+        catch { return false; }
+      })
+      .sort((a, b) => score(b) - score(a));
+    return ranked[0]?.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function score(h: { url: string; title: string }): number {
+  const hay = `${h.url} ${h.title}`.toLowerCase();
+  if (/\b(team|leadership|our-people|founders)\b/.test(hay)) return 3;
+  if (/\babout\b/.test(hay)) return 2;
+  try { return new URL(h.url).pathname.length > 1 ? 1 : 0; } catch { return 0; }
+}

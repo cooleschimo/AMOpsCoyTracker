@@ -46,7 +46,7 @@ export type WarmPath = {
 /**
  * Steep discount: a hub node touching everything tells you nothing.
  *
- * CAVEAT THAT MATTERS (measured 2026-08-24): degree is computed from OUR graph,
+ * CAVEAT THAT MATTERS: degree is computed from OUR graph,
  * so it measures how much we have scraped about a fund, not how connected that
  * fund really is. Lightspeed shows degree 580 because its portfolio page parsed
  * cleanly; GIC and Temasek show degree 3 because they arrived from three seed
