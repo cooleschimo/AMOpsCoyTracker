@@ -50,6 +50,15 @@ export const companies = pgTable('companies', {
   sgMatchStatus: text('sg_match_status'),
   sgEntityStatus: text('sg_entity_status'),
   sgIncorporated: date('sg_incorporated'),
+  /**
+   * CB Insights entity id, stored on a match confirmed against a second
+   * attribute. Resolving by name returned the wrong company outright several
+   * times — a 1996 life-sciences firm for Cognition, a Norwich community-app
+   * builder for Zipline — each with a complete and plausible profile attached.
+   * Once the id is known, a later pull addresses the entity directly and the
+   * question does not arise again.
+   */
+  cbiOrgId: integer('cbi_org_id'),
   atsType: text('ats_type'),
   atsSlug: text('ats_slug'),
   discoveredVia: text('discovered_via'),
@@ -77,6 +86,34 @@ export const people = pgTable('people', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
   normalizedName: text('normalized_name').notNull(),
+  /**
+   * Title and bio from a public search result, never a direct fetch of a
+   * profile site. Anything derived from a snippet is `probable` and carries its
+   * source, so the page can say where it came from rather than asserting it.
+   */
+  title: text('title'),
+  bio: text('bio'),
+  bioSource: text('bio_source'),
+  bioSourceUrl: text('bio_source_url'),
+  bioStatus: text('bio_status'),
+  /**
+   * Profile URL a search index returned. Storing the link is not a fetch of the
+   * site, and §14 permits URLs from a third-party crawl; nothing here reads the
+   * page behind it.
+   */
+  profileUrl: text('profile_url'),
+  /**
+   * Contact details read from a public source. The source url travels with them
+   * and is verified against what the search returned, so a plausible-looking
+   * address assembled from a naming pattern cannot reach the record.
+   *
+   * A contact ages fast, which is the other reason the source is kept.
+   */
+  contactEmail: text('contact_email'),
+  contactPhone: text('contact_phone'),
+  contactSourceUrl: text('contact_source_url'),
+  contactFoundAt: timestamp('contact_found_at', { withTimezone: true }),
+  bioFetchedAt: timestamp('bio_fetched_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 }, (t) => [index('people_normalized_name_idx').on(t.normalizedName)]);
 
@@ -87,6 +124,19 @@ export const organizations = pgTable('organizations', {
   orgType: text('org_type'),
   website: text('website'),
   sgPresence: boolean('sg_presence'),
+  /**
+   * Where the fund itself sits. A fund with a Singapore or APAC office is
+   * reachable directly rather than through a portfolio company, which makes it
+   * a shorter path than any of its investments.
+   */
+  hqCity: text('hq_city'),
+  hqCountry: text('hq_country'),
+  apacOffice: text('apac_office'),
+  foundedYear: integer('founded_year'),
+  description: text('description'),
+  cbiOrgId: integer('cbi_org_id'),
+  infoSource: text('info_source'),
+  infoAsOf: date('info_as_of'),
   notes: text('notes'),
 }, (t) => [uniqueIndex('organizations_normalized_name_key').on(t.normalizedName)]);
 
@@ -205,6 +255,13 @@ export const items = pgTable('items', {
   publishedAt: timestamp('published_at', { withTimezone: true }),
   fetchedAt: timestamp('fetched_at', { withTimezone: true }).defaultNow(),
   companyId: integer('company_id').references(() => companies.id),
+  /**
+   * Context items carry no company: a tariff change or a Singapore budget
+   * commitment bears on a whole sector. `contextKind` marks them so the
+   * company-match filter lets them through, and `sectors` says who they bear on.
+   */
+  contextKind: text('context_kind'),
+  sectors: text('sectors').array(),
   clusterId: integer('cluster_id'),
   status: text('status').notNull(),
   droppedReason: text('dropped_reason'),
@@ -226,12 +283,68 @@ export const scores = pgTable('scores', {
   sectors: text('sectors').array(),
   region: text('region'),
   expansionLanguage: boolean('expansion_language').default(false),
+  /**
+   * How fast the company is moving, 0-3, judged independently of `score`.
+   *
+   * `score` asks "is a location decision in play?"; momentum asks "is this
+   * company accelerating?". They come apart constantly — a company tripling
+   * revenue has high momentum and no location decision — and the dashboard's
+   * two sections rank on different ones: discovery on the company axis,
+   * trending on momentum.
+   *
+   * Nullable because scores written before item-v4 have no momentum judgment,
+   * and a missing value must not read as zero.
+   */
+  momentum: smallint('momentum'),
   why: text('why').notNull(),
   rubricVersion: text('rubric_version').notNull(),
   model: text('model').notNull(),
   fewshotUsed: boolean('fewshot_used').default(false),
   scoredAt: timestamp('scored_at', { withTimezone: true }).defaultNow(),
 }, (t) => [uniqueIndex('scores_item_rubric_key').on(t.itemId, t.rubricVersion)]);
+
+/**
+ * Company-level trigger and momentum over a rolling window. Brief §7.
+ *
+ * The UNIT IS THE COMPANY: this is company discovery, and an RD approaches a
+ * company rather than an article. Scoring per item gave one underlying reality
+ * several inconsistent answers, and left the model padding when an item
+ * supported a single fact.
+ *
+ * `representative_item_id` is what keeps §7a's why-now rule intact — a company
+ * reaches the digest only with a specific event to lead with. A strong company
+ * with nothing to point at stays held back.
+ *
+ * UNIQUE on (company_id, week_of, signal_version) so a re-run replaces the
+ * week's judgment while earlier weeks and earlier versions survive — the same
+ * contract as scores.rubric_version.
+ */
+export const companySignals = pgTable('company_signals', {
+  id: serial('id').primaryKey(),
+  companyId: integer('company_id').references(() => companies.id).notNull(),
+  /** Monday of the week this was computed for. */
+  weekOf: date('week_of').notNull(),
+  /** Is the company deciding where to put something — an Asia move, or an open siting decision. */
+  expansion: smallint('expansion').notNull(),
+  /** Is the company accelerating. */
+  momentum: smallint('momentum').notNull(),
+  /** Is there an opening EDB could propose into — joint R&D, a testbed, a deployment. */
+  partnership: smallint('partnership').notNull(),
+  signalType: text('signal_type').notNull(),
+  expansionLanguage: boolean('expansion_language').default(false),
+  /** Points, ' · ' joined. 1-4, as many as the window supports. */
+  why: text('why').notNull(),
+  /** The item an RD leads with. Null if the model named one we did not offer. */
+  representativeItemId: integer('representative_item_id').references(() => items.id, { onDelete: 'set null' }),
+  itemsConsidered: integer('items_considered'),
+  windowDays: integer('window_days'),
+  signalVersion: text('signal_version').notNull(),
+  model: text('model').notNull(),
+  scoredAt: timestamp('scored_at', { withTimezone: true }).defaultNow(),
+}, (t) => [
+  uniqueIndex('company_signals_company_week_version_key').on(t.companyId, t.weekOf, t.signalVersion),
+  index('company_signals_week_idx').on(t.weekOf),
+]);
 
 /** Company-level assessment. Cached per company and refreshed monthly. */
 export const companyAssessments = pgTable('company_assessments', {
@@ -240,6 +353,46 @@ export const companyAssessments = pgTable('company_assessments', {
   targetPriority: text('target_priority'),
   singaporeFit: text('singapore_fit'),
   potentialContribution: text('potential_contribution'),
+  /**
+   * Whether the company already operates in Asia — offices, entities, staff,
+   * customers. A firm with a Tokyo office is a different conversation from one
+   * with none, and ACRA sees only Singapore.
+   */
+  apacFootprint: text('apac_footprint'),
+  apacFootprintDetail: text('apac_footprint_detail'),
+  /**
+   * Has this company opened international sites before. A company that has
+   * expanded once tends to expand again, which is why OCO and Frenger both
+   * screen on it.
+   */
+  priorExpansions: text('prior_expansions'),
+  priorExpansionsDetail: text('prior_expansions_detail'),
+  /**
+   * Revenue and profit trajectory, runway. Free sources give almost none of
+   * this for private companies, so 'unknown' is the common and honest answer;
+   * `financialSource` records where a figure came from when one exists.
+   */
+  financialHealth: text('financial_health'),
+  financialHealthDetail: text('financial_health_detail'),
+  financialSource: text('financial_source'),
+  financialAsOf: date('financial_as_of'),
+  /**
+   * What changed since the previous assessment and why. Each week revises the
+   * standing judgment rather than replacing it, so this is the record of how a
+   * company moved from medium to high.
+   */
+  revisionNote: text('revision_note'),
+  /** How many prior assessments this one builds on. */
+  revisionOf: integer('revision_of'),
+  /**
+   * Which one or two dimensions drive the contribution band — capex, R&D,
+   * regional HQ, skilled jobs, capability, spillovers.
+   *
+   * A band alone is not readable: "high" is only meaningful once a reader knows
+   * high in what. Stored as an array so the digest can name them and the stats
+   * page can count which dimensions actually recur.
+   */
+  contributionDrivers: text('contribution_drivers').array().default([]),
   confidence: text('confidence'),
   rationale: text('rationale'),
   model: text('model'),
@@ -313,6 +466,28 @@ export const dispositions = pgTable('dispositions', {
   note: text('note'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 }, (t) => [uniqueIndex('dispositions_item_voter_key').on(t.itemId, t.voterKey)]);
+
+/**
+ * Companies an RD chose to monitor (§11a). Their later activity surfaces in the
+ * monitoring section rather than competing for a discovery slot.
+ *
+ * Removal sets `removedAt` rather than deleting the row: how long a company sat
+ * monitored without being promoted is evidence about the company assessment,
+ * and a deleted row cannot say that.
+ */
+export const monitoring = pgTable('monitoring', {
+  id: serial('id').primaryKey(),
+  companyId: integer('company_id').references(() => companies.id).notNull(),
+  voterKey: text('voter_key').notNull(),
+  /** The item that prompted the monitor, for the "why is this here" line. */
+  itemId: integer('item_id').references(() => items.id, { onDelete: 'set null' }),
+  note: text('note'),
+  addedAt: timestamp('added_at', { withTimezone: true }).defaultNow(),
+  removedAt: timestamp('removed_at', { withTimezone: true }),
+}, (t) => [
+  uniqueIndex('monitoring_company_voter_key').on(t.companyId, t.voterKey),
+  index('monitoring_company_idx').on(t.companyId),
+]);
 
 export const opportunities = pgTable('opportunities', {
   id: serial('id').primaryKey(),
