@@ -26,7 +26,7 @@ const TRACKING_PARAMS = [
  *
  * Google News RSS links are redirect wrappers (news.google.com/rss/articles/...)
  * whose target is not in the URL — it is base64 inside the path segment, and
- * Google changed that encoding in 2024, so it no longer decodes reliably. The
+ * That encoding does not decode reliably. The
  * wrapper itself is stable per article, so canonicalising the wrapper is enough:
  * two feeds carrying the same article produce the same wrapper URL and exact
  * dedupe still catches them. Cross-source dedupe is the clustering stage's job.

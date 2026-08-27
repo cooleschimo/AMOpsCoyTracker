@@ -69,16 +69,41 @@ export type FeedItem = {
 
 const UA = 'Mozilla/5.0 (compatible; AMOpsCoyTracker/1.0; +research)';
 
+/**
+ * Decode HTML entities once.
+ * `&amp;` is decoded LAST: doing it first would turn `&amp;lt;` into `&lt;` and
+ * then into `<`, inventing markup that was never in the source.
+ */
+const decodeEntities = (t: string): string => t
+  .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+  .replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'")
+  .replace(/&nbsp;|&#160;/gi, ' ')
+  .replace(/&mdash;|&ndash;/gi, '-')
+  .replace(/&#(\d+);/g, (_m, d) => String.fromCharCode(Number(d)))
+  .replace(/&amp;/g, '&');
+
+/**
+ * Extract the TEXT of an element.
+ *
+ * ORDER MATTERS. A feed carrying escaped HTML — `&lt;a href=...&gt;` — has its
+ * markup restored if tags are stripped before entities are decoded, and Google
+ * News does exactly that: every <description> is an escaped <ol> of related
+ * articles nested inside CDATA.
+ *
+ * So: decode, strip, and REPEAT until the text stops changing, because one pass
+ * unwraps only one level of escaping.
+ */
 const tagText = (xml: string, tag: string): string | null => {
   const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'i'));
   if (!m) return null;
-  return m[1]
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim() || null;
+
+  let t = m[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
+  for (let pass = 0; pass < 3; pass++) {
+    const before = t;
+    t = decodeEntities(t).replace(/<[^>]+>/g, ' ');
+    if (t === before) break;
+  }
+  return t.replace(/\s+/g, ' ').trim() || null;
 };
 
 /** Parse an RSS or Atom feed. Never throws. */
@@ -169,3 +194,271 @@ export const TOPIC_QUERIES: Array<{ id: string; query: string; note: string }> =
 export function googleNewsTopicUrl(query: string): string {
   return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
 }
+
+
+/**
+ * Context sources: what is happening around a company rather than to it.
+ *
+ * A tariff change, an export-control rule, a Singapore budget commitment or a
+ * sector-wide funding wave changes what EDB can offer and whether a company is
+ * reachable at all, without ever naming the company. These land with no
+ * company_id and a sector tag, and feed the company assessment as context.
+ *
+ * Singapore agencies publish no usable feed — EDB, MTI, A*STAR and IMDA all
+ * serve JS-rendered pages with no RSS at any path tried — so agency news
+ * arrives through Google News as reported, which is what an RD would see
+ * anyway. The Federal Register is the authoritative primary source for export
+ * controls and is used directly.
+ */
+export type ContextSource = {
+  id: string;
+  name: string;
+  url: string;
+  /** What kind of context, for the assessment prompt to weigh appropriately. */
+  kind: 'sg_policy' | 'export_control' | 'sector' | 'competitor_ipa' | 'regional' | 'trade';
+  /** Sectors this bears on. Empty means all four. */
+  sectors: string[];
+  enabled: boolean;
+  note?: string;
+};
+
+export const CONTEXT_SOURCES: ContextSource[] = [
+  {
+    id: 'fedreg_bis',
+    name: 'Federal Register — Bureau of Industry and Security',
+    url: 'https://www.federalregister.gov/api/v1/documents.rss?conditions%5Bagencies%5D%5B%5D=industry-and-security-bureau',
+    kind: 'export_control',
+    sectors: ['deeptech', 'defence_tech', 'ai'],
+    enabled: true,
+  },
+  {
+    id: 'fedreg_itar',
+    name: 'Federal Register — State Department, ITAR',
+    url: 'https://www.federalregister.gov/api/v1/documents.rss?conditions%5Bagencies%5D%5B%5D=state-department&conditions%5Bterm%5D=ITAR',
+    kind: 'export_control',
+    sectors: ['defence_tech'],
+    enabled: true,
+  },
+  /**
+   * One agency per query. A single query stacking several OR terms returns
+   * almost nothing recent — the compound form of these two was answering with
+   * results months old while the same agencies had news that week — so each
+   * agency is asked for separately and the results merge on the way in.
+   */
+  {
+    id: 'sg_edb',
+    name: 'Singapore EDB',
+    url: googleNewsTopicUrl('"Economic Development Board" Singapore'),
+    kind: 'sg_policy',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'sg_mti',
+    name: 'Singapore MTI',
+    url: googleNewsTopicUrl('"Ministry of Trade and Industry" Singapore'),
+    kind: 'sg_policy',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'sg_astar',
+    name: 'Singapore A*STAR',
+    url: googleNewsTopicUrl('"A*STAR" Singapore research'),
+    kind: 'sg_policy',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'sg_imda',
+    name: 'Singapore IMDA',
+    url: googleNewsTopicUrl('"IMDA" Singapore digital'),
+    kind: 'sg_policy',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'sg_enterprise',
+    name: 'Enterprise Singapore',
+    url: googleNewsTopicUrl('"Enterprise Singapore"'),
+    kind: 'sg_policy',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'sg_jtc',
+    name: 'JTC Corporation — industrial land',
+    url: googleNewsTopicUrl('"JTC Corporation" Singapore industrial'),
+    kind: 'sg_policy',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'sg_datacentre',
+    name: 'Singapore data centre capacity',
+    url: googleNewsTopicUrl('Singapore data centre capacity'),
+    kind: 'sg_policy',
+    sectors: ['ai', 'deeptech'],
+    enabled: true,
+  },
+  {
+    id: 'sg_semiconductor',
+    name: 'Singapore semiconductor investment',
+    url: googleNewsTopicUrl('Singapore semiconductor investment'),
+    kind: 'sg_policy',
+    sectors: ['deeptech'],
+    enabled: true,
+  },
+  {
+    id: 'export_controls_news',
+    name: 'Export controls and trade policy, as reported',
+    url: googleNewsTopicUrl('("export controls" OR ITAR OR "entity list" OR tariff) AND (semiconductor OR defense OR "advanced manufacturing")'),
+    kind: 'export_control',
+    sectors: ['deeptech', 'defence_tech', 'ai'],
+    enabled: true,
+  },
+  {
+    id: 'sector_waves',
+    name: 'Sector-wide movement',
+    url: googleNewsTopicUrl('(semiconductor OR biotech OR robotics OR "AI infrastructure") AND ("record funding" OR "capacity expansion" OR consolidation OR "industry shift")'),
+    kind: 'sector',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'competitor_ipa',
+    name: 'Competing investment promotion agencies',
+    url: googleNewsTopicUrl('("IDA Ireland" OR "Invest India" OR MIDA Malaysia OR "Abu Dhabi" OR "Saudi Arabia") AND (semiconductor OR biotech OR "data centre" OR "R&D centre") investment'),
+    kind: 'competitor_ipa',
+    sectors: [],
+    enabled: true,
+  },
+
+  /**
+   * Publications read in the region, taken from their own feeds rather than
+   * through a Google News query. A search returns what matched the words; a
+   * masthead's own feed returns what its editors led with, and an RD reads the
+   * second. These carry the Singapore and ASEAN business news that a
+   * company-name search never surfaces because the company is not named.
+   *
+   * Every URL below was fetched and returned same-day items on 2026-08-27.
+   */
+  {
+    id: 'cna_business',
+    name: 'CNA — Business',
+    url: 'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936',
+    kind: 'regional',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'straits_times_business',
+    name: 'The Straits Times — Business',
+    url: 'https://www.straitstimes.com/news/business/rss.xml',
+    kind: 'regional',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'business_times_sg',
+    name: 'The Business Times — Singapore',
+    url: 'https://www.businesstimes.com.sg/rss/top-stories',
+    kind: 'regional',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'tech_in_asia',
+    name: 'Tech in Asia',
+    url: 'https://www.techinasia.com/feed',
+    kind: 'regional',
+    sectors: ['ai', 'deeptech'],
+    enabled: true,
+  },
+  {
+    id: 'nikkei_asia',
+    name: 'Nikkei Asia',
+    url: 'https://asia.nikkei.com/rss/feed/nar',
+    kind: 'regional',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'scmp_business',
+    name: 'South China Morning Post — Business',
+    url: 'https://www.scmp.com/rss/92/feed',
+    kind: 'regional',
+    sectors: [],
+    enabled: true,
+  },
+
+  /**
+   * Sector trade press. A siting decision, a fab announcement or a trial
+   * readout appears here before it reaches general business news, and often
+   * with the detail — capacity, location, timing — that the general story drops.
+   */
+  {
+    id: 'ee_times',
+    name: 'EE Times',
+    url: 'https://www.eetimes.com/feed/',
+    kind: 'trade',
+    sectors: ['deeptech', 'ai'],
+    enabled: true,
+  },
+  {
+    id: 'semiconductor_digest',
+    name: 'Semiconductor Digest',
+    url: 'https://www.semiconductor-digest.com/feed/',
+    kind: 'trade',
+    sectors: ['deeptech'],
+    enabled: true,
+  },
+  {
+    id: 'endpoints_news',
+    name: 'Endpoints News',
+    url: 'https://endpts.com/feed/',
+    kind: 'trade',
+    sectors: ['biotech'],
+    enabled: true,
+  },
+  {
+    id: 'fierce_biotech',
+    name: 'Fierce Biotech',
+    url: 'https://www.fiercebiotech.com/rss/xml',
+    kind: 'trade',
+    sectors: ['biotech'],
+    enabled: true,
+  },
+  {
+    id: 'breaking_defense',
+    name: 'Breaking Defense',
+    url: 'https://breakingdefense.com/feed/',
+    kind: 'trade',
+    sectors: ['defence_tech'],
+    enabled: true,
+  },
+  {
+    id: 'defense_news',
+    name: 'Defense News',
+    url: 'https://www.defensenews.com/arc/outboundfeeds/rss/?outputType=xml',
+    kind: 'trade',
+    sectors: ['defence_tech'],
+    enabled: true,
+  },
+  {
+    id: 'robot_report',
+    name: 'The Robot Report',
+    url: 'https://www.therobotreport.com/feed/',
+    kind: 'trade',
+    sectors: ['deeptech', 'ai'],
+    enabled: true,
+  },
+  {
+    id: 'techcrunch',
+    name: 'TechCrunch',
+    url: 'https://techcrunch.com/feed/',
+    kind: 'trade',
+    sectors: ['ai', 'deeptech'],
+    enabled: true,
+  },
+];

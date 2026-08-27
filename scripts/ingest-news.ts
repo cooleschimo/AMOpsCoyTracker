@@ -3,7 +3,7 @@
  * Brief §5.5. The fetcher lives in lib/news-sources.ts; this script writes.
  *
  * Scope of the company-directed feed: Google News is queried per company for the
- * seed watchlist plus the Form D discoveries that passed the company-level
+ * seed list plus the Form D discoveries that passed the company-level
  * assessment. It is a *why now* trigger, not a discovery route — the query is a
  * company name you must already have. Discovery comes from Form D, portfolio
  * pages, ACRA and ATS boards (brief §5.1-§5.4). The 2,595 portfolio companies
@@ -145,7 +145,7 @@ async function insertItems(db: ReturnType<typeof getDb>, rows: PendingItem[]): P
   try {
     // ---- Company-directed Google News -------------------------------------
     if (!wiresOnly) {
-      // Seed watchlist + Form D discoveries that passed the company assessment.
+      // Seed list + Form D discoveries that passed the company assessment.
       const targets = await db.select({
         id: companies.id, name: companies.name, aliases: companies.aliases,
       }).from(companies)
