@@ -42,27 +42,19 @@ export const JACCARD_THRESHOLD = 0.7;
 /* ------------------------------------------------------------------ */
 
 /**
- * WHY TRIGRAMS ALONE ARE NOT ENOUGH (measured 2026-08-24).
- *
- * Eight outlets covering one story — Nvidia in talks to invest in Perplexity at
- * $30B — produced EIGHT separate scored items. Pairwise character-trigram
- * Jaccard across them: mean 0.338, and only 1 of 153 pairs reached the 0.7
- * threshold. Lowering the threshold to catch them would sit near the level
- * where genuinely unrelated stories start merging, so it is not a fix.
- *
- * The reason is that these headlines share FACTS, not PHRASING:
+ * TRIGRAMS ALONE UNDER-MERGE NEWS. Outlets covering one story share its facts
+ * and almost none of its phrasing:
  *   "Nvidia said to weigh Perplexity investment at $30B valuation"
  *   "NVIDIA Eyes Major Investment in Perplexity at Over $30 Billion Valuation"
- * Almost no character overlap; identical content.
+ * Character overlap between those is near the level where genuinely unrelated
+ * stories start merging, so no trigram threshold separates them.
  *
- * Key terms — proper nouns and money/number tokens — capture that. On the same
- * eight headlines they average 0.442, and the extracted set is exactly what a
- * human would use to say "same story": {nvidia, perplexity, investment,
- * valuation, num:30b}.
+ * Key terms — proper nouns and money/number tokens — do: the set a human would
+ * use to say "same story" is {nvidia, perplexity, investment, valuation,
+ * num:30b}, and it is stable across rewordings.
  *
- * RATIONALE §5 anticipated this: the 0.7 figure is "a starting point from
- * general text-similarity practice, not tuned for news clustering at this
- * scale; expect to calibrate."
+ * RATIONALE §5: the 0.7 figure is "a starting point from general
+ * text-similarity practice, not tuned for news clustering at this scale."
  */
 const STOPWORDS = new Set([
   'the','a','an','of','in','to','for','at','on','and','or','with','as','is','are',
@@ -120,13 +112,11 @@ export const SAME_STORY_DAYS = 5;
  * Relaxed key-term threshold, used ONLY when two items are independently known
  * to describe the same KIND of event at the same company within the window.
  *
- * MEASURED 2026-08-24. At 0.4 one funding round still fragmented across
- * outlets: Castelion's $1B Series C produced 8 heads because coverage split
- * between the raise ("Raises $1 Billion Series C"), the valuation ("hits $13B
- * valuation") and the effect ("Funding will supercharge Blackbeard"). Those
- * share few key terms. But simply lowering the global threshold to 0.2 merged
- * Anthropic's genuinely distinct stories — an outage, an S-1, a product launch
- * — from 44 clusters down to 22.
+ * Coverage of one funding round splits between the raise ("Raises $1 Billion
+ * Series C"), the valuation ("hits $13B valuation") and the effect ("Funding
+ * will supercharge Blackbeard"), which share few key terms. Lowering the global
+ * threshold far enough to catch them merges a company's genuinely distinct
+ * stories — an outage, an S-1, a product launch — instead.
  *
  * Signal type breaks the tie: two 'funding' items about one company in one week
  * are the same round; a 'funding' item and a 'product_launch' item are not,
@@ -143,6 +133,25 @@ export const KEYTERM_THRESHOLD_SAME_SIGNAL = 0.15;
  * earliest publication, because the first outlet to carry a story is usually
  * the one that reported it.
  */
+/**
+ * Sources behind a hard paywall.
+ *
+ * A digest link an RD cannot open is worse than a slightly less authoritative
+ * one, because checking the claim is the whole point (§15). Clustering already
+ * collects the same story from many outlets, so when one of them is readable
+ * that is the one to link — the authority ranking is about which report to
+ * trust, and an unreadable report cannot be checked at all.
+ *
+ * Deliberately a SHORT list of hard paywalls, not metered or registration
+ * walls: over-listing would push genuinely better reporting out of the head
+ * position for no gain.
+ */
+const PAYWALLED = /wall street journal|wsj\b|financial times|\bft\.com|bloomberg|the information|the economist|barron|new york times|nytimes|washington post|nikkei|business insider/i;
+
+export function isPaywalled(source: string): boolean {
+  return PAYWALLED.test(source || '');
+}
+
 const AUTHORITY: Array<{ re: RegExp; rank: number }> = [
   { re: /reuters|bloomberg|financial times|wall street journal|the economist/i, rank: 100 },
   { re: /business wire|pr newswire|globenewswire/i, rank: 90 },
@@ -153,8 +162,11 @@ const AUTHORITY: Array<{ re: RegExp; rank: number }> = [
 ];
 
 export function sourceAuthority(source: string): number {
-  for (const { re, rank } of AUTHORITY) if (re.test(source)) return rank;
-  return 50;
+  let rank = 50;
+  for (const { re, rank: r } of AUTHORITY) if (re.test(source)) { rank = r; break; }
+  // A paywalled source drops below every open one. It stays IN the cluster —
+  // nothing is dropped — it simply does not become the link the digest shows.
+  return isPaywalled(source) ? rank - 60 : rank;
 }
 
 export type Clusterable = {

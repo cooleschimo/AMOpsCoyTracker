@@ -14,7 +14,7 @@
  * possible to tell whether a change helped. Bump RUBRIC_VERSION for any change
  * to the prompt below.
  */
-export const RUBRIC_VERSION = 'item-v3';
+export const RUBRIC_VERSION = 'item-v6';
 
 /**
  * Signal taxonomy. RATIONALE §15.1 flags these weights as a prior with no
@@ -96,9 +96,31 @@ CRITICAL RULES:
   not let a run of 0s pull the next item down with it, and do not smooth scores
   toward the middle of the batch.
 
-- 'why' MUST BE CHECKABLE AND SPECIFIC — <= 25 words, naming what happened.
-  "Funding news" is useless. "Raised $40M Series B; no expansion language" is
-  useful. Never restate the headline verbatim.
+- 'why' IS A LIST OF SHORT POINTS, not a sentence. Each under 15 words, each a
+  FACT ABOUT WHAT HAPPENED, checkable against the item.
+
+  ONE POINT IS A COMPLETE ANSWER. Most items support one, some support two,
+  few support three. Three is a ceiling, NOT a quota — an item that says one
+  thing gets one point. Padding to fill slots is worse than a short list,
+  because a reader cannot tell the invented points from the real one.
+
+  NEVER write a point about:
+   · the company's identity — "X is the AI company on file" restates the
+     prompt, not the news. You are TOLD which company this is; that is context
+     for checking the item is about them, never a finding.
+   · the source or outlet — "Asian business outlet reports funding" describes
+     where you read it, not what occurred. The source is shown separately.
+   · the headline restated in other words.
+   · your own confidence, or the absence of information, unless the absence is
+     itself the point ("no Asian site named yet" is a real fact about the
+     decision; "unclear whether they will expand" is not).
+
+  A point may be about the COMPANY or about its INDUSTRY — sometimes what makes
+  a moment matter is that the sector is moving, not only that this company is.
+  "Second APAC data-centre raise this month" tells a reader something the
+  company-only view misses.
+
+  Give the points in order of what an RD needs first.
 
 - NEVER INVENT FACTS. Score only what the title and snippet actually say. If
   the snippet is truncated and you cannot tell, that uncertainty belongs in
@@ -120,8 +142,35 @@ CRITICAL RULES:
   window (3). A generic non-US posting in Europe is usually a 2 — real
   international activity, but no Asian angle.
 
+MOMENTUM — a SECOND, INDEPENDENT judgment (0-3).
+
+The 0-3 score above asks "is a location decision in play?". Momentum asks a
+different question: IS THIS COMPANY MOVING FAST RIGHT NOW? The two come apart
+constantly, and both are needed — a fast-moving company is worth approaching
+about a joint project (R&D, a testbed, a commercial deployment) whether or not
+it is currently deciding where to put a building.
+
+  3 — A major growth event. A large or rapid raise, a valuation jump, a
+      revenue milestone, a landmark customer or partner, a big capacity or
+      headcount expansion, an IPO filing, a significant acquisition.
+  2 — Real forward motion: a notable product launch, a solid partnership, a
+      meaningful funding round, senior hires into a growth function.
+  1 — The company is active but nothing here signals acceleration.
+  0 — No momentum in this item: commentary, analysis, routine operations,
+      an outage, litigation, or noise.
+
+  Judge the COMPANY'S trajectory as evidenced by THIS item, not the drama of
+  the headline. "AI startup doubles valuation in a month" is a 3. "CEO speaks
+  at conference" is a 0 even at a fast-growing company. Do not let a big
+  company name inflate it — momentum is about the move, not the brand.
+
+  A company already in conversation with EDB still has momentum. Do not
+  discount it for being well known.
+
 Return ONE JSON object, no prose, no markdown fences:
-{"scores":[{"n":1,"score":2,"signal_type":"funding","sectors":["ai"],"region":"bay_area","expansion_language":false,"why":"<= 25 words, specific and checkable"}]}
+{"scores":[{"n":1,"score":2,"momentum":3,"signal_type":"funding","sectors":["ai"],"region":"bay_area","expansion_language":false,"why":["Raised $40M Series B at $400M valuation","No Asian site named yet","Third robotics raise in the sector this month"]}]}
+
+why is an ARRAY of 1-3 short strings — as many as the item genuinely supports, no more. Never one long sentence.
 
 signal_type is exactly one of: funding, expansion, hiring, partnership, leadership, product_launch, ma, regulatory, award, other, noise.
 sectors: copy the company's sectors from "Sectors on file" VERBATIM when the item is genuinely about that company. Use an empty array when the item is about a different company (score 0) or no company is on file. DO NOT infer sectors from the headline — the company record is research-verified and yours would not be.

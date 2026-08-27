@@ -25,7 +25,8 @@ import { and, desc, eq, isNotNull, lt, or, sql } from 'drizzle-orm';
 import { getDb, withRetry } from '../lib/db';
 import { companies, items, jobPostings, jobSnapshots, runs, sgLinks, sourceHealth } from '../lib/schema';
 import {
-  ATS_TYPES, APAC_TITLE_RE, candidateSlugs, fetchAts, isApacLocation, isNonUsLocation,
+  ATS_TYPES, APAC_TITLE_RE, candidateSlugs, discoverFromCareersPage, fetchAts,
+  isApacLocation, isNonUsLocation,
   volumeTriggerFires, type AtsJob, type AtsType,
 } from '../lib/ats';
 import { canonicalizeUrl } from '../lib/news-ingest';
@@ -55,6 +56,7 @@ const PROBE_DELAY_MS = 350;
     companies_considered: 0,
     probes_attempted: 0,
     ats_resolved: 0,
+    ats_via_careers_page: 0,
     ats_not_found: 0,
     probe_errors: 0,
     boards_fetched: 0,
@@ -72,7 +74,7 @@ const PROBE_DELAY_MS = 350;
   };
 
   try {
-    // Same target set as step 8: seed watchlist + assessed Form D discoveries.
+    // Same target set as step 8: seed list + assessed Form D discoveries.
     const targets = await db.select({
       id: companies.id, name: companies.name, website: companies.website,
       atsType: companies.atsType, atsSlug: companies.atsSlug,
@@ -113,6 +115,24 @@ const PROBE_DELAY_MS = 350;
               break outer;
             }
             if (!res.ok && res.reason === 'error') counts.probe_errors++;
+          }
+        }
+
+        // Probing guesses the slug from the name, which misses whenever the
+        // board is filed under something else. The company's own careers page
+        // states where it posts, so it settles what guessing cannot.
+        if (!found && c.website) {
+          const via = await discoverFromCareersPage(c.website);
+          if (via) {
+            atsType = via.type; atsSlug = via.slug; found = true;
+            counts.ats_resolved++;
+            counts.ats_via_careers_page++;
+            console.log(`  [${idx + 1}/${list.length}] ${c.name}: ${via.type}/${via.slug} (via careers page)`);
+            if (!dry) {
+              await withRetry(() => db.update(companies)
+                .set({ atsType: via.type, atsSlug: via.slug })
+                .where(eq(companies.id, c.id)));
+            }
           }
         }
         if (!found) {

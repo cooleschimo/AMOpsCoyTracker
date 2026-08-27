@@ -15,10 +15,17 @@
  * A Lever 404 means the company does not use Lever rather than that the API is
  * broken. Slug probing therefore fails most of the time by design, and a 404 is
  * recorded as 'not this ATS' rather than as a source-health failure.
+ *
+ * Guessing the slug from the company name fails whenever the board is filed
+ * under something else — Hadrian posts as `hadrian-automation`, Apex Space as
+ * `apex-technology-inc`, Amp Robotics as `ampsortation`. No amount of guessing
+ * reaches those, so when probing comes up empty the company's own careers page
+ * is read and the board link taken from it. That recovered 11 of 45 boards
+ * probing had missed.
  */
 
-export type AtsType = 'greenhouse' | 'lever' | 'ashby';
-export const ATS_TYPES: AtsType[] = ['greenhouse', 'lever', 'ashby'];
+export type AtsType = 'greenhouse' | 'lever' | 'ashby' | 'rippling';
+export const ATS_TYPES: AtsType[] = ['greenhouse', 'lever', 'ashby', 'rippling'];
 
 export type AtsJob = {
   externalId: string;
@@ -135,6 +142,7 @@ export async function fetchAshby(slug: string): Promise<AtsResult> {
 export function fetchAts(type: AtsType, slug: string): Promise<AtsResult> {
   if (type === 'greenhouse') return fetchGreenhouse(slug);
   if (type === 'lever') return fetchLever(slug);
+  if (type === 'rippling') return fetchRippling(slug);
   return fetchAshby(slug);
 }
 
@@ -142,6 +150,85 @@ export function fetchAts(type: AtsType, slug: string): Promise<AtsResult> {
  * Candidate ATS slugs for a company name. Boards are usually the company name
  * lowercased with punctuation removed; some use the domain's second-level label.
  */
+/**
+ * Rippling's board API. Used by several defence and hardware companies that
+ * probing never reaches, because the slug rarely resembles the company name.
+ *
+ * A job open in several places is returned once per location, all sharing one
+ * uuid. Since a posting is keyed on that uuid, the locations are joined onto a
+ * single posting — one role in three cities is one role, and leaving the
+ * duplicates in both triples the job count and makes the upsert touch the same
+ * row twice in a batch, which Postgres rejects outright.
+ */
+async function fetchRippling(slug: string): Promise<AtsResult> {
+  const r = await getJson(`https://api.rippling.com/platform/api/ats/v1/board/${encodeURIComponent(slug)}/jobs`);
+  if (!r.ok) return { ok: false, reason: r.status === 404 ? 'not_found' : 'error', detail: r.detail };
+  const raw = Array.isArray(r.json) ? r.json : (r.json as any)?.items;
+  if (!Array.isArray(raw)) return { ok: false, reason: 'not_found', detail: 'unexpected shape' };
+
+  const byId = new Map<string, AtsJob>();
+  const seenLocation = new Map<string, Set<string>>();
+  for (const j of raw as any[]) {
+    const externalId = String(j.uuid ?? j.id ?? '');
+    const title = String(j.name ?? j.title ?? '');
+    if (!externalId || !title) continue;
+    const loc = j.workLocation?.label ?? j.location ?? null;
+
+    const existing = byId.get(externalId);
+    if (existing) {
+      const seen = seenLocation.get(externalId)!;
+      if (loc && !seen.has(loc)) {
+        seen.add(loc);
+        existing.location = existing.location ? `${existing.location}; ${loc}` : loc;
+      }
+      continue;
+    }
+    byId.set(externalId, {
+      externalId, title, location: loc,
+      url: j.url ?? `https://ats.rippling.com/${slug}/jobs/${externalId}`,
+      postedAt: asDate(j.createdAt ?? j.publishedAt),
+      department: j.department?.label ?? j.department ?? null,
+      content: j.jobDescription ?? j.description ?? null,
+    });
+    seenLocation.set(externalId, new Set(loc ? [loc] : []));
+  }
+  return { ok: true, jobs: [...byId.values()] };
+}
+
+/**
+ * Read the company's own careers page and take the board link it points at.
+ * The fallback when slug probing fails: a link on the company's site is the
+ * company's own statement of where it posts, which no guess can beat.
+ */
+export async function discoverFromCareersPage(
+  website: string,
+): Promise<{ type: AtsType; slug: string } | null> {
+  const host = website.replace(/^https?:\/\//, '').replace(/\/+$/, '').split('/')[0];
+  const patterns: Array<[RegExp, AtsType]> = [
+    [/(?:job-boards|boards)\.greenhouse\.io\/(?!embed)([a-z0-9_-]+)/i, 'greenhouse'],
+    [/boards\.greenhouse\.io\/embed\/job_board\?for=([a-z0-9_-]+)/i, 'greenhouse'],
+    [/jobs\.lever\.co\/([a-z0-9_-]+)/i, 'lever'],
+    [/jobs\.ashbyhq\.com\/([a-z0-9_-]+)/i, 'ashby'],
+    [/ats\.rippling\.com\/([a-z0-9_-]+)/i, 'rippling'],
+  ];
+  for (const path of ['careers', 'jobs', 'company/careers', 'about/careers', '']) {
+    try {
+      const res = await fetch(`https://${host}/${path}`, {
+        headers: { 'User-Agent': UA }, redirect: 'follow', signal: AbortSignal.timeout(12000),
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+      for (const [re, type] of patterns) {
+        const m = html.match(re);
+        // A board link can point at a careers-page host rather than a real
+        // slug, so the candidate is confirmed against the API before it counts.
+        if (m?.[1] && (await fetchAts(type, m[1])).ok) return { type, slug: m[1] };
+      }
+    } catch { /* try the next path */ }
+  }
+  return null;
+}
+
 export function candidateSlugs(name: string, website?: string | null): string[] {
   const out: string[] = [];
   const base = (name || '').toLowerCase()

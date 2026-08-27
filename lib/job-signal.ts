@@ -16,6 +16,7 @@
  * a company siting operations there. Those are different FDI propositions, and a
  * bare head count flattens them together.
  */
+import { classifyExecHire, rankExecHires } from './exec-hire';
 
 /**
  * Function buckets. Deterministic, no tokens, editable — brief §12a names
@@ -155,6 +156,8 @@ export type PostingLite = {
 };
 
 export type HiringPattern = {
+  /** Senior roles owning a region — the strongest single expansion signal. */
+  execHires: Array<{ title: string; location: string | null; region: string | null }>;
   total: number;
   nonUs: number;
   apac: number;
@@ -218,6 +221,13 @@ const tally = <T extends string>(xs: T[]): Array<[T, number]> => {
 };
 
 export function summarisePostings(postings: PostingLite[]): HiringPattern {
+  const execHires = rankExecHires(
+    postings.map((p) => {
+      const h = classifyExecHire(p.title, p.location);
+      return h ? { ...h, url: p.url } : null;
+    }).filter((h): h is NonNullable<typeof h> => h !== null),
+  ).slice(0, 5).map((h) => ({ title: h.title, location: h.location, region: h.region }));
+
   const nonUs = postings.filter((p) => p.isNonUs);
   const apac = postings.filter((p) => p.isApac);
   const sg = postings.filter((p) => /\bsingapore\b/i.test(p.location ?? ''));
@@ -243,6 +253,7 @@ export function summarisePostings(postings: PostingLite[]): HiringPattern {
   }
 
   return {
+    execHires,
     total: postings.length,
     nonUs: nonUs.length,
     apac: apac.length,
@@ -283,6 +294,9 @@ const FUNCTION_LABEL: Record<FunctionKey, string> = {
  * become a digest candidate on their own.
  */
 export function hiringItemIsMaterial(h: HiringPattern): boolean {
+  // A senior role owning a region is material alone: it names a decision-maker
+  // and demonstrates intent at once, which no count of individual roles does.
+  if (h.execHires.length) return true;
   if (h.singaporeCount >= 1) return true;          // Singapore is the whole point
   if (h.apac >= 2) return true;                    // a pattern, not a single hire
   const seniorApac = h.apacSeniority.some(([s, n]) => (s === 'director' || s === 'exec') && n > 0);
@@ -292,6 +306,11 @@ export function hiringItemIsMaterial(h: HiringPattern): boolean {
 
 /** The digest-candidate headline. One line, specific, no invented numbers. */
 export function buildHiringTitle(company: string, h: HiringPattern): string {
+  // An executive hire leads, because it names who will own the decision.
+  const lead = h.execHires[0];
+  if (lead && (h.singaporeCount > 0 || /apac|asia|singapore|japan|korea|china|india/i.test(`${lead.title} ${lead.location ?? ''}`))) {
+    return `${company} is recruiting ${lead.title}${lead.location ? ` (${lead.location})` : ''}`;
+  }
   if (h.singaporeCount > 0) {
     // The Singapore mix, which can differ from the APAC-wide one.
     const top = h.sgFunctions[0];
@@ -317,6 +336,9 @@ export function buildHiringSnippet(company: string, h: HiringPattern): string {
   }
   if (h.singaporeCount > 0) {
     parts.push(`Singapore roles (${h.singaporeCount}): ${h.singaporeTitles.slice(0, 8).join('; ')}.`);
+  }
+  if (h.execHires.length) {
+    parts.push(`Senior regional roles open: ${h.execHires.map((e) => `${e.title}${e.location ? ` (${e.location})` : ''}`).join('; ')}.`);
   }
   if (h.sgFunctions.length) {
     parts.push(`Singapore role mix: ${h.sgFunctions.map(([f, n]) => `${FUNCTION_LABEL[f]} ${n}`).join(', ')}.`);

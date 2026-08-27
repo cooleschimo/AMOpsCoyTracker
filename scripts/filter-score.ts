@@ -74,8 +74,8 @@ type Row = {
 };
 
 type ScoreOut = {
-  n: number; score: number; signal_type: string; sectors: string[];
-  region: string; expansion_language: boolean; why: string;
+  n: number; score: number; momentum?: number; signal_type: string; sectors: string[];
+  region: string; expansion_language: boolean; why: string | string[];
 };
 
 (async () => {
@@ -97,6 +97,7 @@ type ScoreOut = {
     dropped_stale: 0,
     dropped_no_date: 0,
     survived_filters: 0,
+    context_set_aside: 0,
     clusters: 0,
     cluster_members_absorbed: 0,
     heads_to_score: 0,
@@ -104,6 +105,7 @@ type ScoreOut = {
     batches_failed: 0,
     scored: 0,
     score_3: 0, score_2: 0, score_1: 0, score_0: 0,
+    momentum_3: 0, momentum_2: 0, momentum_1: 0, momentum_0: 0, momentum_missing: 0,
     uniform_batches: 0,
   };
 
@@ -131,11 +133,19 @@ type ScoreOut = {
     }).from(companies);
     const nameById = new Map(comps.map((c) => [c.id, c.name]));
     const sectorsById = new Map(comps.map((c) => [c.id, c.sectors ?? []]));
+    /**
+     * Fold accents before comparing. A masthead writes "Daré Bioscience" where
+     * the company record says "Dare Bioscience", and an exact compare reads
+     * that as a different company — four of this company's own announcements
+     * were dropped as mismatches before the fold.
+     */
+    const fold = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
     const termsById = new Map<number, string[]>();
     for (const c of comps) {
       const terms = [c.name, ...(c.aliases ?? [])]
         .filter(Boolean)
-        .map((t) => t.toLowerCase().trim())
+        .map(fold)
         // Strip legal suffixes so "Acme, Inc." matches a headline saying "Acme".
         .map((t) => t.replace(/[,.]?\s*(inc|corp|corporation|llc|ltd|limited|co|pbc)\.?$/i, '').trim())
         .filter((t) => t.length >= 3);
@@ -143,6 +153,7 @@ type ScoreOut = {
     }
 
     const drops: Array<{ id: number; reason: string }> = [];
+    const contextItems: number[] = [];
     let survivors: Row[] = [];
 
     if (recluster) {
@@ -204,13 +215,13 @@ type ScoreOut = {
       // are exempt: their title is generated from the company name.
       if (it.companyId !== null && it.sourceType !== 'ats') {
         const terms = termsById.get(it.companyId) ?? [];
-        const hay = `${it.title} ${it.snippet ?? ''}`.toLowerCase();
+        const hay = fold(`${it.title} ${it.snippet ?? ''}`);
         if (terms.length && !terms.some((t) => hay.includes(t))) {
           drops.push({ id: it.id, reason: 'company_mismatch' });
           counts.dropped_company_mismatch++;
           continue;
         }
-      } else if (it.companyId === null) {
+      } else if (it.companyId === null && it.sourceType !== 'context') {
         // Untargeted wire item with no company resolved. Brief §7 stage 4
         // requires a company match for company-scoped feeds; a wire item that
         // names nobody we track is dropped here, and step 16 mines it later.
@@ -225,6 +236,18 @@ type ScoreOut = {
       if (it.sourceType !== 'ats') {
         if (!it.publishedAt) { drops.push({ id: it.id, reason: 'no_published_date' }); counts.dropped_no_date++; continue; }
         if (it.publishedAt < cutoff) { drops.push({ id: it.id, reason: `older_than_${RECENCY_DAYS}d` }); counts.dropped_stale++; continue; }
+      }
+
+      /**
+       * A context item names no company by design — a tariff change or a
+       * Singapore budget line is read by score-companies as the environment a
+       * company is acting in. It is set aside here rather than scored: it has
+       * no company to attach to and never belongs in the digest as an item.
+       */
+      if (it.sourceType === 'context') {
+        contextItems.push(it.id);
+        counts.context_set_aside++;
+        continue;
       }
 
       survivors.push(it);
@@ -276,6 +299,14 @@ type ScoreOut = {
             .set({ status: 'duplicate', droppedReason: 'cluster_member', clusterId: head })
             .where(inArray(items.id, dupes.slice(i, i + 500))));
         }
+      }
+      // Context items: read by score-companies as the environment, so they are
+      // marked processed rather than left at 'fetched' where a later run would
+      // pick them up again.
+      for (let i = 0; i < contextItems.length; i += 500) {
+        await withRetry(() => db.update(items)
+          .set({ status: 'context' })
+          .where(inArray(items.id, contextItems.slice(i, i + 500))));
       }
       // Heads: kept, pointing at themselves.
       const heads = [...headIds];
@@ -378,13 +409,26 @@ type ScoreOut = {
           sectors: Array.isArray(s.sectors) ? s.sectors.filter((x) => typeof x === 'string' && isSector(x)) : [],
           region: typeof s.region === 'string' ? s.region : null,
           expansionLanguage: Boolean(s.expansion_language),
-          why: String(s.why ?? '').slice(0, 500) || 'no rationale returned',
+          // Momentum is optional in the response: a model that omits it leaves
+          // null rather than 0, because "not judged" and "no momentum" are
+          // different facts and the dashboard ranks on this.
+          momentum: Number.isFinite(Number(s.momentum))
+            ? Math.max(0, Math.min(3, Math.round(Number(s.momentum))))
+            : null,
+          // Stored as ' · '-joined text so the column stays a string, and split
+          // back into points at render. Older rows are single points, which
+          // renders correctly as a one-item list.
+          why: (Array.isArray(s.why) ? s.why.filter((w) => typeof w === 'string' && w.trim()).join(' · ') : String(s.why ?? ''))
+            .slice(0, 600) || 'no rationale returned',
           rubricVersion: RUBRIC_VERSION,
           model: res.model,
           fewshotUsed: env.fewshotEnabled(),
         });
         counts.scored++;
         counts[`score_${score}`]++;
+        const m = rows[rows.length - 1].momentum;
+        if (m === null || m === undefined) counts.momentum_missing++;
+        else counts[`momentum_${m}`]++;
       }
 
       if (!dry && rows.length) {
