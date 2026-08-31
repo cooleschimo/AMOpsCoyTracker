@@ -12,25 +12,25 @@
  */
 import { getSql } from '../../../lib/db';
 import { hasDashboard } from '../../../lib/auth';
+import { SectionHeading } from '@/components/primitives';
 import { recordDisposition } from './actions';
 import { REASONS, REASON_LABELS } from '../../../lib/dispositions';
 
 export const dynamic = 'force-dynamic';
 
-const S = {
-  main: { maxWidth: 760, margin: '0 auto', padding: '28px 20px 60px', fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif', color: '#111' } as const,
-  h1: { fontSize: 22, margin: '0 0 6px', fontWeight: 650, lineHeight: 1.3 } as const,
-  h2: { fontSize: 13, letterSpacing: 1, textTransform: 'uppercase', color: '#1a4d8f', margin: '26px 0 10px', fontWeight: 700 } as const,
-  p: { fontSize: 14, lineHeight: 1.55, margin: '0 0 8px' } as const,
-  meta: { color: '#777', fontSize: 12, margin: '4px 0' } as const,
-  card: { border: '1px solid #e3e3e3', borderRadius: 6, padding: '14px 16px', marginBottom: 10, background: '#fff' } as const,
-  warn: { background: '#fff4f4', border: '1px solid #f0c9c9', borderRadius: 6, padding: '10px 12px', fontSize: 13, color: '#7a2f2f', margin: '0 0 14px' } as const,
-  caveat: { background: '#fffaf0', border: '1px solid #f0e2c0', borderRadius: 6, padding: '10px 12px', fontSize: 13, color: '#6b5626', margin: '0 0 14px' } as const,
-  btn: { fontSize: 14, padding: '9px 16px', borderRadius: 6, border: '1px solid #1a4d8f', background: '#1a4d8f', color: '#fff', cursor: 'pointer', marginRight: 8 } as const,
-  btnAlt: { fontSize: 14, padding: '9px 16px', borderRadius: 6, border: '1px solid #bbb', background: '#fff', color: '#333', cursor: 'pointer', marginRight: 8 } as const,
-  label: { display: 'inline-block', fontSize: 13, marginRight: 14, marginBottom: 6 } as const,
-  a: { color: '#1a4d8f' } as const,
-};
+/* Shared class strings. The page is a reading column rather than the dashboard's
+   card grid, so it keeps its own narrow measure. */
+const MAIN = 'mx-auto max-w-[760px] px-5 pb-16 pt-7';
+const CARD = 'mb-2.5 rounded-md border border-border bg-card px-4 py-3.5';
+const META = 'my-1 text-xs text-muted-foreground';
+const BODY = 'mb-2 text-sm';
+const LINK = 'text-primary link-underline hover:text-foreground';
+/* Caution notice — a fact recorded by a person, or a prior call being replaced. */
+const CAUTION = 'mb-3.5 rounded-md border border-caution/30 bg-caution-soft px-3 py-2.5 text-2xs text-caution';
+/* Duplicate-outreach warning: the one thing on the page that must stop an RD. */
+const WARN = 'mb-3.5 rounded-md border border-destructive/30 bg-destructive/8 px-3 py-2.5 text-2xs text-destructive';
+const BTN = 'mr-2 cursor-pointer rounded-md border border-primary bg-primary px-4 py-2.5 text-sm text-primary-foreground hover:bg-primary/90';
+const BTN_ALT = 'mr-2 cursor-pointer rounded-md border border-border bg-card px-4 py-2.5 text-sm text-foreground hover:bg-muted';
 
 export default async function ItemPage(
   { params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ token?: string }> },
@@ -38,12 +38,12 @@ export default async function ItemPage(
   const { id } = await params;
   const sp = await searchParams;
   if (!(await hasDashboard(sp.token))) {
-    return <main style={S.main}><h1 style={S.h1}>Not authorised</h1>
-      <p style={S.p}>Append <code>?token=…</code> with your DASHBOARD_TOKEN.</p></main>;
+    return <main className={MAIN}><h1 className="mb-1.5 font-display text-2xl font-semibold tracking-tight">Not authorised</h1>
+      <p className={BODY}>Append <code>?token=…</code> with your DASHBOARD_TOKEN.</p></main>;
   }
 
   const itemId = Number(id);
-  if (!Number.isFinite(itemId)) return <main style={S.main}><h1 style={S.h1}>Not found</h1></main>;
+  if (!Number.isFinite(itemId)) return <main className={MAIN}><h1 className="mb-1.5 font-display text-2xl font-semibold tracking-tight">Not found</h1></main>;
 
   const sql = getSql();
   const [it]: any = await sql`
@@ -54,7 +54,7 @@ export default async function ItemPage(
     left join scores s on s.item_id = i.id
     where i.id = ${itemId}
     order by s.scored_at desc limit 1`;
-  if (!it) return <main style={S.main}><h1 style={S.h1}>Not found</h1></main>;
+  if (!it) return <main className={MAIN}><h1 className="mb-1.5 font-display text-2xl font-semibold tracking-tight">Not found</h1></main>;
 
   const [cluster, existingOpp, priorDisposition, assessment, related, jobs, funding]: any = await Promise.all([
     sql`select id, title, source from items where cluster_id = ${itemId} and id <> ${itemId} limit 12`,
@@ -67,9 +67,16 @@ export default async function ItemPage(
                  order by assessed_at desc limit 1` : Promise.resolve([]),
     // OTHER activity at this company — the point of clicking through from
     // Trending is to see whether one headline is part of a pattern.
+    // Latest score per item: a plain join returns the same article once per
+    // rubric version, so one headline appeared several times in this list.
     it.cid ? sql`select i2.id, i2.title, i2.source, i2.published_at, i2.source_type,
                         s2.score, s2.momentum, s2.signal_type
-                 from items i2 join scores s2 on s2.item_id = i2.id
+                 from items i2
+                 join lateral (
+                   select score, momentum, signal_type from scores sc
+                   where sc.item_id = i2.id
+                   order by sc.scored_at desc nulls last, sc.id desc limit 1
+                 ) s2 on true
                  where i2.company_id = ${it.cid} and i2.id <> ${itemId} and i2.status = 'kept'
                  order by s2.momentum desc nulls last, i2.published_at desc nulls last
                  limit 10` : Promise.resolve([]),
@@ -85,18 +92,18 @@ export default async function ItemPage(
   const prior = priorDisposition[0];
 
   return (
-    <main style={S.main}>
-      <p style={S.meta}>
-        {it.company_name ? <a href={`/company/${it.cid}`} style={S.a}>{it.company_name}</a> : 'Unmatched company'}
+    <main className={MAIN}>
+      <p className={META}>
+        {it.company_name ? <a href={`/company/${it.cid}`} className={LINK}>{it.company_name}</a> : 'Unmatched company'}
         {' · '}{it.source}
         {it.published_at ? ` · ${new Date(it.published_at).toISOString().slice(0, 10)}` : ''}
       </p>
-      <h1 style={S.h1}>{it.title}</h1>
-      <p style={S.p}><a href={it.url} style={S.a}>Open the source</a></p>
+      <h1 className="mb-1.5 font-display text-2xl font-semibold leading-tight tracking-tight">{it.title}</h1>
+      <p className={BODY}><a href={it.url} className={LINK}>Open the source</a></p>
 
       {/* Duplicate-outreach warning (§11): who already owns this, and since when. */}
       {existingOpp.length ? (
-        <p style={S.warn}>
+        <p className={WARN}>
           <b>This company already has an open opportunity</b>
           {existingOpp[0].owner ? ` owned by ${existingOpp[0].owner}` : ' with no owner recorded'}
           {` since ${new Date(existingOpp[0].created_at).toISOString().slice(0, 10)}`}
@@ -106,32 +113,32 @@ export default async function ItemPage(
       ) : null}
 
       {it.account_status && it.account_status !== 'unknown' ? (
-        <p style={S.caveat}>Account status: <b>{it.account_status}</b> — recorded by a person, not derived by the tool.</p>
+        <p className={CAUTION}>Account status: <b>{it.account_status}</b> — recorded by a person, not derived by the tool.</p>
       ) : null}
 
       {/* ---- Why it surfaced ---- */}
-      <h2 style={S.h2}>Why it surfaced</h2>
-      <div style={S.card}>
-        <p style={S.p}><b>Why now:</b> {it.why ?? 'not scored'}</p>
-        <p style={S.p}>
+      <div className="mb-2.5 mt-6"><SectionHeading title="Why it surfaced" /></div>
+      <div className={CARD}>
+        <p className={BODY}><b>Why now:</b> {it.why ?? 'not scored'}</p>
+        <p className={BODY}>
           <b>Signal:</b> {it.signal_type ?? '—'} · score {it.score ?? '—'}
           {it.expansion_language ? ' · uses expansion language' : ' · no expansion language in the text'}
         </p>
         {a ? (
-          <p style={S.p}>
+          <p className={BODY}>
             <b>Company:</b> {a.target_priority} priority · Singapore fit {a.singapore_fit} ·
             {' '}contribution {a.potential_contribution} ({a.confidence} confidence)
           </p>
-        ) : <p style={S.p}><b>Company:</b> not assessed</p>}
-        <p style={S.meta}>{it.rubric_version} · {it.model}</p>
+        ) : <p className={BODY}><b>Company:</b> not assessed</p>}
+        <p className={META}>{it.rubric_version} · {it.model}</p>
       </div>
-      {it.snippet ? <p style={S.p}>{it.snippet}</p> : null}
+      {it.snippet ? <p className={BODY}>{it.snippet}</p> : null}
 
       {cluster.length ? (
         <>
-          <h2 style={S.h2}>Also reported by ({cluster.length})</h2>
+          <div className="mb-2.5 mt-6"><SectionHeading title={`Also reported by (${cluster.length})`} /></div>
           {cluster.map((c: any) => (
-            <p key={c.id} style={S.meta}>{c.source} — {c.title}</p>
+            <p key={c.id} className={META}>{c.source} — {c.title}</p>
           ))}
         </>
       ) : null}
@@ -139,13 +146,13 @@ export default async function ItemPage(
       {/* ---- Momentum: why this ranked in Trending ---- */}
       {it.momentum !== null && it.momentum !== undefined ? (
         <>
-          <h2 style={S.h2}>Momentum</h2>
-          <div style={S.card}>
-            <p style={S.p}>
-              <b>{it.momentum}/3</b> — how fast this company is moving, judged separately from
+          <div className="mb-2.5 mt-6"><SectionHeading title="Momentum" /></div>
+          <div className={CARD}>
+            <p className={BODY}>
+              <b className="num">{it.momentum}/3</b> — how fast this company is moving, judged separately from
               whether a location decision is in play.
             </p>
-            <p style={S.meta}>
+            <p className={META}>
               Carried by {cluster.length + 1} outlet{cluster.length ? 's' : ''}
               {jobs.length ? ` · ${jobs[0].total_jobs} open roles, ${jobs[0].apac_jobs} in APAC` : ''}
               {jobs.length > 1 ? ` (was ${jobs[1].total_jobs} last snapshot)` : ''}
@@ -158,13 +165,15 @@ export default async function ItemPage(
       {/* ---- The rest of what is happening at this company ---- */}
       {related.length ? (
         <>
-          <h2 style={S.h2}>Other activity at {it.company_name} ({related.length})</h2>
+          <div className="mb-2.5 mt-6">
+            <SectionHeading title={`Other activity at ${it.company_name} (${related.length})`} />
+          </div>
           {related.map((r: any) => (
-            <div key={r.id} style={S.card}>
-              <p style={S.p}>
-                <a href={`/item/${r.id}?token=${sp.token ?? ''}`} style={S.a}>{r.title}</a>
+            <div key={r.id} className={CARD}>
+              <p className={BODY}>
+                <a href={`/item/${r.id}?token=${sp.token ?? ''}`} className={LINK}>{r.title}</a>
               </p>
-              <p style={S.meta}>
+              <p className={META}>
                 {r.signal_type} · score {r.score}
                 {r.momentum !== null ? ` · momentum ${r.momentum}/3` : ''}
                 {r.source_type === 'ats' ? ' · job board' : ` · ${r.source}`}
@@ -172,8 +181,8 @@ export default async function ItemPage(
               </p>
             </div>
           ))}
-          <p style={S.meta}>
-            <a href={`/company/${it.cid}?token=${sp.token ?? ''}`} style={S.a}>
+          <p className={META}>
+            <a href={`/company/${it.cid}?token=${sp.token ?? ''}`} className={LINK}>
               Full connection view for {it.company_name} →
             </a>
           </p>
@@ -181,9 +190,9 @@ export default async function ItemPage(
       ) : null}
 
       {/* ---- Disposition ---- */}
-      <h2 style={S.h2}>Your call</h2>
+      <div className="mb-2.5 mt-6"><SectionHeading title="Your call" /></div>
       {prior ? (
-        <p style={S.caveat}>
+        <p className={CAUTION}>
           Recorded from this browser: <b>{prior.disposition.replace(/_/g, ' ')}</b>
           {prior.reasons?.length ? ` (${prior.reasons.map((r: string) => (REASON_LABELS as Record<string, string>)[r] ?? r).join(', ')})` : ''}.
           Submitting again replaces it.
@@ -194,31 +203,31 @@ export default async function ItemPage(
         <input type="hidden" name="itemId" value={itemId} />
         {it.cid ? <input type="hidden" name="companyId" value={it.cid} /> : null}
 
-        <div style={S.card}>
-          <p style={S.p}><b>Reasons</b> — optional for Take forward and Monitor, please give one for Dismiss.</p>
+        <div className={CARD}>
+          <p className={BODY}><b>Reasons</b> — optional for Draft an email and Monitor, please give one for Dismiss.</p>
           {REASONS.map((r) => (
-            <label key={r} style={S.label}>
+            <label key={r} className="mb-1.5 mr-3.5 inline-block text-2xs">
               <input type="checkbox" name={`reason_${r}`} /> {REASON_LABELS[r]}
             </label>
           ))}
-          <p style={{ margin: '10px 0 0' }}>
+          <p className="mt-2.5">
             <textarea name="note" rows={2} placeholder="Anything worth recording (optional)"
-              style={{ width: '100%', fontSize: 13, padding: 8, borderRadius: 6, border: '1px solid #ccc', fontFamily: 'inherit' }} />
+              className="w-full rounded-md border border-input bg-card p-2 font-sans text-2xs" />
           </p>
         </div>
 
-        <button type="submit" name="disposition" value="draft_email" style={S.btn}>Draft an email</button>
-        <button type="submit" name="disposition" value="monitor" style={S.btnAlt}>Monitor</button>
-        <button type="submit" name="disposition" value="dismiss" style={S.btnAlt}>Dismiss</button>
+        <button type="submit" name="disposition" value="draft_email" className={BTN}>Draft an email</button>
+        <button type="submit" name="disposition" value="monitor" className={BTN_ALT}>Monitor</button>
+        <button type="submit" name="disposition" value="dismiss" className={BTN_ALT}>Dismiss</button>
       </form>
 
-      <p style={S.meta}>
+      <p className={`${META} mt-4`}>
         Reactions are anonymous. Nothing here records who you are — a per-browser key
         deduplicates repeat clicks and that is all.
       </p>
-      <p style={S.meta}>
-        Take forward opens an opportunity with no owner or due date required. Monitor means
-        &ldquo;keep this warm, resurface on the next trigger&rdquo;.
+      <p className={META}>
+        Draft an email opens an opportunity with no owner or due date required. Monitor watches
+        for what the company does next.
       </p>
     </main>
   );

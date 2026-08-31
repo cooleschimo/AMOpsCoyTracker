@@ -11,14 +11,34 @@ import { companyCandidates, personCandidates, orgCandidates, type Candidate } fr
 import { hasAdmin } from '../../../lib/auth';
 import { eq } from 'drizzle-orm';
 import { MergeControls } from './controls';
+import { SectionHeading } from '@/components/primitives';
 
 export const dynamic = 'force-dynamic';
+
+/* Shared class strings. A reading column, matching the sibling admin pages. */
+const MAIN = 'mx-auto max-w-[860px] px-5 pb-16 pt-7';
+const H1 = 'mb-2 font-display text-2xl font-semibold tracking-tight';
+const BODY = 'text-sm text-foreground/85';
+const META = 'text-xs text-muted-foreground';
+const CARD = 'mb-3 rounded-md border border-border bg-card p-3.5';
+const TAB = 'rounded-md border border-border px-3 py-1.5 text-xs text-foreground/85 no-underline hover:bg-muted';
+const TAB_ON = 'border-foreground bg-foreground text-background hover:bg-foreground';
+/* Caution notice — where a claim is weaker than it looks. */
+const NOTE = 'rounded-md border border-caution/40 bg-caution-soft/40 px-3 py-2.5 text-xs leading-relaxed text-caution';
+
+/**
+ * Score badge ground. The literal hexes carried meaning rather than brand — a
+ * confident match, a borderline one, and a weak one — so each maps to the
+ * token that already says that on every other page.
+ */
+const scoreTone = (score: number) =>
+  score >= 0.8 ? 'bg-confirmed' : score >= 0.6 ? 'bg-caution' : 'bg-muted-foreground';
 
 export default async function MergePage({ searchParams }: { searchParams: Promise<{ token?: string; type?: string }> }) {
   const sp = await searchParams;
   if (!(await hasAdmin(sp.token))) {
-    return <main style={S.main}><h1 style={S.h1}>Not authorised</h1>
-      <p style={S.p}>Append <code>?token=…</code> with your ADMIN_TOKEN.</p></main>;
+    return <main className={MAIN}><h1 className={H1}>Not authorised</h1>
+      <p className={BODY}>Append <code>?token=…</code> with your ADMIN_TOKEN.</p></main>;
   }
 
   const db = getDb();
@@ -53,36 +73,36 @@ export default async function MergePage({ searchParams }: { searchParams: Promis
   }
 
   return (
-    <main style={S.main}>
-      <h1 style={S.h1}>Entity resolution review</h1>
-      <p style={S.note}>
+    <main className={MAIN}>
+      <SectionHeading title="Entity resolution review" />
+      <p className={`${NOTE} mt-5`}>
         Prefer <strong>false splits over false merges</strong>. A duplicate is untidy; a wrong
         merge invents a connection that does not exist, and an RD acting on it looks foolish in
         front of a founder. When unsure, choose <em>Different</em> or <em>Not sure</em>.
       </p>
-      <nav style={S.nav}>
+      <nav className="mb-2.5 mt-[18px] flex gap-2">
         {['person', 'company', 'organization'].map((t) => (
           <a key={t} href={`?type=${t}${sp.token ? `&token=${sp.token}` : ''}`}
-             style={{ ...S.tab, ...(t === type ? S.tabOn : {}) }}>{t}s</a>
+             className={`${TAB}${t === type ? ` ${TAB_ON}` : ''}`}>{t}s</a>
         ))}
       </nav>
-      <p style={S.count}>{cands.length} undecided {type} pair{cands.length === 1 ? '' : 's'} · {decided.length} already decided</p>
-      {cands.length === 0 && <p style={S.p}>Nothing awaiting review.</p>}
+      <p className={`${META} num mb-3.5`}>{cands.length} undecided {type} pair{cands.length === 1 ? '' : 's'} · {decided.length} already decided</p>
+      {cands.length === 0 && <p className={BODY}>Nothing awaiting review.</p>}
       {cands.slice(0, 60).map((c) => (
-        <div key={`${c.leftId}-${c.rightId}`} style={S.card}>
-          <div style={S.scoreRow}>
-            <span style={{ ...S.score, background: c.score >= 0.8 ? '#0a7' : c.score >= 0.6 ? '#c80' : '#888' }}>
+        <div key={`${c.leftId}-${c.rightId}`} className={CARD}>
+          <div className="mb-2.5 flex items-center gap-2.5">
+            <span className={`${scoreTone(c.score)} num rounded-sm px-2 py-0.5 text-xs font-semibold text-background`}>
               {c.score.toFixed(2)}
             </span>
-            <span style={S.signals}>{c.signals.join(' · ')}</span>
+            <span className={META}>{c.signals.join(' · ')}</span>
           </div>
-          <div style={S.pair}>
-            <div style={S.side}><div style={S.id}>#{c.leftId}</div><div style={S.name}>{c.leftName}</div></div>
-            <div style={S.vs}>vs</div>
-            <div style={S.side}><div style={S.id}>#{c.rightId}</div><div style={S.name}>{c.rightName}</div></div>
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1"><div className="text-2xs text-muted-foreground">#{c.leftId}</div><div className="break-words text-sm font-medium">{c.leftName}</div></div>
+            <div className={META}>vs</div>
+            <div className="min-w-0 flex-1"><div className="text-2xs text-muted-foreground">#{c.rightId}</div><div className="break-words text-sm font-medium">{c.rightName}</div></div>
           </div>
-          {c.sharedContext && <p style={S.shared}>Shared: {c.sharedContext}</p>}
-          {c.caution && <p style={S.caution}>⚠ {c.caution}</p>}
+          {c.sharedContext && <p className="mt-2 text-xs text-confirmed">Shared: {c.sharedContext}</p>}
+          {c.caution && <p className="mt-2 text-xs leading-relaxed text-caution">⚠ {c.caution}</p>}
           <MergeControls entityType={type as 'person' | 'company' | 'organization'}
             leftId={c.leftId} rightId={c.rightId} signals={c.signals} score={c.score} />
         </div>
@@ -90,25 +110,3 @@ export default async function MergePage({ searchParams }: { searchParams: Promis
     </main>
   );
 }
-
-const S: Record<string, React.CSSProperties> = {
-  main: { maxWidth: 860, margin: '0 auto', padding: '32px 20px', fontFamily: 'system-ui, sans-serif', color: '#111' },
-  h1: { fontSize: 22, marginBottom: 8 },
-  note: { fontSize: 13, lineHeight: 1.55, background: '#fffbe6', border: '1px solid #f0e0a0', padding: '10px 12px', borderRadius: 6 },
-  nav: { display: 'flex', gap: 8, margin: '18px 0 10px' },
-  tab: { padding: '6px 12px', border: '1px solid #ddd', borderRadius: 6, textDecoration: 'none', color: '#333', fontSize: 13 },
-  tabOn: { background: '#111', color: '#fff', borderColor: '#111' },
-  count: { fontSize: 12, color: '#666', marginBottom: 14 },
-  card: { border: '1px solid #e3e3e3', borderRadius: 8, padding: 14, marginBottom: 12 },
-  scoreRow: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 },
-  score: { color: '#fff', borderRadius: 4, padding: '2px 8px', fontSize: 12, fontWeight: 600 },
-  signals: { fontSize: 12, color: '#666' },
-  pair: { display: 'flex', alignItems: 'center', gap: 12 },
-  side: { flex: 1, minWidth: 0 },
-  id: { fontSize: 11, color: '#999' },
-  name: { fontSize: 15, fontWeight: 500, wordBreak: 'break-word' },
-  vs: { fontSize: 12, color: '#aaa' },
-  shared: { fontSize: 12, color: '#0a7', marginTop: 8 },
-  caution: { fontSize: 12, color: '#a40', marginTop: 8, lineHeight: 1.5 },
-  p: { fontSize: 14, color: '#444' },
-};

@@ -10,32 +10,39 @@
  * already holds, which are live conversations, and which surfaced this week.
  */
 import { getSql } from '../../../lib/db';
+import { sectorLabel } from '../../../lib/subsectors';
 import { hasDashboard } from '../../../lib/auth';
 import { ACCOUNT_STATUS_LABELS, type AccountStatus } from '../../../lib/accounts';
 
 export const dynamic = 'force-dynamic';
 
-const S = {
-  main: { maxWidth: 900, margin: '0 auto', padding: '28px 20px 60px', fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif', color: '#111' } as const,
-  h1: { fontSize: 24, margin: '0 0 4px', fontWeight: 650 } as const,
-  sub: { color: '#666', fontSize: 14, margin: '0 0 20px' } as const,
-  h2: { fontSize: 13, letterSpacing: 1, textTransform: 'uppercase', color: '#1a4d8f', margin: '26px 0 10px', fontWeight: 700 } as const,
-  card: { border: '1px solid #e3e3e3', borderRadius: 6, padding: '12px 14px', marginBottom: 8, background: '#fff' } as const,
-  p: { fontSize: 14, lineHeight: 1.55, margin: '0 0 6px' } as const,
-  meta: { color: '#777', fontSize: 12, margin: '2px 0' } as const,
-  caveat: { background: '#fffaf0', border: '1px solid #f0e2c0', borderRadius: 6, padding: '10px 12px', fontSize: 13, color: '#6b5626', margin: '0 0 14px' } as const,
-  row: { display: 'block', borderBottom: '1px solid #eee', padding: '7px 0', fontSize: 14 } as const,
-  tag: { display: 'inline-block', fontSize: 11, padding: '1px 7px', borderRadius: 10, marginLeft: 6 } as const,
-  a: { color: '#1a4d8f' } as const,
-};
+const MAIN = 'mx-auto max-w-[900px] px-5 pb-16 pt-7';
+const H1 = 'font-display text-2xl font-semibold tracking-tight';
+const BODY = 'text-sm';
+const META = 'text-xs text-muted-foreground';
+const TAG = 'ml-1.5 inline-block rounded-full px-[7px] py-px text-2xs';
+const ROW = 'block hairline-b py-[7px] text-sm';
+const LINK = 'text-primary link-underline hover:text-foreground';
+const H2 = 'mb-2.5 mt-6 text-xs font-bold uppercase tracking-[0.08em] text-primary';
 
-const TAG_COLOURS: Record<string, { background: string; color: string }> = {
-  existing_account: { background: '#e8f0e8', color: '#2c5c2c' },
-  in_conversation: { background: '#e8eef7', color: '#1a4d8f' },
-  not_an_account: { background: '#f4f4f2', color: '#6b6b64' },
-  not_pursuing: { background: '#f2f2f2', color: '#777' },
-  surfaced: { background: '#fdf0e3', color: '#8a5a1b' },
-  singapore: { background: '#f7e8ee', color: '#8a2b4d' },
+/**
+ * Tag colours as class strings rather than style objects, so an accent change
+ * in globals.css reaches this page too.
+ *
+ * The five account statuses keep their distinct meanings: an account held is
+ * confirmed green, a live conversation carries the accent, and the two
+ * negative-but-different states stay neutral and separable — 'not an account'
+ * is a fact about the relationship, 'not pursuing' a decision, so the latter
+ * reads dimmer rather than identical.
+ */
+const TAG_COLOURS: Record<string, string> = {
+  unknown: 'bg-muted text-muted-foreground',
+  existing_account: 'bg-confirmed/15 text-confirmed',
+  in_conversation: 'bg-primary/10 text-primary',
+  not_an_account: 'bg-muted text-muted-foreground',
+  not_pursuing: 'bg-muted/60 text-muted-foreground/70',
+  surfaced: 'bg-caution-soft/60 text-caution',
+  singapore: 'bg-destructive/10 text-destructive',
 };
 
 export default async function OrgPage(
@@ -44,16 +51,16 @@ export default async function OrgPage(
   const { id } = await params;
   const sp = await searchParams;
   if (!(await hasDashboard(sp.token))) {
-    return <main style={S.main}><h1 style={S.h1}>Not authorised</h1>
-      <p style={S.p}>Append <code>?token=…</code> with your DASHBOARD_TOKEN.</p></main>;
+    return <main className={MAIN}><h1 className={H1}>Not authorised</h1>
+      <p className={`${BODY} mt-1`}>Append <code>?token=…</code> with your DASHBOARD_TOKEN.</p></main>;
   }
 
   const orgId = Number(id);
-  if (!Number.isFinite(orgId)) return <main style={S.main}><h1 style={S.h1}>Not found</h1></main>;
+  if (!Number.isFinite(orgId)) return <main className={MAIN}><h1 className={H1}>Not found</h1></main>;
 
   const sql = getSql();
   const [o]: any = await sql`select * from organizations where id = ${orgId}`;
-  if (!o) return <main style={S.main}><h1 style={S.h1}>Not found</h1></main>;
+  if (!o) return <main className={MAIN}><h1 className={H1}>Not found</h1></main>;
 
   const [portfolio, people, sectorMix, stageMix]: any = await Promise.all([
     // One row per company. A fund that led three rounds in the same company is
@@ -115,41 +122,40 @@ export default async function OrgPage(
   const STAGE_ORDER = ['seed', 'series A', 'series B', 'growth'];
 
   return (
-    <main style={S.main}>
-      <h1 style={S.h1}>{o.name}</h1>
-      <p style={S.sub}>
+    <main className={MAIN}>
+      <h1 className={H1}>{o.name}</h1>
+      <p className="mb-5 text-sm text-muted-foreground">
         {o.org_type ?? 'organization'}
-        {o.website ? <> · <a href={o.website} style={S.a}>{o.website.replace(/^https?:\/\//, '')}</a></> : null}
+        {o.website ? <> · <a href={o.website} className={LINK}>{o.website.replace(/^https?:\/\//, '')}</a></> : null}
         {o.hq_city ? ` · ${o.hq_city}${o.hq_country && o.hq_country !== 'United States' ? `, ${o.hq_country}` : ''}` : ''}
         {o.founded_year ? ` · founded ${o.founded_year}` : ''}
       </p>
       {o.apac_office ? (
-        <p style={S.meta}>
+        <p className={META}>
           <b>Asian office: {o.apac_office}</b> — reachable directly rather than through a portfolio company
         </p>
       ) : null}
-      {o.description ? <p style={S.p}>{o.description}</p> : null}
+      {o.description ? <p className={`${BODY} mb-1.5`}>{o.description}</p> : null}
 
-      <div style={S.card}>
-        <p style={S.p}>
+      <div className="mb-2 rounded-md border border-border bg-card px-3.5 py-3">
+        <p className={`${BODY} mb-1.5`}>
           <b>{sgCompanies.length}</b> portfolio companies with a Singapore entity ·{' '}
           <b>{accounts.length}</b> EDB already holds or is talking to ·{' '}
-          <b>{surfaced.length}</b> surfaced in the last month ·{' '}
-          {portfolio.length} in the graph
+          <b>{surfaced.length}</b> surfaced in the last month
         </p>
         {sectorMix.length ? (
-          <p style={S.meta}>
-            Backs: {sectorMix.map((x: any) => `${x.sector} ${x.n}`).join(' · ')}
+          <p className={META}>
+            Backs: {sectorMix.map((x: any) => `${sectorLabel(x.sector)} (${x.n})`).join(' · ')}
           </p>
         ) : null}
         {stageMix.length ? (
-          <p style={S.meta}>
+          <p className={META}>
             Stage: {[...stageMix].sort((a: any, b: any) => STAGE_ORDER.indexOf(a.stage) - STAGE_ORDER.indexOf(b.stage))
               .map((x: any) => `${x.stage} ${Math.round((x.n / totalStage) * 100)}%`).join(' · ')}
             <span> — of {totalStage} round{totalStage === 1 ? '' : 's'} with a stage recorded</span>
           </p>
         ) : null}
-        <p style={S.meta}>
+        <p className={META}>
           Portfolio counts reflect what has been read from public sources, not the fund&rsquo;s full
           book. A fund with few companies here may simply be one we have read less of.
         </p>
@@ -157,42 +163,42 @@ export default async function OrgPage(
 
       {surfaced.length ? (
         <>
-          <h2 style={S.h2}>Surfaced in the last month ({surfaced.length})</h2>
+          <h2 className={H2}>Surfaced in the last month ({surfaced.length})</h2>
           {surfaced.map((c: any) => (
-            <span key={c.id} style={S.row}>
-              <a href={`/company/${c.id}?token=${t}`} style={S.a}>{c.name}</a>
-              <span style={{ ...S.tag, ...TAG_COLOURS.surfaced }}>surfaced</span>
-              {c.has_sg ? <span style={{ ...S.tag, ...TAG_COLOURS.singapore }}>SG entity</span> : null}
+            <span key={c.id} className={ROW}>
+              <a href={`/company/${c.id}?token=${t}`} className={LINK}>{c.name}</a>
+              <span className={`${TAG} ${TAG_COLOURS.surfaced}`}>surfaced</span>
+              {c.has_sg ? <span className={`${TAG} ${TAG_COLOURS.singapore}`}>SG entity</span> : null}
             </span>
           ))}
         </>
       ) : null}
 
-      <h2 style={S.h2}>Portfolio — worth a look ({notable.length})</h2>
-      {notable.length === 0 ? <p style={S.p}>Nothing in this portfolio is marked.</p> : notable.map((c: any) => (
-        <span key={c.id} style={S.row}>
-          <a href={`/company/${c.id}?token=${t}`} style={S.a}>{c.name}</a>
-          {c.is_lead ? <span style={S.meta}> · lead</span> : null}
-          {c.round ? <span style={S.meta}> · {c.round}</span> : null}
+      <h2 className={H2}>Portfolio — worth a look ({notable.length})</h2>
+      {notable.length === 0 ? <p className={BODY}>Nothing in this portfolio is marked.</p> : notable.map((c: any) => (
+        <span key={c.id} className={ROW}>
+          <a href={`/company/${c.id}?token=${t}`} className={LINK}>{c.name}</a>
+          {c.is_lead ? <span className={META}> · lead</span> : null}
+          {c.round ? <span className={META}> · {c.round}</span> : null}
           {c.account_status && c.account_status !== 'unknown' ? (
-            <span style={{ ...S.tag, ...(TAG_COLOURS[c.account_status] ?? TAG_COLOURS.not_pursuing) }}>
+            <span className={`${TAG} ${TAG_COLOURS[c.account_status] ?? TAG_COLOURS.not_pursuing}`}>
               {ACCOUNT_STATUS_LABELS[c.account_status as AccountStatus] ?? c.account_status}
             </span>
           ) : null}
-          {(c.recent_signal ?? 0) >= 2 ? <span style={{ ...S.tag, ...TAG_COLOURS.surfaced }}>surfaced</span> : null}
-          {c.has_sg ? <span style={{ ...S.tag, ...TAG_COLOURS.singapore }}>SG entity</span> : null}
+          {(c.recent_signal ?? 0) >= 2 ? <span className={`${TAG} ${TAG_COLOURS.surfaced}`}>surfaced</span> : null}
+          {c.has_sg ? <span className={`${TAG} ${TAG_COLOURS.singapore}`}>SG entity</span> : null}
         </span>
       ))}
 
       {rest.length ? (
-        <details style={{ marginTop: 14 }}>
-          <summary style={{ ...S.h2, cursor: 'pointer', margin: '14px 0 8px' }}>
+        <details className="mt-3.5">
+          <summary className={`${H2} mb-2 mt-3.5 cursor-pointer`}>
             The other {rest.length} portfolio companies
           </summary>
           {rest.map((c: any) => (
-            <span key={c.id} style={S.row}>
-              <a href={`/company/${c.id}?token=${t}`} style={S.a}>{c.name}</a>
-              {c.round ? <span style={S.meta}> · {c.round}</span> : null}
+            <span key={c.id} className={ROW}>
+              <a href={`/company/${c.id}?token=${t}`} className={LINK}>{c.name}</a>
+              {c.round ? <span className={META}> · {c.round}</span> : null}
             </span>
           ))}
         </details>
@@ -200,14 +206,14 @@ export default async function OrgPage(
 
       {people.length ? (
         <>
-          <h2 style={S.h2}>People ({people.length})</h2>
+          <h2 className={H2}>People ({people.length})</h2>
           {people.map((p: any) => (
-            <span key={p.id} style={S.row}>
-              <a href={`/person/${p.id}?token=${t}`} style={S.a}>{p.name}</a>
-              {p.title || p.role ? <span style={S.meta}> · {p.title ?? p.role}</span> : null}
+            <span key={p.id} className={ROW}>
+              <a href={`/person/${p.id}?token=${t}`} className={LINK}>{p.name}</a>
+              {p.title || p.role ? <span className={META}> · {p.title ?? p.role}</span> : null}
             </span>
           ))}
-          <p style={S.caveat}>
+          <p className="mb-3.5 rounded-md border border-caution/40 bg-caution-soft/40 px-3 py-2.5 text-xs text-caution">
             A person affiliated with this fund who also sits on a company board is a possible
             path, not a confirmed one. Someone has to know whether EDB actually has access.
           </p>

@@ -11,7 +11,9 @@
  * the page behind one is never fetched.
  */
 import { getSql } from '../../../lib/db';
+import { profileLabel } from '../../../lib/utils';
 import { hasDashboard } from '../../../lib/auth';
+import { SectionHeading } from '@/components/primitives';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,17 +23,16 @@ const day = (v: unknown) => {
   return Number.isNaN(d.getTime()) ? String(v) : d.toISOString().slice(0, 10);
 };
 
-const S = {
-  main: { maxWidth: 760, margin: '0 auto', padding: '28px 20px 60px', fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif', color: '#111' } as const,
-  h1: { fontSize: 24, margin: '0 0 4px', fontWeight: 650 } as const,
-  sub: { color: '#666', fontSize: 14, margin: '0 0 20px' } as const,
-  h2: { fontSize: 13, letterSpacing: 1, textTransform: 'uppercase', color: '#1a4d8f', margin: '26px 0 10px', fontWeight: 700 } as const,
-  card: { border: '1px solid #e3e3e3', borderRadius: 6, padding: '12px 14px', marginBottom: 8, background: '#fff' } as const,
-  p: { fontSize: 14, lineHeight: 1.55, margin: '0 0 6px' } as const,
-  meta: { color: '#777', fontSize: 12, margin: '2px 0' } as const,
-  caveat: { background: '#fffaf0', border: '1px solid #f0e2c0', borderRadius: 6, padding: '10px 12px', fontSize: 13, color: '#6b5626', margin: '0 0 14px' } as const,
-  a: { color: '#1a4d8f' } as const,
-};
+/* Shared class strings. A reading column, not the dashboard's card grid. */
+const MAIN = 'mx-auto max-w-[760px] px-5 pb-16 pt-7';
+const H1 = 'mb-1 font-display text-2xl font-semibold tracking-tight';
+const CARD = 'mb-2 rounded-md border border-border bg-card px-3.5 py-3';
+const BODY = 'mb-1.5 text-sm';
+const META = 'my-0.5 text-xs text-muted-foreground';
+const LINK = 'text-primary link-underline hover:text-foreground';
+/* Caution notice — where a claim is weaker than it looks. */
+const CAUTION = 'mb-3.5 rounded-md border border-caution/30 bg-caution-soft px-3 py-2.5 text-2xs text-caution';
+const HEADING = 'mb-2.5 mt-6';
 
 export default async function PersonPage(
   { params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ token?: string }> },
@@ -39,16 +40,16 @@ export default async function PersonPage(
   const { id } = await params;
   const sp = await searchParams;
   if (!(await hasDashboard(sp.token))) {
-    return <main style={S.main}><h1 style={S.h1}>Not authorised</h1>
-      <p style={S.p}>Append <code>?token=…</code> with your DASHBOARD_TOKEN.</p></main>;
+    return <main className={MAIN}><h1 className={H1}>Not authorised</h1>
+      <p className={BODY}>Append <code>?token=…</code> with your DASHBOARD_TOKEN.</p></main>;
   }
 
   const personId = Number(id);
-  if (!Number.isFinite(personId)) return <main style={S.main}><h1 style={S.h1}>Not found</h1></main>;
+  if (!Number.isFinite(personId)) return <main className={MAIN}><h1 className={H1}>Not found</h1></main>;
 
   const sql = getSql();
   const [p]: any = await sql`select * from people where id = ${personId}`;
-  if (!p) return <main style={S.main}><h1 style={S.h1}>Not found</h1></main>;
+  if (!p) return <main className={MAIN}><h1 className={H1}>Not found</h1></main>;
 
   const [roles, affiliations, sgCompanies]: any = await Promise.all([
     sql`select r.role, r.role_raw, r.source, r.source_url, r.first_seen, r.last_seen,
@@ -70,21 +71,21 @@ export default async function PersonPage(
   const t = sp.token ?? '';
 
   return (
-    <main style={S.main}>
-      <h1 style={S.h1}>{p.name}</h1>
-      <p style={S.sub}>
+    <main className={MAIN}>
+      <h1 className={H1}>{p.name}</h1>
+      <p className="mb-5 text-sm text-muted-foreground">
         {p.title ?? 'No title recorded'}
-        {p.profile_url ? <> · <a href={p.profile_url} style={S.a}>profile</a></> : null}
+        {p.profile_url ? <> · <a href={p.profile_url} className={LINK}>{profileLabel(p.profile_url)}</a></> : null}
       </p>
 
       {p.bio ? (
         <>
-          <div style={S.card}>
-            <p style={S.p}>{p.bio}</p>
-            <p style={S.meta}>
+          <div className={CARD}>
+            <p className={BODY}>{p.bio}</p>
+            <p className={META}>
               {p.bio_status === 'probable' ? 'From a search result, not verified' : 'Recorded'}
               {p.bio_source ? ` · ${p.bio_source}` : ''}
-              {p.bio_source_url ? <> · <a href={p.bio_source_url} style={S.a}>source</a></> : null}
+              {p.bio_source_url ? <> · <a href={p.bio_source_url} className={LINK}>source</a></> : null}
               {p.bio_fetched_at ? ` · ${new Date(p.bio_fetched_at).toISOString().slice(0, 10)}` : ''}
             </p>
           </div>
@@ -93,53 +94,53 @@ export default async function PersonPage(
 
       {p.contact_email || p.contact_phone ? (
         <>
-          <h2 style={S.h2}>Contact</h2>
-          <div style={S.card}>
-            {p.contact_email ? <p style={S.p}>{p.contact_email}</p> : null}
-            {p.contact_phone ? <p style={S.p}>{p.contact_phone}</p> : null}
-            <p style={S.meta}>
+          <div className={HEADING}><SectionHeading title="Contact" /></div>
+          <div className={CARD}>
+            {p.contact_email ? <p className={BODY}>{p.contact_email}</p> : null}
+            {p.contact_phone ? <p className={BODY}>{p.contact_phone}</p> : null}
+            <p className={META}>
               From a public source
-              {p.contact_source_url ? <> · <a href={p.contact_source_url} style={S.a}>where it came from</a></> : null}
+              {p.contact_source_url ? <> · <a href={p.contact_source_url} className={LINK}>where it came from</a></> : null}
               {p.contact_found_at ? ` · found ${new Date(p.contact_found_at).toISOString().slice(0, 10)}` : ''}
             </p>
-            <p style={S.meta}>Contacts age quickly. Check it still works before using it.</p>
+            <p className={META}>Contacts age quickly. Check it still works before using it.</p>
           </div>
         </>
       ) : null}
 
-      <h2 style={S.h2}>Roles ({roles.length})</h2>
-      {roles.length === 0 ? <p style={S.p}>None recorded.</p> : roles.map((r: any, i: number) => (
-        <div key={i} style={S.card}>
-          <p style={S.p}>
+      <div className={HEADING}><SectionHeading title={`Roles (${roles.length})`} /></div>
+      {roles.length === 0 ? <p className={BODY}>None recorded.</p> : roles.map((r: any, i: number) => (
+        <div key={i} className={CARD}>
+          <p className={BODY}>
             <b>{r.role_raw ?? r.role}</b> at{' '}
-            <a href={`/company/${r.company_id}?token=${t}`} style={S.a}>{r.company}</a>
+            <a href={`/company/${r.company_id}?token=${t}`} className={LINK}>{r.company}</a>
             {r.account_status && r.account_status !== 'unknown' ? ` · ${String(r.account_status).replace(/_/g, ' ')}` : ''}
           </p>
-          <p style={S.meta}>
+          <p className={META}>
             {r.source}
-            {r.first_seen ? ` · first seen ${day(r.first_seen)}` : ''}
-            {r.last_seen ? ` · last seen ${day(r.last_seen)}` : ''}
-            {r.source_url ? <> · <a href={r.source_url} style={S.a}>source</a></> : ''}
+            {r.first_seen ? ` · in our data since ${day(r.first_seen)}` : ''}
+            {r.last_seen ? ` · last confirmed ${day(r.last_seen)}` : ''}
+            {r.source_url ? <> · <a href={r.source_url} className={LINK}>source</a></> : ''}
           </p>
         </div>
       ))}
 
       {affiliations.length ? (
         <>
-          <h2 style={S.h2}>Fund affiliations ({affiliations.length})</h2>
+          <div className={HEADING}><SectionHeading title={`Fund affiliations (${affiliations.length})`} /></div>
           {affiliations.map((a: any, i: number) => (
-            <div key={i} style={S.card}>
-              <p style={S.p}>
+            <div key={i} className={CARD}>
+              <p className={BODY}>
                 {a.role ?? 'Affiliated'} at{' '}
-                <a href={`/org/${a.org_id}?token=${t}`} style={S.a}>{a.org}</a>
+                <a href={`/org/${a.org_id}?token=${t}`} className={LINK}>{a.org}</a>
               </p>
-              <p style={S.meta}>
+              <p className={META}>
                 {a.source}
-                {a.source_url ? <> · <a href={a.source_url} style={S.a}>source</a></> : ''}
+                {a.source_url ? <> · <a href={a.source_url} className={LINK}>source</a></> : ''}
               </p>
             </div>
           ))}
-          <p style={S.caveat}>
+          <p className={CAUTION}>
             A fund affiliation and a board seat are separate facts from separate sources.
             Appearing as a director on a filing does not establish which fund a person
             represents, and this page keeps the two apart for that reason.
@@ -149,16 +150,16 @@ export default async function PersonPage(
 
       {sgCompanies.length ? (
         <>
-          <h2 style={S.h2}>Singapore connections</h2>
+          <div className={HEADING}><SectionHeading title="Singapore connections" /></div>
           {sgCompanies.map((c: any) => (
-            <div key={c.id} style={S.card}>
-              <p style={S.p}>
-                Also connected to <a href={`/company/${c.id}?token=${t}`} style={S.a}>{c.name}</a>,
+            <div key={c.id} className={CARD}>
+              <p className={BODY}>
+                Also connected to <a href={`/company/${c.id}?token=${t}`} className={LINK}>{c.name}</a>,
                 which has a {c.match_status ?? 'possible'} Singapore entity
               </p>
             </div>
           ))}
-          <p style={S.caveat}>
+          <p className={CAUTION}>
             This is an association from public records, not a confirmed introduction.
             Someone has to know whether EDB actually has access.
           </p>
