@@ -580,6 +580,8 @@ const toPlacementInput = (r: Row): PlacementInput => ({
 export type WeeklyDigest = {
   weekLabel: string;
   coverage: string;
+  /** The same three numbers as `coverage`, for a stat row rather than a sentence. */
+  coverageStats: { monitored: number; processed: number; surfaced: number };
   worthAConversation: DashboardCompany[];
   newOnTheRadar: DashboardCompany[];
   accountActivity: DashboardCompany[];
@@ -623,6 +625,11 @@ export async function getWeeklyDigest(
   return {
     weekLabel: weekLabel(),
     coverage: coverageLine(Number(companies), Number(signals), worth.length + radar.length),
+    coverageStats: {
+      monitored: Number(companies),
+      processed: Number(signals),
+      surfaced: worth.length + radar.length,
+    },
     worthAConversation: worth,
     newOnTheRadar: radar,
     accountActivity,
@@ -630,14 +637,25 @@ export async function getWeeklyDigest(
   };
 }
 
+/**
+ * The week being reported on, as a date range.
+ *
+ * The digest goes out on a Monday about the week that just ended, so this is
+ * the previous Monday to Sunday rather than the current week. The month is
+ * repeated when a range spans two — "29 September – 5 October" reads wrong
+ * without it.
+ */
 function weekLabel(): string {
   const now = new Date();
   const day = (now.getUTCDay() + 6) % 7;
-  const mon = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day));
+  const thisMonday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day);
+  const mon = new Date(thisMonday - 7 * 86400_000);
   const sun = new Date(mon.getTime() + 6 * 86400_000);
   const fmt = (d: Date, opts: Intl.DateTimeFormatOptions) =>
     d.toLocaleDateString('en-GB', { timeZone: 'UTC', ...opts });
-  return `Week of ${fmt(mon, { day: 'numeric' })}–${fmt(sun, { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  const sameMonth = mon.getUTCMonth() === sun.getUTCMonth();
+  const from = sameMonth ? fmt(mon, { day: 'numeric' }) : fmt(mon, { day: 'numeric', month: 'long' });
+  return `${from} – ${fmt(sun, { day: 'numeric', month: 'long', year: 'numeric' })}`;
 }
 
 /** Companies an RD chose to monitor, with their signal row when one exists. */
@@ -881,6 +899,23 @@ export type PathRow = {
   reviewStatus: string;
   viaPersonName: string | null;
   viaOrgName: string | null;
+  /** The company at the far end, so its name can link to its own page. */
+  targetCompanyId: number | null;
+  targetCompanyName: string | null;
+  /**
+   * The edges this path actually runs along, as `from|to` node-id pairs.
+   *
+   * The graph cannot infer them from `nodeIds`: several paths share a connector
+   * and a destination, so any edge between two of a path's nodes lit up whether
+   * or not it belonged to that path.
+   */
+  edgeKeys: string[];
+  /**
+   * The graph nodes this path runs through, using the same ids getCompanyGraph
+   * assigns. Selecting a row can then light up its own edges rather than every
+   * path that happens to go through a person.
+   */
+  nodeIds: string[];
 };
 
 /** The ranked path list for a company. Brief §8. */
@@ -902,5 +937,19 @@ export async function getCompanyPaths(companyId: number): Promise<PathRow[]> {
     reviewStatus: p.reviewStatus,
     viaPersonName: p.viaPersonName,
     viaOrgName: p.viaOrgName,
+    targetCompanyId: p.targetCompanyId,
+    targetCompanyName: p.targetCompanyName,
+    edgeKeys: (() => {
+      const hub = `c${companyId}`;
+      const via = p.viaPersonId ? `p${p.viaPersonId}` : p.viaOrgId ? `o${p.viaOrgId}` : null;
+      const end = p.targetCompanyId ? `c${p.targetCompanyId}` : null;
+      if (!via) return [];
+      return [`${hub}|${via}`, ...(end ? [`${via}|${end}`] : [])];
+    })(),
+    nodeIds: [
+      `c${companyId}`,
+      p.viaPersonId ? `p${p.viaPersonId}` : p.viaOrgId ? `o${p.viaOrgId}` : null,
+      p.targetCompanyId ? `c${p.targetCompanyId}` : null,
+    ].filter((x): x is string => x !== null),
   }));
 }
