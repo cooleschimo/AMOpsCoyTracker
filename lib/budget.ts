@@ -24,18 +24,23 @@ export const LIMITS = {
   tpdSoftStop: 180_000,
 };
 
+type ProviderLimit = { tpd?: number; rpd?: number };
+
+function numberedLimits(base: string, limit: ProviderLimit): Record<string, ProviderLimit> {
+  return Object.fromEntries(
+    Array.from({ length: 10 }, (_, i) => [i === 0 ? base : `${base}${i + 1}`, limit]),
+  );
+}
+
 /**
  * What each provider is actually limited by. A provider absent from here is
  * tracked but never pre-emptively halted — its own 429 is the signal, which is
  * the honest default for a limit we have not verified.
  */
-export const PROVIDER_LIMITS: Record<string, { tpd?: number; rpd?: number }> = {
-  groq: { tpd: LIMITS.tpdSoftStop, rpd: LIMITS.rpd },
-  groq2: { tpd: LIMITS.tpdSoftStop, rpd: LIMITS.rpd },
+export const PROVIDER_LIMITS: Record<string, ProviderLimit> = {
+  ...numberedLimits('groq', { tpd: LIMITS.tpdSoftStop, rpd: LIMITS.rpd }),
   // GenerateRequestsPerDayPerProjectPerModel-FreeTier = 20.
-  gemini: { rpd: 20 },
-  gemini2: { rpd: 20 },
-  gemini3: { rpd: 20 },
+  ...numberedLimits('gemini', { rpd: 20 }),
 };
 
 type Spend = { tokensIn: number; tokensOut: number; requests: number; exhausted: string | null };

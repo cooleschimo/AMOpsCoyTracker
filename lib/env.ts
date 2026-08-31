@@ -71,54 +71,63 @@ export type LlmProvider = {
   label?: string;
 };
 
+export const DEFAULT_LLM_CHAIN = 'gemini,groq,gemini2,groq2,openrouter,gemini3,groq3,gemini4,groq4';
+
+type KeySlot = { apiKey: string; label: string };
+
+/**
+ * Numbered API keys, preserving the suffix in the provider label.
+ *
+ * Reads BASE_KEY, BASE_KEY_2 ... BASE_KEY_10. Gaps are allowed: if _3 is absent
+ * but _4 exists, _4 is still exposed as provider label `base4`, so LLM_CHAIN
+ * can name exactly the credential it means.
+ */
+function numberedKeys(envName: string, baseLabel: string): KeySlot[] {
+  const slots: KeySlot[] = [];
+  const seen = new Set<string>();
+  const add = (apiKey: string, label: string) => {
+    if (!apiKey || seen.has(apiKey)) return;
+    seen.add(apiKey);
+    slots.push({ apiKey, label });
+  };
+
+  add(optional(envName), baseLabel);
+  for (let i = 2; i <= 10; i++) add(optional(`${envName}_${i}`), `${baseLabel}${i}`);
+  return slots;
+}
+
 /**
  * Every configured Groq key, in order: GROQ_API_KEY, GROQ_API_KEY_2, ...
- * Stops at the first gap, so numbering must be contiguous. Duplicates are
- * dropped — the same key twice is not extra capacity, only wasted failover.
+ * Duplicates are dropped — the same key twice is not extra capacity, only
+ * wasted failover.
  */
-function groqKeys(): string[] {
-  const keys: string[] = [];
-  const first = optional('GROQ_API_KEY');
-  if (first) keys.push(first);
-  for (let i = 2; i <= 10; i++) {
-    const k = optional(`GROQ_API_KEY_${i}`);
-    if (!k) break;
-    keys.push(k);
-  }
-  return [...new Set(keys)];
+function groqKeys(): KeySlot[] {
+  return numberedKeys('GROQ_API_KEY', 'groq');
 }
 
 /**
  * Every configured Gemini key, in order: GEMINI_API_KEY, GEMINI_API_KEY_2, ...
- * Stops at the first gap, so numbering must be contiguous. Duplicates are
- * dropped — the same key twice is not extra quota, only wasted failover steps.
+ * Duplicates are dropped — the same key twice is not extra quota, only wasted
+ * failover steps.
  */
-function geminiKeys(): string[] {
-  const keys: string[] = [];
-  const first = optional('GEMINI_API_KEY');
-  if (first) keys.push(first);
-  for (let i = 2; i <= 10; i++) {
-    const k = optional(`GEMINI_API_KEY_${i}`);
-    if (!k) break;
-    keys.push(k);
-  }
-  return [...new Set(keys)];
+function geminiKeys(): KeySlot[] {
+  return numberedKeys('GEMINI_API_KEY', 'gemini');
 }
 
 export function llmProviders(): LlmProvider[] {
   const all: LlmProvider[] = [
-    ...groqKeys().map((apiKey, i) => ({
+    ...groqKeys().map(({ apiKey, label }) => ({
       name: 'groq' as const,
       apiKey,
       baseUrl: optional('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
       model: optional('GROQ_MODEL_SCORING', 'openai/gpt-oss-120b'),
-      label: i === 0 ? 'groq' : `groq${i + 1}`,
+      label,
     })),
     // Gemini accepts MULTIPLE KEYS: GEMINI_API_KEY, then GEMINI_API_KEY_2..N.
     // Free-tier quota is per project, so a teammate's key on their own project
     // carries its own allowance; each becomes a separate entry so the failover
     // moves to the next when one is exhausted.
-    ...geminiKeys().map((apiKey, i) => ({
+    ...geminiKeys().map(({ apiKey, label }) => ({
       name: 'gemini' as const,
       apiKey,
       baseUrl: optional('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai'),
@@ -127,7 +136,7 @@ export function llmProviders(): LlmProvider[] {
       model: optional('GEMINI_MODEL', 'gemini-3.6-flash'),
       // NOT 'gemini#2': '#' starts a comment in .env parsing, so a chain
       // string containing it is silently truncated.
-      label: i === 0 ? 'gemini' : `gemini${i + 1}`,
+      label,
     })),
     {
       name: 'openrouter',
@@ -166,7 +175,8 @@ export function llmProviders(): LlmProvider[] {
 
   /**
    * LLM_CHAIN sets the failover order explicitly, as a comma-separated list of
-   * LABELS. The default is: gemini, gemini2, groq, openrouter, groq2.
+   * LABELS. The default alternates Gemini/Groq around OpenRouter:
+   * gemini, groq, gemini2, groq2, openrouter, gemini3, groq3, gemini4, groq4.
    * No '#' in labels: it starts a comment in .env files and would truncate the
    * chain string. Labels rather than provider names, so several keys on one
    * provider can be placed independently. Anything keyed but not named in the
@@ -178,7 +188,7 @@ export function llmProviders(): LlmProvider[] {
   const chain = optional('LLM_CHAIN');
   if (chain) return byChain(chain);
 
-  const defaultChain = byChain('gemini,gemini2,groq,openrouter,groq2');
+  const defaultChain = byChain(DEFAULT_LLM_CHAIN);
 
   const preferred = optional('LLM_PROVIDER').toLowerCase();
   if (!preferred) return defaultChain;
