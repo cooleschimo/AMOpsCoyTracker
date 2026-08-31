@@ -18,13 +18,28 @@ Brief §12 build order, actual status:
 | 4 | Entity resolution + `/admin/merge` | ✅ done |
 | 5 | VC portfolio scraping → organizations + investments | ✅ done |
 | 6 | ACRA bulk load + resolution → `sg_links` | ✅ done |
-| 7 | Warm-path query | ✅ query done; `/company/[id]` view NOT built |
+| 7 | Warm-path query + `/company/[id]` view | ✅ done |
 | 8 | Google News + wire RSS | ✅ done — 8,996 items from 121 companies + 2 wires |
-| 9 | Filter, cluster, score | ⚠️ cascade done; **288 of 651 heads scored** (free-tier caps) |
+| 9 | Filter, cluster, score | ✅ done — 451 cluster heads, two axes (`score` + `momentum`) |
 | 10 | ATS discovery + source | ✅ done — 71 boards, aggregated to one hiring item per company |
-| 11–20 | digest, dashboard, labelling, admin, drafts, edges, events, sector sources, cron, DEBUGGING.md | ❌ not started |
+| 11 | Digest render + placement | ✅ render done (`out/digest-*.html` + `.txt`); approval and send NOT built |
+| 11 (UI) | `/item/[id]` review page + dispositions | ✅ done |
+| — | `/admin/accounts` — account status by hand | ✅ done |
+| 12–20 | dashboard, labelling, admin stats, drafts, edges, events, sector sources, cron, DEBUGGING.md | ❌ not started |
+
+**A second agent is working on the dashboard, monitoring and disposition
+actions.** `design/LOVABLE_PROMPT.md` is theirs. Coordinate before editing
+`lib/dispositions.ts`, `lib/placement.ts`, `app/item/`, or the digest sections.
 
 **Extra work not in the brief's numbering**, built because it was needed:
+
+- Placement and digest render — `lib/placement.ts`, `scripts/render-digest.ts`
+- Digest render, Outlook-safe — `lib/digest-render.ts`, `scripts/render-digest.ts`
+- Singapore value propositions per item — `lib/proposition.ts`, drawing on
+  `lib/valueprops.ts` and a site-restricted precedent search
+- Account status by hand — `lib/accounts.ts`, `/admin/accounts`
+- Snippet repair — `scripts/clean-snippets.ts`
+- Doc-vs-code audit — `scripts/dev/doc-sync.ts`
 
 - Company-level assessment (§7a) — `lib/company-rubric.ts`, `scripts/assess-companies.ts`
 - Website enrichment — `lib/enrich.ts`, `scripts/enrich-websites.ts`
@@ -47,13 +62,19 @@ organizations         103
 investments          2853
 sg_links               91
 sec_filings           116
-company_assessments    31
-items               10418    (dropped 9726 · kept 651 · duplicate 41)
-scores                492    (item-v1 204 · item-v3 288)
+company_assessments   258    (company-v1 → v4; queried by version)
+items               10418    (dropped 9726 · kept 451 · duplicate 241)
+scores               1494    (item-v1 → v5; queried by version)
 job_snapshots         347    ← WoW baseline; volume trigger goes live next run
 job_postings         8507
 source_health          67
+dispositions            1
+digests                 0    ← render works; nothing saved or sent
 ```
+
+**Current versions:** `item-v5` (adds `momentum`, two routes to a 3, why-now as
+points) and `company-v4` (engagement-based Singapore fit, contribution drivers).
+Both are queried by version, so earlier judgments survive for comparison.
 
 **Scoring is incomplete on purpose.** 363 cluster heads have no `item-v3` score:
 all three free LLM tiers were exhausted in one day. `npx tsx
@@ -90,48 +111,56 @@ These are amendments the product owner made. **Do not silently revert them.**
 
 ---
 
-## 3b. Amendments made during the step 8/9/10 session (2026-08-24)
+## 3b. Amendments to the design, all reflected in `design/`
 
-1. **ATS emits ONE aggregated hiring item per company, not one per posting.**
-   §5.5 says "emit a synthetic item for any non-US posting"; taken literally
-   that made every job listing a candidate digest line — 231 for Databricks
-   alone — and fed the scorer uniform batches, the condition behind the
-   anchoring failure in §4. Postings stay in `job_postings` with their URLs so
-   every number remains checkable. RATIONALE §4 updated.
-2. **The item rubric no longer infers sectors.** It was tagging a web-search
-   company `biotech` and adding `deeptech` to most AI firms. The company record
-   is research-verified; the model now copies it.
-3. **A materiality floor on hiring items** (`hiringItemIsMaterial`). "1 open
-   APAC role" scored a 3 in the first run. Now needs a Singapore role, ≥2 APAC
-   roles, or a director-level APAC hire — mirroring §5.5's floor on the volume
-   trigger.
-4. **The 0-3 rubric was widened to two routes to a 3** (`item-v3`). Route (a) is
-   explicit Asia intent; route (b) is an OPEN LOCATION DECISION at a company
-   with traction and no Asian commitment yet — a large raise, a new plant, a
-   first international hire. The product owner's point: AM Ops exists to attract
-   companies that have not decided, not only to detect those already going.
-   `expansion_language: false` on a 3 is what an untapped prospect looks like.
-5. **Multi-provider LLM failover** in `lib/llm.ts`. A daily-cap 429 moves to the
-   next provider instead of sleeping; a malformed response does not.
+The docs are the spec and are current. `npx tsx scripts/dev/doc-sync.ts` checks
+that every table, decision-bearing column, judgment-holding module and design
+concept appears in them; it reports no gaps.
 
----
+1. **Sections answer questions; signals are the evidence.** The digest is
+   *worth a conversation* / *new on the radar* / *trending* / *monitoring*, not
+   a block per signal type. A Singapore job posting is a reason a company
+   appears, not a category.
+2. **Two scoring axes.** `score` asks whether a location decision is open, by
+   either explicit Asia intent or an open location decision at a company with
+   traction and no Asia mention. `momentum` asks whether the company is moving
+   fast. Trending ranks on momentum; discovery on the trigger plus the company
+   assessment.
+3. **Account status is ranked on in discovery, ignored in trending.** An
+   existing account is not a discovery; a fast-moving company EDB already meets
+   is exactly where a joint project becomes possible.
+4. **Singapore fit is judged against a plausible engagement**, not whole-company
+   relocation, and `potential_contribution` names the one or two dimensions its
+   band rests on.
+5. **The value proposition is selected from `lib/valueprops.ts`, never invented**,
+   with a site-restricted search for public precedent. The model may cite only a
+   url it was given.
+6. **ATS emits one aggregated hiring item per company**, characterised by
+   function and seniority, with a materiality floor mirroring §5.5's volume
+   floor. Individual postings stay in `job_postings`.
+7. **No internal team routing.** The tool has no knowledge of EDB's org
+   structure and a plausible wrong team is worse than no line.
 
-## 3c. Open calibration issues — decide before building the digest
+## 3c. Open calibration issues
 
-1. **Clustering is too strict.** 13 companies produced multiple score-3 items
-   for ONE event (Perplexity ×6 on the same Nvidia deal, Castelion ×6). The 0.7
-   Jaccard threshold is what RATIONALE §5 warned would need calibrating. A
-   digest built on this would repeat itself.
-2. **`dropped_blocked_domain` is structurally 0** for news. Google News wraps
+1. **`dropped_blocked_domain` is structurally 0** for news. Google News wraps
    every link on `news.google.com`, so the publisher domain is never in the URL.
-   `blockedSourceName()` matches `items.source` instead and drops 615 — but the
-   domain stage stays inert for that feed.
-3. **61% of items dropped as stale.** Google returns ~100 items per company
+   `blockedSourceName()` matches `items.source` instead and drops 615 — the
+   domain stage stays inert for that feed and always will.
+2. **61% of items dropped as stale.** Google returns ~100 items per company
    regardless of age; only ~950 fell inside the 10-day window. Confirm 10 days
    is right before treating the drop rate as a problem.
-4. **50 of 121 companies have no ATS board.** Slug guessing from name and domain
-   found 71. The rest need their careers page located by hand or by search —
-   a one-time backfill, since `companies.ats_slug` is cached.
+3. **50 of 121 companies have no ATS board.** Slug guessing from name and domain
+   found 71. The rest need their careers page located by hand or by search — a
+   one-time backfill, since `companies.ats_slug` is cached.
+4. **The volume trigger has never fired.** 347 snapshots exist but the
+   week-over-week comparison needs a second ATS run. It goes live then.
+5. **Seed companies have no people.** All 314 roles attach to Form D companies,
+   so warm paths are thin for exactly the companies that matter most. §8 ranks
+   person-mediated paths highest, and there are none for the seed list.
+6. **The token budget halts the run before the provider chain is consulted** —
+   see BLOCKERS §8. Worked around with `LLM_CHAIN`; the accounting needs to be
+   per provider.
 
 ---
 
@@ -182,6 +211,34 @@ Each of these looked fine until checked against live data. Expect more of the sa
   on gemini-3.6-flash really is 20 requests, and both keys really were spent.
   The misclassification bug was real, but it was hiding a genuine cap, not
   inventing one.
+
+- **A feed's markup came back after the tags were stripped.** `tagText` stripped
+  HTML and then decoded entities, so a description carrying escaped markup —
+  Google News nests an escaped `<ol>` of related articles in every one — had its
+  tags resurrected after the stripper had run. 8,967 of 10,418 snippets were
+  stored as raw markup, and the snippet goes into the SCORING PROMPT, so the
+  model was reading `<a href="https://news.google.com/rss/...">` as evidence
+  about a company. **Decode first, strip second, repeat until stable.**
+  `scripts/clean-snippets.ts` repaired the stored rows.
+
+- **A digest link nobody can open.** Google News RSS links are ~400-character
+  redirect wrappers whose target is base64 in the path and not reliably
+  decodable. They resolve in a browser but are useless to read, so plaintext
+  names the publisher instead. Separately, hard-paywalled sources now rank below
+  open ones when choosing a cluster head — checking the claim is the point, and
+  a report an RD cannot open cannot be checked. That moved 12 paywalled heads
+  down to 7, the rest being Bloomberg stories with no open alternative.
+
+- **A vendor lookup resolves a name, not a company.** Backfilling from CB
+  Insights by company name returned, alongside the right answers: a 1996
+  Massachusetts life-sciences SaaS firm for "Cognition" (the AI coding company),
+  a Buenos Aires swimwear brand for "Chroma" (the vector database), and a
+  Georgia IT-training provider for "GenSpark" (the AI search company). Each came
+  back with a full funding history that would have loaded cleanly and read as
+  fact. The vendor is not at fault — it returns the best match for a string and
+  lists alternates — but a name is not an identity. **Check the description
+  against what the company actually does before loading a vendor row**, and
+  prefer the vendor's own id once a match is confirmed.
 
 - **Same-name-different-company is the main false-positive risk.**
   AMPLIFICA HOLDINGS (biotech) matched both a US marketing agency and a Chilean
@@ -234,22 +291,44 @@ replacing one is a config change.
 
 ---
 
+## 5b. Sources verified but not built
+
+Probed 2026-08-26. Keys are in `.env.local`; nothing calls these yet.
+
+| source | status |
+|---|---|
+| EDGAR full-text (`efts.sec.gov`) | works, no key — **built** in `lib/entry-signals.ts` |
+| ClinicalTrials.gov v2 | works, no key — **built**; filter out Singapore institutions or local hospital trials swamp the result |
+| USASpending | works, no key |
+| GLEIF | works, no key |
+| Hacker News (Algolia) | works, no key |
+| OpenCorporates | 401 without a key; free tier is ODbL share-alike — see `design/OPENCORPORATES_OBLIGATIONS.md` |
+| USPTO / TSDR | 401; a key becomes mandatory October 2026 |
+| SBIR awards API | **403 to server requests on both documented endpoints.** The brief calls SBIR the primary discovery route for `defence_tech`, so this is a real gap. USASpending may cover federal awards instead |
+
+---
+
 ## 6. Immediate next steps
 
-1. **Step 8 + 10 together** — news ingestion into `items` AND ATS job boards.
-   Do both before scoring: the co-occurrence rule ("an APAC job posting plus a
-   recent raise is a 3") needs both signal types to exist, or the step 9 review
-   gives a misleading picture.
-2. **Step 9** — filter, cluster, score. **This is the agreed stopping point**:
-   show the product owner real scored headlines (score, signal type, sector,
-   `why`) plus per-stage drop counts, before building the digest.
-3. Then: `/company/[id]` view (step 7's UI half), digest, dashboard.
+1. **Events (step 17)** — the one digest section with no data behind it.
+   `events` and `event_participants` are empty. Parsing conference speaker and
+   exhibitor lists answers a question RDs actually have: *who from our list will
+   be at SEMICON West, and can we get a meeting?* Nobody is working on it.
+2. **Approval and send (step 11's other half)** — the render works and writes to
+   `out/`; nothing saves a digest row or sends. §13 requires testing the Outlook
+   render against a real address, which needs the send path first.
+3. **Second ATS run** — brings the volume trigger live.
+4. **ATS slug backfill** for the 50 unresolved companies.
 
 **Sources still unbuilt**, with a caveat: the brief calls SBIR the *primary*
 discovery route for `defence_tech` and ClinicalTrials *primary* for `biotech`,
 yet §12 schedules both at step 18 and lists them first in the cut list. If those
 sectors matter, promote them. IPOS trademarks and EDB press releases appear in
 §5.4 but are **not scheduled anywhere** in §12.
+
+**The 7 topic queries in `lib/news-sources.ts` are built but never run.** They
+are the untargeted discovery channel — company-directed news can only ever
+confirm companies already on the list.
 
 ---
 
