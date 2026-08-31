@@ -39,12 +39,11 @@ export default async function MonitoringPage() {
   const groups = groupBySector(companies);
 
   return (
-    <main className="mx-auto max-w-[1400px] px-5 py-10 sm:px-8 sm:py-14">
+    <main className="mx-auto max-w-[1400px] px-6 py-10 sm:px-12 sm:py-14 lg:px-16">
       <header className="mb-10 space-y-1">
         <h1 className="font-display text-3xl font-semibold tracking-tight">Monitored companies</h1>
         <p className="text-sm text-muted-foreground">
-          A standing choice, held until you undo it. Everything a monitored company has done since
-          it was added is here, not only the line the digest showed.
+          Everything these companies have done since you started watching them.
         </p>
         <p className="pt-2 text-xs text-muted-foreground">
           <Link href="/" className="link-underline hover:text-foreground">
@@ -55,9 +54,7 @@ export default async function MonitoringPage() {
 
       {companies.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Nothing monitored yet. Choosing <span className="text-foreground">Monitor</span> on a
-          company keeps it warm and resurfaces it on its next trigger, rather than letting it
-          compete for a discovery slot every week.
+          Nothing monitored yet. Monitored companies appear here when they do something new.
         </p>
       ) : (
         <div className="grid gap-x-8 gap-y-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">

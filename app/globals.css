@@ -89,7 +89,7 @@
   --popover-foreground: oklch(0.16 0.004 95);
 
   /* one strong accent — deep cobalt */
-  --primary: oklch(0.52 0.21 258);
+  --primary: oklch(0.56 0.075 195);
   --primary-foreground: oklch(0.985 0.002 95);
   --secondary: oklch(0.945 0.004 95);
   --secondary-foreground: oklch(0.22 0.004 95);
@@ -103,7 +103,7 @@
   --border: oklch(0.85 0.005 95);
   --hairline: oklch(0.16 0.004 95 / 16%);
   --input: oklch(0.85 0.005 95);
-  --ring: oklch(0.52 0.21 258 / 50%);
+  --ring: oklch(0.56 0.075 195 / 50%);
 
   --caution: oklch(0.5 0.11 68);
   --caution-soft: oklch(0.94 0.035 80);
@@ -111,10 +111,13 @@
   --plausible: oklch(0.52 0.1 72);
   --weak: oklch(0.5 0.006 95);
 
-  --sector-deeptech: oklch(0.5 0.18 250);
-  --sector-biotech: oklch(0.48 0.15 160);
-  --sector-defence: oklch(0.5 0.17 32);
-  --sector-ai: oklch(0.48 0.19 305);
+  /* Held near the accent's saturation. Left at chroma 0.15-0.19 against a
+     0.09 accent, the sector tags became the loudest thing on a card — colour
+     should say which family a company is in, not shout it. */
+  --sector-deeptech: oklch(0.48 0.09 250);
+  --sector-biotech: oklch(0.46 0.08 160);
+  --sector-defence: oklch(0.48 0.09 32);
+  --sector-ai: oklch(0.46 0.1 305);
 
 }
 
@@ -126,7 +129,7 @@
   --popover: oklch(0.22 0.004 95);
   --popover-foreground: oklch(0.94 0.003 95);
 
-  --primary: oklch(0.78 0.16 258);
+  --primary: oklch(0.76 0.06 195);
   --primary-foreground: oklch(0.17 0.004 95);
   --secondary: oklch(0.25 0.004 95);
   --secondary-foreground: oklch(0.92 0.003 95);
@@ -140,7 +143,7 @@
   --border: oklch(0.35 0.005 95);
   --hairline: oklch(0.94 0.003 95 / 18%);
   --input: oklch(0.35 0.005 95);
-  --ring: oklch(0.78 0.16 258 / 50%);
+  --ring: oklch(0.76 0.06 195 / 50%);
 
   --caution: oklch(0.76 0.1 72);
   --caution-soft: oklch(0.32 0.045 70);
@@ -148,10 +151,10 @@
   --plausible: oklch(0.76 0.1 75);
   --weak: oklch(0.6 0.006 95);
 
-  --sector-deeptech: oklch(0.75 0.09 250);
-  --sector-biotech: oklch(0.75 0.08 160);
-  --sector-defence: oklch(0.76 0.09 45);
-  --sector-ai: oklch(0.75 0.1 300);
+  --sector-deeptech: oklch(0.74 0.06 250);
+  --sector-biotech: oklch(0.74 0.055 160);
+  --sector-defence: oklch(0.75 0.06 45);
+  --sector-ai: oklch(0.74 0.07 300);
 
 }
 
@@ -278,8 +281,9 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.dense-cards .fact-grid > div {
-  padding: 0.22rem 0.3rem;
+.dense-cards .fact-grid {
+  column-gap: 0.75rem;
+  row-gap: 0.35rem;
 }
 
 /* The fact grid is four cells in a narrow card, so its type runs smaller than
@@ -378,4 +382,20 @@
 
 .panel-scale > div {
   padding: 1rem 1.25rem;
+}
+
+/*
+ * Possible-paths table. Hovering a row lifts it out of the list.
+ *
+ * The company page is a server component with inline styles, which cannot
+ * express :hover — these rules carry it instead. No animated link: each
+ * connector now appears once with its destinations beside it, so there is no
+ * chain left to draw.
+ */
+.path-table tbody tr {
+  transition: background-color 140ms ease;
+}
+
+.path-table tbody tr:hover {
+  background-color: color-mix(in oklch, var(--color-primary) 5%, transparent);
 }

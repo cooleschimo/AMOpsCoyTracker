@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, profileLabel } from "@/lib/utils";
 import type { DashboardCompany as Company } from "@/lib/ui-types";
 import {
   BandMeterSet,
@@ -68,11 +68,11 @@ export function CompanyCase({
   }, [open]);
 
   return (
-    <article className="overflow-hidden rounded-md border border-border bg-card transition-colors border-l-[3px] border-l-primary/70">
+    <article className="overflow-hidden rounded-md border border-border bg-card transition-colors">
       {/* Header zone. The badge sits top-right in flow rather than absolutely
           positioned — in the two-column layout a card is narrow enough that a
           pinned corner overlaps the company name. */}
-      <div className="space-y-3 border-b border-[color:var(--hairline)] bg-primary/[0.035] p-5 sm:p-7">
+      <div className="space-y-3 p-5 sm:p-7">
         {/* One right-aligned group, not two. MetaRow is itself justify-between,
             so nesting it beside the badges pushed the date into them at narrow
             widths — the meta now flows left and the badges own the right edge. */}
@@ -99,7 +99,7 @@ export function CompanyCase({
               href={company.trigger.source.url}
               target="_blank"
               rel="noreferrer"
-              className="measure font-serif text-lg italic leading-snug text-foreground/85 link-underline hover:text-foreground"
+              className="measure text-sm leading-snug text-muted-foreground link-underline hover:text-foreground"
             >
               {company.trigger.headline}
             </a>
@@ -111,7 +111,7 @@ export function CompanyCase({
       {/* Assessment zone: the hard numbers first, then the four judgments as
           meters. Funding and headcount are facts about the company; the bands
           are a reading of it, and the two should not look alike. */}
-      <div className="border-b border-[color:var(--hairline)] px-5 pt-5 pb-4 sm:px-7">
+      <div className="px-5 pb-4 sm:px-7">
         <FactGrid
           // Every figure carries where it came from, not only the valuation:
           // a reader judging staleness needs the provider and the date, and a
@@ -179,7 +179,7 @@ export function CompanyCase({
       {/* Actions stay on the card rather than behind the toggle. They are what
           the pilot measures, and a disposition that costs an extra click to
           reach is a disposition that does not get recorded. */}
-      <div className="space-y-2.5 rounded-b-md border-t-2 border-primary/25 bg-primary/[0.045] p-5 sm:px-7">
+      <div className="space-y-2.5 rounded-b-md border-t border-[color:var(--hairline)] bg-muted/30 p-5 sm:px-7">
         <AccountStatusControl company={company} />
         <DispositionControls company={company} preselect={preselect} />
       </div>
@@ -283,7 +283,7 @@ export function CompanyCase({
                       <>
                         {" · "}
                         <a href={p.profileUrl} target="_blank" rel="noreferrer" className="link-underline">
-                          profile
+                          {profileLabel(p.profileUrl)}
                         </a>
                       </>
                     )}

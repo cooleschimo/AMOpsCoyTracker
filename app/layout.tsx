@@ -24,12 +24,12 @@ const baskerville = Libre_Baskerville({
 });
 
 export const metadata: Metadata = {
-  title: "FDI Signals",
+  title: "AM News",
   description: "Discovery, connection and intelligence for inward investment",
 };
 
 const NAV = [
-  { href: "/", label: "This week" },
+  { href: "/", label: "Last week" },
   { href: "/monitoring", label: "Monitoring" },
   { href: "/graph", label: "Connections" },
 ];
@@ -42,9 +42,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body>
         <header className="border-b border-border bg-card/70 backdrop-blur">
-          <div className="mx-auto flex max-w-[1400px] flex-wrap items-baseline gap-x-6 gap-y-2 px-5 py-4 sm:px-8">
+          <div className="mx-auto flex max-w-[1400px] flex-wrap items-baseline gap-x-6 gap-y-2 px-6 py-4 sm:px-12 lg:px-16">
             <Link href="/" className="text-lg font-semibold tracking-tight text-primary">
-              FDI Signals
+              AM News
             </Link>
             <nav className="flex flex-wrap gap-x-5 gap-y-1">
               {NAV.map((n) => (

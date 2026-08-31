@@ -325,12 +325,15 @@ export function FactGrid({
   return (
     <dl
       className={cn(
-        "fact-grid grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-4",
+        // No cell borders. Four numbers do not need a table around them, and
+        // the rules made a quiet reference row read as the loudest thing on
+        // the card. Alignment carries the grouping instead.
+        "fact-grid grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4",
         className,
       )}
     >
       {items.map((it) => (
-        <div key={it.name} className="bg-card px-3 py-2.5">
+        <div key={it.name}>
           <dt className="font-mono text-2xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
             {it.name}
           </dt>
@@ -710,7 +713,7 @@ export function QuietButton({
     <button
       type="button"
       className={cn(
-        "rounded-sm px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground",
+        "rounded-sm px-2 py-1 text-xs text-muted-foreground hover:bg-primary/10 hover:text-primary",
         "transition-colors duration-200 ease-out",
         "focus-visible:outline focus-visible:outline-1 focus-visible:outline-ring",
         active &&
@@ -734,7 +737,9 @@ export function SectionHeading({
   return (
     <div className="border-b-2 border-primary pb-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-        <h2 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h2>
+        {/* Held below the page title. At sm: this matched the h1 exactly, so a
+            section read as important as the page it sits inside. */}
+        <h2 className="font-display text-xl font-semibold tracking-tight sm:text-2xl">{title}</h2>
         {right}
       </div>
       {subtitle && (

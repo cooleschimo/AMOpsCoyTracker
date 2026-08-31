@@ -10,6 +10,7 @@
  * so the two cannot disagree about which company sits where.
  */
 import { CompanyCase } from '@/components/company-case';
+import { Building2, Radio, Sparkles } from 'lucide-react';
 import { Masonry } from '@/components/masonry';
 import { SectionHeading } from '@/components/primitives';
 import { getWeeklyDigest, type DashboardCompany } from '@/lib/dashboard-data';
@@ -58,28 +59,58 @@ export default async function Dashboard() {
   const d = await getWeeklyDigest();
 
   return (
-    <main className="mx-auto max-w-[1400px] px-5 py-10 sm:px-8 sm:py-14">
+    <main className="mx-auto max-w-[1400px] px-6 py-10 sm:px-12 sm:py-14 lg:px-16">
       <header className="mb-12 space-y-1">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">This week</h1>
+        <h1 className="flex items-center gap-2.5 font-display text-3xl font-semibold tracking-tight">
+          {/* A sun, drawn rather than an icon-font glyph: a bare circle with
+              eight rays, at the weight of the text beside it. */}
+          Good AM
+          <svg
+            viewBox="0 0 24 24"
+            className="size-7 shrink-0 text-primary"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            aria-hidden
+          >
+            <circle cx="12" cy="12" r="4.25" />
+            <path d="M12 2.5v2.25M12 19.25v2.25M21.5 12h-2.25M4.75 12H2.5M18.72 5.28l-1.6 1.6M6.88 17.12l-1.6 1.6M18.72 18.72l-1.6-1.6M6.88 6.88l-1.6-1.6" />
+          </svg>
+        </h1>
         <p className="text-sm text-muted-foreground">
-          {d.weekLabel} · {d.coverage}
+          Here&rsquo;s what happened last week, {d.weekLabel}.
         </p>
-        {/* Stated once, rather than a hint repeated on every element that has
-            one. The dotted underline is the shared convention. */}
-        <p className="pt-1 text-xs text-muted-foreground">
-          Anything{" "}
-          <span className="underline decoration-dotted decoration-from-font underline-offset-[3px]">
-            underlined like this
-          </span>{" "}
-          explains itself on hover — why a band landed where it did, where a figure came from.
-        </p>
+
+        {/* The coverage numbers as a stat row rather than a sentence: three
+            figures read faster as figures, and "monitored / processed" stays
+            in the labels so the wording still avoids claiming more than the
+            tool does. */}
+        <dl className="flex flex-wrap items-baseline gap-x-8 gap-y-2 pt-4">
+          {[
+            { n: d.coverageStats.monitored, label: "companies monitored", Icon: Building2 },
+            { n: d.coverageStats.processed, label: "signals processed", Icon: Radio },
+            { n: d.coverageStats.surfaced, label: "surfaced this week", Icon: Sparkles },
+          ].map(({ n, label, Icon }) => (
+            <div key={label} className="flex items-center gap-2">
+              <Icon className="size-4 shrink-0 text-primary/70" strokeWidth={1.5} aria-hidden />
+              <dt className="sr-only">{label}</dt>
+              <dd className="flex items-baseline gap-1.5">
+                <span className="num text-lg font-semibold leading-none">
+                  {n.toLocaleString()}
+                </span>
+                <span className="text-xs text-muted-foreground">{label}</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
       </header>
 
       <div className="space-y-14">
         <Section
           title="Worth a conversation"
           companies={d.worthAConversation}
-          empty="Nothing cleared the bar this week. A quiet week is a real result, not a failure."
+          empty="Nothing cleared the bar this week."
         />
         <Section
           title="New on the radar"
@@ -89,12 +120,12 @@ export default async function Dashboard() {
         <Section
           title="EDB account activity"
           companies={d.accountActivity}
-          empty="Nothing here until account status is recorded — every company currently reads as unknown."
+          empty="No companies marked as accounts yet."
         />
         <Section
           title="Monitoring"
           companies={d.monitoring}
-          empty="Nothing monitored yet. Choosing Monitor on a company keeps it warm and resurfaces it on its next trigger."
+          empty="Nothing monitored yet."
         />
       </div>
     </main>

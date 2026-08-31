@@ -39,7 +39,7 @@ export function AccountStatusControl({ company }: { company: Company }) {
         onChange={(e) => actions.setAccountStatus(company.id, e.target.value as AccountStatus)}
         title={accountStatusHelp[value]}
         className={cn(
-          "min-w-0 flex-1 cursor-pointer rounded-sm border border-border/60 bg-transparent px-1.5 py-0.5 text-2xs transition-colors",
+          "min-w-0 flex-1 cursor-pointer rounded-sm border border-border/60 bg-transparent px-1.5 py-0.5 text-2xs transition-colors hover:border-primary/50",
           "focus-visible:outline focus-visible:outline-1 focus-visible:outline-ring",
           value === "unknown"
             ? "text-muted-foreground hover:border-border hover:text-foreground"
@@ -253,7 +253,9 @@ export function DispositionControls({
                 "rounded-sm px-2 py-1 text-xs transition-colors duration-200 ease-out",
                 open === "draft" || preselect === "draft_email"
                   ? "bg-primary text-primary-foreground"
-                  : "bg-primary/10 font-medium text-primary hover:bg-primary/18",
+                  // Quiet at rest, filled on hover. Twenty-five filled buttons
+                  // down a page is twenty-five things asking to be clicked.
+                  : "font-medium text-primary hover:bg-primary hover:text-primary-foreground",
               )}
             >
               Draft an email
@@ -261,7 +263,7 @@ export function DispositionControls({
             <span className="text-muted-foreground/40">·</span>
             <QuietButton
               onClick={() => actions.setDisposition(company.id, { disposition: "monitor" })}
-              title="Keep this warm, resurface on the next trigger."
+              title="Watch for what this company does next."
             >
               Monitor
             </QuietButton>
