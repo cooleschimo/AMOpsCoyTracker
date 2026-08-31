@@ -44,6 +44,19 @@ const CHROME = new Set([
   'back to top','link','[emailprotected]','disclosures','our approach','our focus',
   'why us','join us','apply','pitch us','submit a pitch','portfolio companies',
   'offices','office','locations','location','our offices',
+  // A fund's own office list sits on the portfolio page and reads exactly like
+  // a list of company names. B Capital's page put 25 of these into companies.
+  'san francisco','new york','los angeles','austin','boston','chicago','seattle',
+  'menlo park','palo alto','london','paris','berlin','munich','zurich','amsterdam',
+  'stockholm','dubai','abu dhabi','doha','riyadh','tel aviv','bangalore','bengaluru',
+  'mumbai','delhi','singapore','hong kong','tokyo','seoul','beijing','shanghai',
+  'shenzhen','taipei','sydney','melbourne','toronto','vancouver','sao paulo','mexico city',
+  // Section headings and calls to action, which the shorter forms above missed
+  'contact information','press/media','press / media','news & insights','news and insights',
+  'who we serve','how we help','what we do','connect','connect with us','get in touch',
+  'view open roles','open roles','job openings','portfolio job openings',
+  'terms of use & privacy','follow','clear','builders',
+  'partner with us','work with us','get in touch','contact us today','offices',
 ]);
 
 const BAD_PATTERNS = [
@@ -51,7 +64,45 @@ const BAD_PATTERNS = [
   /\b(cookie|consent|gdpr|copyright|all rights reserved)\b/i,
   /^(series|seed|stage|sector|industry|category|region)\b/i,
   /@|https?:\/\//,
+  // Nav and CTA shapes rather than exact strings: a page can word these many
+  // ways, and matching the shape catches the variants an exact list misses.
+  /\b(job openings?|open roles?|apply now|read the|view all|get in touch)\b/i,
+  /^(news|press|media|contact|careers|jobs|about|team|insights)\b.{0,20}$/i,
+  // Anchored: "Privacy Dynamics" is a real company, "Privacy Policy" is not.
+  /^(terms of (use|service)|privacy policy|cookie policy|accessibility)$/i,
+  // Un-decoded HTML entities mean the text was never a clean name — in practice
+  // pull quotes and slogans lifted from a fund's own page.
+  /&(quot|amp|#x27|#\d+);/,
+  // Cookie banners, which a scraper meets before it reaches the portfolio.
+  /^(accept|reject|allow|manage|decline)\b.{0,24}\bcookies?\b/i,
+  // A template variable rendered as text: the page never filled it in.
+  /\{\{|\}\}|\bitem\.\w+\.\w+/,
+  // A tagline describes what a company does; a name says who it is.
+  /\b(platform|solution|software|tools?|infrastructure) for\b/i,
 ];
+
+/**
+ * Decode the HTML entities a scraped name can carry.
+ *
+ * Three call sites decoded `&amp;` alone, so `&quot;` and `&#x27;` survived into
+ * the database — "GC&amp;H INVESTMENTS" and a set of pull quotes wrapped in
+ * `&quot;`. Decoding in one place means every path handles the same set.
+ */
+export function decodeName(raw: string): string {
+  return raw
+    .replace(/&(amp|#38);/g, '&')
+    .replace(/&(quot|#34);/g, '"')
+    .replace(/&(apos|#39|#x27);/gi, "'")
+    .replace(/&(lt|#60);/g, '<')
+    .replace(/&(gt|#62);/g, '>')
+    .replace(/&nbsp;|&#160;/gi, ' ')
+    .replace(/&#(\d+);/g, (_m, d) => String.fromCharCode(Number(d)))
+    // Zero-width characters ride along in scraped text and make an otherwise
+    // exact string comparison fail: "Doha\u200b" is not "Doha".
+    .replace(/[\u200b-\u200d\ufeff]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 export function looksLikeCompanyName(raw: string): boolean {
   const s = raw.trim();
@@ -119,7 +170,7 @@ export function extractDomains(html: string, pageUrl: string): Record<string, st
       chunk.match(/<(?:h[2-5]|div|span)[^>]*>([^<]{2,48})<\/(?:h[2-5]|div|span)>/i)?.[1] ??
       chunk.match(/alt=["']([^"']{2,48})["']/i)?.[1];
     if (!nameMatch) continue;
-    const name = nameMatch.replace(/&amp;/g, '&').trim();
+    const name = decodeName(nameMatch);
     if (!looksLikeCompanyName(name)) continue;
 
     for (const lm of chunk.matchAll(/href=["'](https?:\/\/[^"']+)["']/gi)) {
@@ -145,7 +196,7 @@ export function extractDomains(html: string, pageUrl: string): Record<string, st
     ].filter((x): x is string => !!x);
 
     for (const c of candidates) {
-      const cleaned = c.replace(/&amp;/g, '&').trim();
+      const cleaned = decodeName(c);
       if (looksLikeCompanyName(cleaned)) { out[cleaned] = host; break; }
     }
   }
@@ -205,7 +256,7 @@ export function extractNames(html: string): { names: string[]; rejected: number;
     const kept: string[] = [];
     let rejected = 0;
     for (const r of a.raw) {
-      const s = r.replace(/&amp;/g, '&').replace(/&#\d+;/g, '').trim();
+      const s = decodeName(r);
       if (!s) continue;
       if (looksLikeCompanyName(s)) {
         const k = s.toLowerCase();
