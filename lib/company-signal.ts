@@ -15,7 +15,7 @@
  * visible for about a month and fades unless something else happens. A company
  * returns when its picture strengthens, not indefinitely off one event.
  */
-export const COMPANY_SIGNAL_VERSION = 'signal-v7';
+export const COMPANY_SIGNAL_VERSION = 'signal-v8';
 
 /** Days of activity a company is judged on. */
 export const WINDOW_DAYS = 30;
@@ -102,9 +102,13 @@ C) partnership — IS THERE AN OPENING EDB COULD PROPOSE SOMETHING INTO?
   export-control change may be the reason to approach now or the reason not to.
   Where a context item bears directly on this company, say so in the why points.
 
-D) why — WHAT AN RD NEEDS TO KNOW, as a list of short points.
+D) why — WHAT AN RD NEEDS TO KNOW, as a list of short points, each paired with
+   the id of the item it came from.
 
   Each under 15 words, each a FACT drawn from the items given, each checkable.
+  Give each point as {"text": "...", "item": <id>} so a reader can follow the
+  point back to the item it came from. Use the id of the item that point is
+  actually drawn from, which is often not the representative item.
   One point is a complete answer when that is all the window supports. Four is
   a ceiling, not a quota. Padding is worse than a short list, because a reader
   cannot tell an invented point from a real one.
@@ -136,14 +140,23 @@ E) signal_type — the ONE that best characterises the window: funding,
    award, other, noise.
 
 F) representative_item — the id of the item an RD should lead the conversation
-   with. Choose the strongest trigger; where two are comparable, prefer a
-   Singapore or APAC hiring signal over general news, because it is the more
-   direct evidence of expansion intent. It must be an id from the list given.
+   with. It is the opening line of an approach, so choose what a person would
+   actually raise first: a funding round, a facility, a partnership, a product
+   launch, a regulatory decision.
+
+   A hiring summary is evidence, not an opening. "You are hiring nine people in
+   Singapore" reveals that we have been reading their job board and says
+   nothing they do not know; it belongs in why-now, where it corroborates. Lead
+   with hiring ONLY when nothing else happened in the window, or when the
+   hiring itself is the news — a named senior regional appointment, or a first
+   Singapore role at a company with no presence here.
+
+   It must be an id from the list given.
 
 Return ONE JSON object, no prose, no markdown fences:
-{"expansion":3,"momentum":2,"partnership":2,"signal_type":"funding","representative_item":123,"expansion_language":false,"why":["Raised $360M for manufacturing scale-up","14 open Singapore roles, mostly engineering","No Asian site named yet"]}
+{"expansion":3,"momentum":2,"partnership":2,"signal_type":"funding","representative_item":123,"expansion_language":false,"why":[{"text":"Raised $360M for manufacturing scale-up","item":123},{"text":"14 open Singapore roles, mostly engineering","item":456}]}
 
-All properties are required. why is an array of 1-4 short strings.`;
+All properties are required. why is an array of 1-4 objects, each with text and item.`;
 
 export type CompanyItem = {
   itemId: number;

@@ -27,6 +27,8 @@ import {
 import { isSignalType } from '../lib/rubric';
 import { candidateProps } from '../lib/proposition';
 import { classifyExecHire } from '../lib/exec-hire';
+import { hiringIsTheNews } from '../lib/job-signal';
+import { volumeTriggerFires } from '../lib/ats';
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -78,7 +80,8 @@ type Out = {
   const [run] = await db.insert(runs).values({ stage: 'score_companies' }).returning();
   const budget = new Budget();
   const counts: Record<string, number> = {
-    companies: 0, scored: 0, failed: 0, no_representative: 0, context_items_seen: 0,
+    companies: 0, scored: 0, failed: 0, no_representative: 0, hiring_lead_replaced: 0,
+    context_items_seen: 0,
     expansion_3: 0, expansion_2: 0, expansion_1: 0, expansion_0: 0,
     momentum_3: 0, momentum_2: 0, momentum_1: 0, momentum_0: 0,
     partnership_3: 0, partnership_2: 0, partnership_1: 0, partnership_0: 0,
@@ -127,6 +130,27 @@ type Out = {
       const execRoles = execRows
         .map((j: any) => classifyExecHire(j.title, j.location))
         .filter(Boolean).slice(0, 4);
+
+      /**
+       * Is the hiring itself the event. lib/job-signal.ts holds the rule; the
+       * inputs it needs — the volume trigger and whether a Singapore entity
+       * already exists — are known here.
+       */
+      const volumeTriggerFired = volumeTriggerFires(
+        snaps.length > 1 ? Number(snaps[1].total_jobs) : null,
+        snaps.length ? Number(snaps[0].total_jobs) : 0,
+      );
+      const [sgEntity]: any = await sqlc`
+        select exists (select 1 from sg_links g
+                       where g.subject_type = 'company' and g.subject_id = ${c.id}) as has_sg`;
+      const hiringIsNews = hiringIsTheNews(
+        {
+          execHires: execRoles as any,
+          apac: Number(snap?.apac_jobs ?? 0),
+          singaporeCount: Number(sgCount?.n ?? 0),
+        } as any,
+        { volumeTriggerFired, hasSgEntity: Boolean(sgEntity?.has_sg) },
+      );
 
       const filings: any = await sqlc`
         select form_type, filed_at, amount, security_type from sec_filings
@@ -221,12 +245,63 @@ type Out = {
       // did not supply has invented the evidence an RD would lead with.
       const offered = new Set(items.map((i) => i.itemId));
       const repId = Number(d.representative_item);
-      const representativeItemId = offered.has(repId) ? repId : null;
+      let representativeItemId = offered.has(repId) ? repId : null;
+
+      /**
+       * Hiring never leads while there is other news.
+       *
+       * The item is the opening line of an approach. "You are hiring nine
+       * people in Singapore" tells a founder we have been reading their job
+       * board and says nothing they do not already know — it corroborates in
+       * why-now, where it belongs. A funding round, a facility or a partnership
+       * is what a person would actually raise first.
+       *
+       * The prompt asks for this, and asking was not enough: the model led with
+       * hiring for 27 of 70 companies, 22 of which had news available — one led
+       * with a job posting while eighty-one news items sat unused. So the rule
+       * is applied here rather than requested there.
+       */
+      const byId = new Map(items.map((i) => [i.itemId, i]));
+      if (representativeItemId !== null
+          && byId.get(representativeItemId)?.sourceType === 'ats'
+          && !hiringIsNews) {
+        const news = items.filter((i) => i.sourceType !== 'ats');
+        if (news.length) {
+          // The most corroborated, then the most recent: the same order the
+          // digest ranks by, so the lead is the story that actually travelled.
+          const best = [...news].sort((a, b) =>
+            (b.clusterSize - a.clusterSize)
+            || ((b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0)))[0];
+          representativeItemId = best.itemId;
+          counts.hiring_lead_replaced++;
+        }
+      }
       if (representativeItemId === null) counts.no_representative++;
 
-      const why = (Array.isArray(d.why) ? d.why : [String(d.why ?? '')])
-        .filter((w) => typeof w === 'string' && w.trim())
-        .slice(0, 4).join(' · ');
+      // Points arrive as {text, item} so each keeps the item it was drawn from.
+      // Plain strings are still accepted: a rescore under an older signal
+      // version has no per-point ids, and losing the points would be worse than
+      // falling back to the representative item for their source.
+      const rawPoints = Array.isArray(d.why) ? d.why : [d.why];
+      const points = rawPoints
+        .map((w: unknown) => {
+          if (typeof w === 'string') return { text: w.trim(), item: null as number | null };
+          if (w && typeof w === 'object') {
+            const o = w as { text?: unknown; item?: unknown };
+            const n = Number(o.item);
+            return {
+              text: String(o.text ?? '').trim(),
+              item: Number.isFinite(n) && offered.has(n) ? n : null,
+            };
+          }
+          return { text: '', item: null as number | null };
+        })
+        .filter((p) => p.text)
+        .slice(0, 4);
+      const why = points.map((p) => p.text).join(' · ');
+      // Positionally aligned with `why`; the representative item stands in
+      // wherever the model did not name one we offered.
+      const whyItemIds = points.map((p) => p.item ?? representativeItemId ?? 0);
 
       const hasHiring = items.some((i) => i.sourceType === 'ats');
       const hasOther = items.some((i) => i.sourceType !== 'ats');
@@ -238,6 +313,7 @@ type Out = {
           signalType: isSignalType(d.signal_type) ? d.signal_type : 'other',
           expansionLanguage: Boolean(d.expansion_language),
           why: why || 'no rationale returned',
+          whyItemIds,
           representativeItemId,
           itemsConsidered: items.length,
           windowDays: WINDOW_DAYS,
@@ -247,7 +323,7 @@ type Out = {
           target: [companySignals.companyId, companySignals.weekOf, companySignals.signalVersion],
           set: {
             expansion, momentum, partnership, why: why || 'no rationale returned',
-            representativeItemId, model: res.model, scoredAt: new Date(),
+            whyItemIds, representativeItemId, model: res.model, scoredAt: new Date(),
             signalType: isSignalType(d.signal_type) ? d.signal_type : 'other',
             expansionLanguage: Boolean(d.expansion_language),
             itemsConsidered: items.length,
