@@ -47,6 +47,8 @@ type Assessment = {
   prior_expansions?: string; prior_expansions_detail?: string;
   financial_health?: string; financial_health_detail?: string;
   confidence: string; rationale: string; revision_note?: string;
+  priority_reason?: string; singapore_fit_reason?: string;
+  contribution_reason?: string; confidence_reason?: string;
 };
 
 (async () => {
@@ -174,7 +176,10 @@ type Assessment = {
         ?? batch.find((c) => c.name.toLowerCase() === String(a.name ?? '').toLowerCase());
       if (!target) { counts.unmatched++; continue; }
 
-      const sectors = Array.isArray(a.sectors) ? a.sectors.filter(isSector) : [];
+      // Scope only. Sectors are classified by scripts/classify-sectors.ts
+      // against lib/subsectors.ts; an assessment that also wrote them would
+      // overwrite that taxonomy with whatever this prompt happened to return.
+      const inScope = (a as any).in_scope === true;
       const bands = {
         targetPriority: isBand(a.target_priority) ? a.target_priority : 'unknown',
         singaporeFit: isBand(a.singapore_fit) ? a.singapore_fit : 'unknown',
@@ -198,24 +203,25 @@ type Assessment = {
         confidence: isBand(a.confidence) ? a.confidence : 'low',
       };
 
-      results.push({ ...a, id: target.id, sectors });
+      results.push({ ...a, id: target.id, sectors: [] });
       counts.assessed++;
-      if (sectors.length) counts.sector_assigned++; else counts.no_sector++;
+      if (inScope) counts.sector_assigned++; else counts.no_sector++;
 
       if (!dry) {
         await db.insert(companyAssessments).values({
           companyId: target.id, ...bands,
           rationale: a.rationale ?? null,
+          priorityReason: a.priority_reason ?? null,
+          singaporeFitReason: a.singapore_fit_reason ?? null,
+          contributionReason: a.contribution_reason ?? null,
+          confidenceReason: a.confidence_reason ?? null,
           model: res.model, rubricVersion: COMPANY_RUBRIC_VERSION,
         });
-        // Sectors are written only when the model found some. An empty result
-        // means "not in scope", which scope_status is what records; a real
-        // classification keeps its value rather than being replaced by silence.
-        if (sectors.length) {
-          await db.update(companies).set({ sectors }).where(eq(companies.id, target.id));
-        } else {
+        // Out of scope is recorded; in scope leaves scope_status alone, since
+        // the sector itself is not this script's to write.
+        if (!inScope) {
           await db.update(companies)
-            .set({ scopeStatus: 'out_of_scope', scopeReason: `assessment ${COMPANY_RUBRIC_VERSION}: no in-scope sector` })
+            .set({ scopeStatus: 'out_of_scope', scopeReason: `assessment ${COMPANY_RUBRIC_VERSION}: not in scope` })
             .where(eq(companies.id, target.id));
         }
       }
@@ -238,9 +244,15 @@ type Assessment = {
   console.log('\n--- results ---');
   for (const r of results) {
     console.log(`\n  ${r.name}`);
-    console.log(`    sectors      : ${r.sectors.length ? r.sectors.join(', ') : '(none - out of scope)'}`);
+    console.log(`    in scope     : ${(r as any).in_scope === true ? 'yes' : 'no'}`);
     console.log(`    priority     : ${r.target_priority}   sg_fit: ${r.singapore_fit}   contribution: ${r.potential_contribution}`);
     console.log(`    confidence   : ${r.confidence}`);
     console.log(`    rationale    : ${r.rationale}`);
+    // Print the per-band reasons too: they are what the dashboard shows on the
+    // band itself, so a dry run has to make them checkable.
+    if (r.priority_reason) console.log(`    why priority : ${r.priority_reason}`);
+    if (r.singapore_fit_reason) console.log(`    why sg_fit   : ${r.singapore_fit_reason}`);
+    if (r.contribution_reason) console.log(`    why contrib  : ${r.contribution_reason}`);
+    if (r.confidence_reason) console.log(`    why confid.  : ${r.confidence_reason}`);
   }
 })();

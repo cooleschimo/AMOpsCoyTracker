@@ -334,6 +334,16 @@ export const companySignals = pgTable('company_signals', {
   expansionLanguage: boolean('expansion_language').default(false),
   /** Points, ' · ' joined. 1-4, as many as the window supports. */
   why: text('why').notNull(),
+  /**
+   * The item each why point came from, positionally aligned with `why`.
+   *
+   * A company's points are drawn from several of its items — a raise, a hiring
+   * aggregate, a partnership — and each was checked against its own item. One
+   * source for the whole list would cite a funding article for a claim about
+   * job postings, so the digest and dashboard need per-point provenance to keep
+   * every point separately checkable (§10).
+   */
+  whyItemIds: integer('why_item_ids').array().default([]),
   /** The item an RD leads with. Null if the model named one we did not offer. */
   representativeItemId: integer('representative_item_id').references(() => items.id, { onDelete: 'set null' }),
   itemsConsidered: integer('items_considered'),
@@ -395,6 +405,21 @@ export const companyAssessments = pgTable('company_assessments', {
   contributionDrivers: text('contribution_drivers').array().default([]),
   confidence: text('confidence'),
   rationale: text('rationale'),
+  /**
+   * Why each band landed where it did, one per band.
+   *
+   * A band on its own is not something a reader can argue with — "priority:
+   * high" gives them nothing to correct. The dashboard shows these on the band
+   * itself, so the judgment and its reasoning travel together and an RD can see
+   * exactly what to push back on.
+   *
+   * The confidence reason is the load-bearing one: it names what specifically
+   * is uncertain, which is what turns a hedge into something actionable.
+   */
+  priorityReason: text('priority_reason'),
+  singaporeFitReason: text('singapore_fit_reason'),
+  contributionReason: text('contribution_reason'),
+  confidenceReason: text('confidence_reason'),
   model: text('model'),
   rubricVersion: text('rubric_version'),
   assessedAt: timestamp('assessed_at', { withTimezone: true }).defaultNow(),
