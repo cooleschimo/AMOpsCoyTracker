@@ -1,0 +1,747 @@
+"use client";
+
+import { ArrowUpRight, TriangleAlert } from "lucide-react";
+import type { ReactNode } from "react";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { cn } from "@/lib/utils";
+import { broadSectorLabel, sectorBroadSector, sectorLabel, sectorShort } from "@/lib/subsectors";
+import type {
+  AccountStatus,
+  Band,
+  DismissReason,
+  EvidencePoint,
+  Feasibility,
+  OfferTier,
+  PathKind,
+  PathReviewStatus,
+  Sector,
+  SignalType,
+  Source,
+} from "@/lib/ui-types";
+
+export const signalTypeLabel: Record<string, string> = {
+  funding: "Funding",
+  expansion: "Expansion",
+  hiring: "Hiring",
+  partnership: "Partnership",
+  leadership: "Leadership",
+  product_launch: "Product launch",
+  ma: "M&A",
+  regulatory: "Regulatory",
+  award: "Award",
+  other: "Other",
+  noise: "Noise",
+};
+
+export const bandLabel: Record<Band, string> = {
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+  unknown: "Unknown",
+};
+
+/**
+ * Labels come from the taxonomy rather than a list kept here, so a subsector
+ * added to lib/subsectors.ts shows its name instead of its id.
+ */
+export { sectorLabel, sectorShort, broadSectorLabel };
+
+export const accountStatusLabel: Record<AccountStatus, string> = {
+  unknown: "Unknown",
+  existing_account: "Existing account",
+  in_conversation: "In conversation",
+  not_an_account: "Not an account",
+  not_pursuing: "Not pursuing",
+};
+
+export const accountStatusHelp: Record<AccountStatus, string> = {
+  unknown: "We have no record either way.",
+  existing_account: "Already an account with an assigned owner.",
+  in_conversation: "An active exchange is running right now.",
+  not_an_account: "Checked, and not an EDB account. Different from a decision not to pursue.",
+  not_pursuing: "A deliberate decision not to approach.",
+};
+
+export const dismissReasonLabel: Record<DismissReason, string> = {
+  irrelevant_company: "Irrelevant company",
+  too_early: "Too early",
+  no_sg_angle: "No Singapore angle",
+  already_tracked: "Already tracked",
+};
+
+export const dismissReasonFeedback: Record<DismissReason, string> = {
+  irrelevant_company: "dismissals for 'irrelevant company' tune the company assessment axis",
+  too_early: "dismissals for 'too early' tune the stage threshold, not the relevance rubric",
+  no_sg_angle: "dismissals for 'no Singapore angle' tune the scoring rubric",
+  already_tracked: "dismissals for 'already tracked' tune deduplication against the account list",
+};
+
+export const pathKindLabel: Record<PathKind, string> = {
+  person_role: "Person / role",
+  fund_portfolio: "Fund portfolio",
+  company_edge: "Company edge",
+  event: "Event",
+};
+
+export const pathReviewLabel: Record<PathReviewStatus, string> = {
+  unreviewed: "Unreviewed",
+  usable: "Usable connection",
+  needs_verifying: "Potential, needs verifying",
+  not_usable: "Not usable",
+  not_sure: "Not sure",
+};
+
+export const feasibilityLabel: Record<Feasibility, string> = {
+  confirmed: "1 · Confirmed edge",
+  plausible: "2 · Plausible",
+  weak: "3 · Weak",
+};
+
+export const offerTierLabel: Record<OfferTier, string> = {
+  available_now: "Available now",
+  underway: "Underway",
+  exploratory: "Exploratory",
+};
+
+/* ---------------------------------------------------------------- */
+
+export function SourceLink({ source, label }: { source: Source; label?: string }) {
+  return (
+    <a
+      href={source.url}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-baseline gap-0.5 text-2xs text-primary/80 link-underline hover:text-primary"
+    >
+      {label ?? source.name}
+      <span className="num opacity-70"> · {source.date}</span>
+      <ArrowUpRight className="size-3 shrink-0 self-center" strokeWidth={1.5} />
+    </a>
+  );
+}
+
+export function Label({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "font-mono text-2xs font-semibold uppercase tracking-[0.14em] text-primary",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+/* Mono metadata row — the quiet dateline above each entry */
+export function MetaRow({
+  left,
+  right,
+  className,
+}: {
+  left: ReactNode;
+  right?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn("flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5", className)}
+    >
+      {/* No type treatment here: the children own theirs. A mono/uppercase
+          wrapper flattened a coloured sector tag and a plain word list into one
+          undifferentiated strip. */}
+      <span className="min-w-0">{left}</span>
+      {right && <span className="num font-mono text-2xs text-muted-foreground">{right}</span>}
+    </div>
+  );
+}
+
+/* Hairline stat grid — bands at a glance, editorial ledger style */
+/**
+ * A band as a three-segment meter. Colour and fill both carry the value, and
+ * the label stays readable, so it survives a greyscale print and a colourblind
+ * reader. 'unknown' fills nothing and says so rather than showing an empty bar
+ * that could read as low.
+ */
+/**
+ * Labels abbreviated to fit the card, spelled out in the hover.
+ *
+ * The card's label column is narrow enough that a long label either leaves a
+ * gap before its value or pushes the value out of alignment. The hover has room
+ * for the full word, which is where a reader unsure what a band means will look.
+ */
+const METER_FULL_NAME: Record<string, string> = {
+  "Conf.": "Confidence",
+  "SG fit": "Singapore fit",
+  Value: "Potential value",
+};
+
+export function BandMeter({
+  name,
+  band,
+  reason,
+  className,
+}: {
+  name: string;
+  band: Band;
+  /** Why this band landed here. Shown on hover — a band alone is not arguable. */
+  reason?: string | undefined;
+  className?: string | undefined;
+}) {
+  const filled: Record<Band, number> = { high: 3, medium: 2, low: 1, unknown: 0 };
+  const fillColor: Record<Band, string> = {
+    high: "bg-primary",
+    medium: "bg-primary/55",
+    low: "bg-primary/30",
+    unknown: "bg-transparent",
+  };
+  const textColor: Record<Band, string> = {
+    high: "text-primary",
+    medium: "text-foreground",
+    low: "text-muted-foreground",
+    unknown: "italic text-muted-foreground/70",
+  };
+  const n = filled[band];
+
+  const row = (
+    <div
+      className={cn(
+        "flex items-center gap-x-2.5",
+        reason && "cursor-help rounded-sm transition-colors hover:bg-muted/60",
+        className,
+      )}
+    >
+      <div className="flex shrink-0 gap-0.5" role="img" aria-label={`${name}: ${bandLabel[band]}`}>
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className={cn("meter-bar h-3.5 w-1.5 rounded-[1px]", i < n ? fillColor[band] : "bg-border")}
+          />
+        ))}
+      </div>
+      {/* Fixed label column keeps values on a common left edge across rows. */}
+      <span
+        className={cn(
+          "meter-label w-[5.5rem] shrink-0 text-2xs uppercase tracking-[0.1em] text-muted-foreground",
+          // Underlined at rest, not on hover: an affordance that only appears
+          // once you are already hovering cannot tell you the thing is there.
+          reason && "underline decoration-dotted decoration-from-font underline-offset-[3px]",
+        )}
+      >
+        {name}
+      </span>
+      <span className={cn("min-w-0 text-sm font-medium leading-none", textColor[band])}>
+        {bandLabel[band]}
+      </span>
+    </div>
+  );
+
+  if (!reason) return row;
+
+  return (
+    <HoverCard openDelay={120} closeDelay={80}>
+      <HoverCardTrigger asChild>
+        <button type="button" className="group -mx-1.5 px-1.5 py-1 text-left">
+          {row}
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent align="start" className="w-80">
+        <p className="text-2xs uppercase tracking-[0.12em] text-muted-foreground">
+          {METER_FULL_NAME[name] ?? name} · {bandLabel[band]}
+        </p>
+        <p className="mt-2 text-sm leading-relaxed">{reason}</p>
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
+/** The four assessment bands as meters — one compact block instead of a wide grid. */
+export function BandMeterSet({
+  items,
+  className,
+}: {
+  items: { name: string; band: Band; reason?: string | undefined }[];
+  className?: string | undefined;
+}) {
+  return (
+    <div className={cn("band-meters grid gap-x-8 gap-y-1.5 sm:grid-cols-2", className)}>
+      {items.map((it) => (
+        <BandMeter key={it.name} name={it.name} band={it.band} reason={it.reason} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Hard facts about the company — funding, valuation, headcount. These are
+ * figures rather than judgments, so they read plainly and carry their source
+ * where one exists.
+ */
+/**
+ * The bands with their reasoning written out, one per line.
+ *
+ * The compact meter hides its reason behind a hover, which suits a card being
+ * scanned. In the panel there is room to show it, and a reader who has opened
+ * the panel is reading rather than scanning — asking them to hover four times
+ * to get the argument would be work for its own sake.
+ */
+export function BandMeterList({
+  items,
+  className,
+}: {
+  items: { name: string; band: Band; reason?: string | undefined }[];
+  className?: string | undefined;
+}) {
+  return (
+    <dl className={cn("space-y-3", className)}>
+      {items.map((it) => (
+        <div key={it.name}>
+          <dt>
+            <BandMeter name={it.name} band={it.band} />
+          </dt>
+          {it.reason && (
+            <dd className="mt-1 pl-[1.4rem] text-sm leading-relaxed text-muted-foreground">
+              {it.reason}
+            </dd>
+          )}
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+export function FactGrid({
+  items,
+  className,
+}: {
+  items: {
+    name: string;
+    value: ReactNode;
+    /** Caveat behind the figure, shown on hover from the value itself. */
+    noteDetail?: string | undefined;
+  }[];
+  className?: string | undefined;
+}) {
+  return (
+    <dl
+      className={cn(
+        "fact-grid grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-4",
+        className,
+      )}
+    >
+      {items.map((it) => (
+        <div key={it.name} className="bg-card px-3 py-2.5">
+          <dt className="font-mono text-2xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            {it.name}
+          </dt>
+          <dd className="num mt-1 text-base font-semibold leading-tight">
+            {it.noteDetail ? (
+              // The caveat hangs off the figure rather than taking its own line:
+              // a reader who trusts the number never has to read it.
+              <HoverCard openDelay={120} closeDelay={80}>
+                <HoverCardTrigger asChild>
+                  <button
+                    type="button"
+                    className="cursor-help text-left underline decoration-dotted decoration-from-font underline-offset-[3px] hover:decoration-solid"
+                  >
+                    {it.value}
+                    {/* A dotted underline, not a query mark: the hover names
+                        where the figure came from, which is provenance rather
+                        than a caution about its reliability. */}
+                  </button>
+                </HoverCardTrigger>
+                {/* font-normal: the panel sits inside the <dd>, which is
+                    semibold for the figure itself, and the source text would
+                    otherwise inherit that weight. */}
+                <HoverCardContent align="start" className="w-80 font-normal">
+                  <p className="text-2xs uppercase tracking-[0.12em] text-muted-foreground">
+                    {it.name} · source
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed">{it.noteDetail}</p>
+                </HoverCardContent>
+              </HoverCard>
+            ) : (
+              it.value
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+export function BandValue({
+  name,
+  band,
+  className,
+}: {
+  name: string;
+  band: Band;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex flex-col gap-0.5", className)}>
+      <span className="text-2xs uppercase tracking-[0.12em] text-muted-foreground">{name}</span>
+      <span
+        className={cn(
+          "text-sm leading-tight",
+          band === "unknown" ? "italic text-muted-foreground" : "text-foreground",
+        )}
+      >
+        {bandLabel[band]}
+      </span>
+    </div>
+  );
+}
+
+
+/** What each axis asks, and what a level means on it. */
+export const AXIS_SCALE = {
+  expansion: {
+    label: "Siting",
+    question: "Is this company deciding where to put something?",
+    levels: [
+      "No siting decision visible.",
+      "Growing, but nothing about where.",
+      "Moving into new markets, no location named.",
+      "Choosing where to put a facility, a region lead, or newly raised money.",
+    ],
+  },
+  partnership: {
+    label: "Opening",
+    question: "Is there something EDB could propose into?",
+    levels: [
+      "Nothing to propose into.",
+      "Possible in principle, nothing concrete.",
+      "Building the kind of thing a partner could join.",
+      "Actively seeking partners, testbeds or joint work.",
+    ],
+  },
+  momentum: {
+    label: "Pace",
+    question: "Is this company accelerating?",
+    levels: [
+      "Quiet.",
+      "Steady.",
+      "Moving — raising, growing, winning customers.",
+      "Moving fast, and visibly.",
+    ],
+  },
+} as const;
+
+export type AxisKey = keyof typeof AXIS_SCALE;
+
+function AxisDots({ value }: { value: number }) {
+  return (
+    <span className="flex gap-0.5" aria-hidden>
+      {[1, 2, 3].map((i) => (
+        <span
+          key={i}
+          className={cn(
+            "h-1.5 w-1.5 rounded-full",
+            i <= value ? "bg-current" : "bg-current opacity-25",
+          )}
+        />
+      ))}
+    </span>
+  );
+}
+
+/**
+ * The three axes the company was scored on, as one mark.
+ *
+ * Showing only the strongest made every card read alike, because qualifying
+ * requires a 3 on siting or opening — the badge just restated the entry bar. It
+ * also flattened a real difference: a company choosing where to build and one
+ * looking for a partner need different approaches, and the badge called both
+ * the same thing.
+ */
+export function SignalBadge({
+  expansion,
+  partnership,
+  momentum,
+  companyName,
+  className,
+}: {
+  expansion: number;
+  partnership: number;
+  momentum: number;
+  /** Named in the explanation, so it reads as this company's situation. */
+  companyName: string;
+  className?: string;
+}) {
+  const axes: Array<{ key: AxisKey; value: number }> = [
+    { key: "expansion", value: expansion },
+    { key: "partnership", value: partnership },
+    { key: "momentum", value: momentum },
+  ];
+  // Named for whichever opening is stronger: that is the approach an RD would
+  // actually make, and it is what the placement rule keyed on.
+  const lead: AxisKey = partnership > expansion ? "partnership" : "expansion";
+
+  // Deliberately hueless. The sector tags own the colour wheel, and a badge
+  // beside a deeptech tag in the same blue read as one label in two halves.
+  const strength = Math.max(expansion, partnership);
+  const tone =
+    strength >= 3
+      ? "bg-foreground text-background ring-transparent"
+      : strength === 2
+        ? "bg-foreground/[0.08] text-foreground ring-foreground/15"
+        : "bg-transparent text-muted-foreground ring-border";
+
+  return (
+    <HoverCard openDelay={120} closeDelay={80}>
+      <HoverCardTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Siting ${expansion} of 3, opening ${partnership} of 3, pace ${momentum} of 3`}
+          className={cn(
+            "inline-flex cursor-help items-center gap-1.5 rounded-full px-2.5 py-1 ring-1 ring-inset transition-opacity hover:opacity-80",
+            tone,
+            className,
+          )}
+        >
+          <AxisDots value={Math.max(expansion, partnership)} />
+          <span className="text-2xs font-medium uppercase tracking-[0.1em]">
+            {AXIS_SCALE[lead].label}
+          </span>
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent align="end" className="w-80">
+        <dl className="space-y-3">
+          {axes.map(({ key, value }) => (
+            <div key={key}>
+              <dt className="flex items-center gap-2">
+                <AxisDots value={value} />
+                <span className="text-2xs uppercase tracking-[0.12em] text-muted-foreground">
+                  {AXIS_SCALE[key].label}
+                </span>
+              </dt>
+              <dd className="mt-0.5 pl-[1.4rem] text-sm leading-relaxed">
+                {AXIS_SCALE[key].levels[value] ?? AXIS_SCALE[key].levels[0]}
+              </dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-3 border-t border-border pt-2 text-2xs leading-relaxed text-muted-foreground">
+          What is happening at {companyName} right now. Whether it is a company worth pursuing is a
+          separate judgment, shown below.
+        </p>
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
+/**
+ * Colour is assigned on the broad sector, not the subsector: four hues across
+ * twenty-six values would be arbitrary, and the reader is scanning for family
+ * anyway. Anything outside the four defined hues is deliberately neutral —
+ * colour is meaning here, and inventing a hue would imply one.
+ */
+const BROAD_HUE: Partial<Record<string, string>> = {
+  compute: "deeptech", industrial: "deeptech", aerospace: "deeptech",
+  health: "biotech",
+  defence: "defence",
+  ai: "ai",
+};
+
+const hueFor = (sector: string) => {
+  const broad = sectorBroadSector(sector) ?? sector;
+  return BROAD_HUE[broad];
+};
+
+const sectorColor = (sector: string) => {
+  const h = hueFor(sector);
+  return h ? `text-sector-${h}` : "text-muted-foreground";
+};
+
+const sectorBg = (sector: string) => {
+  const h = hueFor(sector);
+  return h ? `bg-sector-${h}/12` : "bg-muted";
+};
+
+/*
+ * Sector tags — the one place colour is used for categorisation.
+ *
+ * Two tags, because the taxonomy has two levels and collapsing them loses the
+ * one a reader scans by. The broad sector is the family and carries the colour;
+ * the subsector is the precise reading and sits alongside it in outline. Both
+ * use the short form: a tag has room for a word, and the full label is a
+ * definition written for the classifier, not a caption.
+ */
+export function SectorTag({ sector, className }: { sector: string; className?: string }) {
+  const broad = sectorBroadSector(sector);
+  const isSub = Boolean(broad);
+  const family = broad ?? sector;
+
+  return (
+    <span className={cn("inline-flex items-center gap-1", className)}>
+      <span
+        className={cn(
+          "sector-tag inline-flex w-fit items-center justify-center gap-1.5 rounded-sm px-1.5 py-0.5 text-center font-mono text-2xs font-semibold uppercase leading-tight tracking-[0.16em] [text-indent:0.16em]",
+          sectorColor(family),
+          sectorBg(family),
+        )}
+        title={broadSectorLabel(family)}
+      >
+        <span className="size-1.5 rounded-full bg-current" aria-hidden />
+        {sectorShort(family)}
+      </span>
+      {isSub && (
+        <span
+          className={cn(
+            // Letter-spacing adds a trailing gap after the last character, which
+            // reads as the box being too wide on a long label. Compensated with
+            // a negative right margin so the text sits centred in its box.
+            // The label may wrap; the box then shrinks to its longest wrapped
+            // line rather than holding the full unwrapped width. Text is
+            // centred so a short second line does not sit ragged left.
+            "subsector-tag inline-block w-fit rounded-sm border px-1.5 py-0.5 text-center font-mono text-2xs font-medium uppercase leading-tight tracking-[0.16em] [text-indent:0.16em]",
+            sectorColor(family),
+            "border-current/25",
+          )}
+          title={sectorLabel(sector)}
+        >
+          {sectorShort(sector)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/* Signal types are per evidence point, so a company shows the set it produced */
+export function SignalTypeSet({ points }: { points: EvidencePoint[] }) {
+  const types = Array.from(new Set(points.map((p) => p.signalType)));
+  if (types.length === 0) return null;
+  // Sentence case in the body face. These are ordinary words, and mono with wide
+  // tracking made them read as machine output while competing with the sector
+  // tag beside them, which is the label that should own that treatment.
+  return (
+    <span className="signal-types text-xs text-muted-foreground">
+      {types.map((t) => signalTypeLabel[t]).join(" · ")}
+    </span>
+  );
+}
+
+export function WhyNow({ points }: { points: EvidencePoint[] }) {
+  return (
+    <ul className="measure space-y-2">
+      {points.map((p) => (
+        <li key={p.id} className="flex gap-2.5 text-sm leading-relaxed">
+          <span
+            className={cn(
+              "mt-[0.6em] size-1 shrink-0 rounded-full",
+              p.origin === "headline_signal" ? "bg-foreground/70" : "bg-foreground/25",
+            )}
+            aria-hidden
+          />
+          <span>
+            {p.text}
+            <span className="ml-2 whitespace-nowrap text-2xs text-muted-foreground">
+              {signalTypeLabel[p.signalType]}
+              {p.origin === "headline_signal" ? " · headline signal" : " · supporting"}
+            </span>
+            <span className="ml-2">
+              <SourceLink source={p.source} />
+            </span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function ModelNote({ children }: { children: ReactNode }) {
+  return <p className="measure text-sm leading-relaxed text-muted-foreground">{children}</p>;
+}
+
+/**
+ * A caution to verify before approaching — export control, mostly.
+ *
+ * A mark rather than a block: it applies to a minority of companies, and a
+ * full-width panel on those cards alone breaks the rhythm of a grid of
+ * otherwise-equal cards. The warning is still one hover away, and the mark is
+ * coloured so a reader scanning the grid can see which companies carry one.
+ */
+export function CheckFirst({ text }: { text: string }) {
+  return (
+    <HoverCard openDelay={100} closeDelay={80}>
+      <HoverCardTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Check first: ${text}`}
+          className="inline-flex shrink-0 cursor-help items-center gap-1 rounded-full border border-caution/40 bg-caution-soft/60 px-1.5 py-0.5 text-caution transition-opacity hover:opacity-80"
+        >
+          <TriangleAlert className="size-3" strokeWidth={2} aria-hidden />
+          <span className="font-mono text-2xs font-medium uppercase tracking-[0.1em]">Check</span>
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent align="end" className="w-80">
+        <p className="font-mono text-2xs font-medium uppercase tracking-[0.12em] text-caution">
+          Check first
+        </p>
+        <p className="mt-2 text-sm leading-relaxed">{text}</p>
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
+export function FeasibilityMark({ feasibility }: { feasibility: Feasibility }) {
+  const color =
+    feasibility === "confirmed"
+      ? "text-confirmed"
+      : feasibility === "plausible"
+        ? "text-plausible"
+        : "text-weak";
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 text-2xs", color)}>
+      <span className="size-1.5 rounded-full bg-current" aria-hidden />
+      {feasibilityLabel[feasibility]}
+    </span>
+  );
+}
+
+export function QuietButton({
+  active,
+  className,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean }) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "rounded-sm px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground",
+        "transition-colors duration-200 ease-out",
+        "focus-visible:outline focus-visible:outline-1 focus-visible:outline-ring",
+        active &&
+          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export function SectionHeading({
+  title,
+  subtitle,
+  right,
+}: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  right?: ReactNode;
+}) {
+  return (
+    <div className="border-b-2 border-primary pb-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+        <h2 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h2>
+        {right}
+      </div>
+      {subtitle && (
+        <p className="measure mt-1.5 text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+          {subtitle}
+        </p>
+      )}
+    </div>
+  );
+}
