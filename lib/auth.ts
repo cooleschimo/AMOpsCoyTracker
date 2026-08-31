@@ -35,6 +35,23 @@ export async function hasDashboard(searchParamToken?: string): Promise<boolean> 
   return hasAdmin(searchParamToken);
 }
 
+/**
+ * Remember a valid token so the rest of the app opens without it in every URL.
+ *
+ * Arriving with `?token=` and then following a link lost the token on the first
+ * hop, so every company, person and item page read as unauthorised even though
+ * the reader had just been let in. Route handlers and server actions can write
+ * cookies; a page render cannot, which is why this is called from middleware
+ * rather than from the gate itself.
+ */
+export const DASHBOARD_COOKIE = 'dashboard_token';
+export const ADMIN_COOKIE = 'admin_token';
+
+export function tokenMatches(kind: 'dashboard' | 'admin', token: string): boolean {
+  const expected = optional(kind === 'admin' ? 'ADMIN_TOKEN' : 'DASHBOARD_TOKEN');
+  return !!expected && timingSafeEqual(token, expected);
+}
+
 export function checkAdminHeader(header: string | null): boolean {
   const expected = optional('ADMIN_TOKEN');
   if (!expected || !header) return false;

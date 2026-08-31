@@ -32,7 +32,7 @@ const S = {
 const TAG_COLOURS: Record<string, { background: string; color: string }> = {
   existing_account: { background: '#e8f0e8', color: '#2c5c2c' },
   in_conversation: { background: '#e8eef7', color: '#1a4d8f' },
-  prior_contact: { background: '#f2f0e8', color: '#6b5626' },
+  not_an_account: { background: '#f4f4f2', color: '#6b6b64' },
   not_pursuing: { background: '#f2f2f2', color: '#777' },
   surfaced: { background: '#fdf0e3', color: '#8a5a1b' },
   singapore: { background: '#f7e8ee', color: '#8a2b4d' },
