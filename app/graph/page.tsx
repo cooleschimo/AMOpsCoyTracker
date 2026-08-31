@@ -40,13 +40,12 @@ export default async function GraphPage({
     : [{ nodes: [], edges: [] }, []];
 
   return (
-    <main className="mx-auto max-w-[1400px] px-5 py-10 sm:px-8 sm:py-14">
+    <main className="mx-auto max-w-[1400px] px-6 py-10 sm:px-12 sm:py-14 lg:px-16">
       <header className="mb-8 space-y-1">
         <h1 className="font-display text-3xl font-semibold tracking-tight">Connections</h1>
         <p className="measure text-sm text-muted-foreground">
-          People, investors and Singapore-linked entities around a company, with each possible path
-          as an edge. A path is a possibility until someone reviews it — nothing here is a warm
-          introduction.
+          People, investors and Singapore-linked entities around a company, drawn from public
+          records.
         </p>
         <p className="pt-2 text-xs text-muted-foreground">
           <Link href="/" className="link-underline hover:text-foreground">

@@ -39,6 +39,8 @@ export function NetworkGraph({
   edges,
   height = 380,
   selected,
+  highlight,
+  highlightEdges,
   onSelect,
   className,
 }: {
@@ -46,6 +48,20 @@ export function NetworkGraph({
   edges: NetEdge[];
   height?: number;
   selected?: string | null;
+  /**
+   * Nodes to light up directly, rather than deriving them from a selected
+   * node's neighbours. Selecting a path highlights exactly that path, where
+   * selecting a node highlights everything it touches.
+   */
+  highlight?: string[] | null;
+  /**
+   * The specific edges belonging to the highlighted path, as `from|to` keys.
+   *
+   * Inferring edges from the node set lit up every edge running between any two
+   * highlighted nodes — so an unrelated path sharing two of them was drawn as
+   * though it were part of the one being previewed.
+   */
+  highlightEdges?: string[] | null;
   onSelect?: (id: string | null) => void;
   className?: string;
 }) {
@@ -136,6 +152,7 @@ export function NetworkGraph({
   }, [edges]);
 
   const neighbours = useMemo(() => {
+    if (highlight?.length) return new Set(highlight);
     if (!selected) return null;
     const s = new Set<string>([selected]);
     for (const e of edges) {
@@ -143,7 +160,12 @@ export function NetworkGraph({
       if (e.to === selected) s.add(e.from);
     }
     return s;
-  }, [selected, edges]);
+  }, [selected, highlight, edges]);
+
+  const highlightEdgeSet = useMemo(
+    () => (highlightEdges?.length ? new Set(highlightEdges) : null),
+    [highlightEdges],
+  );
 
   const P = (id: string) => pos[id];
 
@@ -152,7 +174,9 @@ export function NetworkGraph({
       ref={wrapRef}
       style={{ height }}
       className={cn(
-        "relative w-full touch-none select-none overflow-hidden rounded-md border border-border bg-card",
+        // No panel: transparent, no border. A bordered white card made the graph
+        // read as a widget dropped onto the page rather than part of it.
+        "relative w-full touch-none select-none overflow-hidden",
         className
       )}
       onPointerDown={(e) => {
@@ -181,7 +205,11 @@ export function NetworkGraph({
             const a = P(e.from);
             const b = P(e.to);
             if (!a || !b) return null;
-            const dim = neighbours ? !(neighbours.has(e.from) && neighbours.has(e.to)) : false;
+            const dim = highlightEdgeSet
+              ? !(highlightEdgeSet.has(`${e.from}|${e.to}`) || highlightEdgeSet.has(`${e.to}|${e.from}`))
+              : neighbours
+                ? !(neighbours.has(e.from) && neighbours.has(e.to))
+                : false;
             // Straight. The layout is radial, so edges from the hub are spokes
             // and read cleanly; bowing them — in a direction picked by hashing
             // the edge id, so neighbouring edges bent opposite ways — was what

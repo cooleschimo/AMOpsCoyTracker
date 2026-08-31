@@ -11,6 +11,7 @@
  * association, and the wording stays "possible" until a human says otherwise.
  */
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { NetworkGraph, radialLayout, type NetEdge, type NetNode } from './network-graph';
 import { cn } from '@/lib/utils';
 import type { CompanyGraph, PathRow } from '@/lib/dashboard-data';
@@ -31,6 +32,13 @@ export function CompanyGraphView({
   companyName: string;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  // Hover previews a path, a click pins it. Hovering wins while it lasts, so
+  // running the cursor down the list traces each one in turn without losing
+  // whatever is pinned underneath.
+  const [hoveredPath, setHoveredPath] = useState<string | null>(null);
+  const shownPathId = hoveredPath ?? selectedPath;
+  const activePath = paths.find((p) => p.id === shownPathId) ?? null;
 
   const { nodes, edges } = useMemo(() => {
     // Centre the hub and ring the satellites around it; the layout also gets the
@@ -70,13 +78,9 @@ export function CompanyGraphView({
     return { nodes: netNodes, edges: netEdges };
   }, [graph]);
 
-  const shown = selected
-    ? paths.filter(
-        (p) =>
-          (p.viaPersonName && selected.startsWith('p')) ||
-          (p.viaOrgName && selected.startsWith('o')),
-      )
-    : paths;
+  // Paths carry the nodes they run through, so a selected node matches exactly
+  // the paths that touch it rather than every path of the same kind.
+  const shown = selected ? paths.filter((p) => p.nodeIds.includes(selected)) : paths;
 
   if (paths.length === 0) {
     return (
@@ -87,18 +91,29 @@ export function CompanyGraphView({
   }
 
   return (
-    <div className="space-y-5">
-      <div className="overflow-hidden rounded-md border border-border bg-card">
+    // Graph left, list right. The graph sticks while the list scrolls, so a
+    // reader working down a long path list never loses sight of the shape they
+    // are reading about.
+    <div className="grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start">
+      <div className="lg:sticky lg:top-6">
+        {/* No card around it: a border and a white panel made the graph read as
+            a widget dropped on the page rather than part of it. */}
         <NetworkGraph
           nodes={nodes}
           edges={edges}
           height={520}
           selected={selected}
-          onSelect={(id) => setSelected((cur) => (cur === id ? null : id))}
+          highlight={activePath?.nodeIds ?? null}
+          highlightEdges={activePath?.edgeKeys ?? null}
+          onSelect={(id) => {
+            // Picking a node clears a picked path: the two are different
+            // questions — everything this node touches, versus this one path.
+            setSelectedPath(null);
+            setSelected((cur) => (cur === id ? null : id));
+          }}
         />
-      </div>
 
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-2xs text-muted-foreground">
+      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-2xs text-muted-foreground">
         {(['confirmed', 'plausible', 'weak'] as const).map((t) => (
           <span key={t} className="inline-flex items-center gap-1.5">
             <span
@@ -110,12 +125,33 @@ export function CompanyGraphView({
             {TONE_LABEL[t]}
           </span>
         ))}
-        <span>Drag to pan · scroll to zoom · click a node to filter</span>
+        <span>Drag to pan · scroll to zoom · click a node or a path</span>
+      </div>
       </div>
 
       <ul className="space-y-3">
         {shown.map((p) => (
-          <li key={p.id} className="hairline-b pb-3">
+          <li key={p.id}>
+            {/* The whole row selects the path and lights it on the graph. The
+                source link sits outside the button, since it goes elsewhere. */}
+            <button
+              type="button"
+              onClick={() => {
+                setSelected(null);
+                setSelectedPath((cur) => (cur === p.id ? null : p.id));
+              }}
+              onMouseEnter={() => setHoveredPath(p.id)}
+              onMouseLeave={() => setHoveredPath(null)}
+              onFocus={() => setHoveredPath(p.id)}
+              onBlur={() => setHoveredPath(null)}
+              aria-pressed={selectedPath === p.id}
+              className={cn(
+                'hairline-b w-full rounded-sm px-2 py-2 text-left transition-colors',
+                selectedPath === p.id
+                  ? 'bg-muted ring-1 ring-inset ring-primary/30'
+                  : 'hover:bg-muted/50',
+              )}
+            >
             <div className="flex flex-wrap items-baseline gap-x-3">
               <span
                 className={cn(
@@ -129,6 +165,19 @@ export function CompanyGraphView({
               >
                 {TONE_LABEL[p.feasibility]}
               </span>
+            </div>
+            <p className="mt-1 text-sm leading-relaxed">Possible path: {p.description}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{p.evidence}</p>
+            </button>
+            <span className="ml-2 inline-flex gap-x-3">
+              {p.targetCompanyId && p.targetCompanyName ? (
+                <Link
+                  href={`/company/${p.targetCompanyId}`}
+                  className="text-2xs text-primary link-underline"
+                >
+                  {p.targetCompanyName}
+                </Link>
+              ) : null}
               {p.sourceUrl && (
                 <a
                   href={p.sourceUrl}
@@ -139,16 +188,15 @@ export function CompanyGraphView({
                   source
                 </a>
               )}
-            </div>
-            <p className="mt-1 text-sm leading-relaxed">Possible path: {p.description}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{p.evidence}</p>
+            </span>
           </li>
         ))}
       </ul>
-      {selected && (
+      {(selected || selectedPath) && (
         <p className="text-xs text-muted-foreground">
-          Filtered to paths through the selected node. Click it again to show all {paths.length} for{' '}
-          {companyName}.
+          {selectedPath
+            ? `Showing one path through the graph. Click it again to show all ${paths.length} for ${companyName}.`
+            : `Filtered to paths through the selected node. Click it again to show all ${paths.length} for ${companyName}.`}
         </p>
       )}
     </div>
