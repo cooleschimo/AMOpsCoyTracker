@@ -1,49 +1,381 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design system — weekly intelligence dashboard.
+ * Typography-led, near-white warm ground, near-black text, one muted accent.
+ * Colour carries meaning only: feasibility, caution, signal strength.
+ */
+
+@theme inline {
+  --font-sans: var(--font-plex-sans), "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: var(--font-baskerville), "Libre Baskerville", Georgia, "Times New Roman", serif;
+  --font-display: var(--font-baskerville), "Libre Baskerville", Georgia, "Times New Roman", serif;
+  --font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-hairline: var(--hairline);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* meaning-bearing colours */
+  --color-caution: var(--caution);
+  --color-caution-soft: var(--caution-soft);
+  --color-confirmed: var(--confirmed);
+  --color-plausible: var(--plausible);
+  --color-weak: var(--weak);
+
+  /* sector tagging */
+  --color-sector-deeptech: var(--sector-deeptech);
+  --color-sector-biotech: var(--sector-biotech);
+  --color-sector-defence: var(--sector-defence);
+  --color-sector-ai: var(--sector-ai);
+
+
+  /* Type scale, bumped one step up from Tailwind's defaults.
+     The reading unit here is a dense analyst list scanned at a desk, so the
+     small end of the scale carries most of the text and needs to stay
+     comfortable: 15px body rather than 14, 13px captions rather than 12. */
+  --text-2xs: 0.8125rem;      /* 13px */
+  --text-2xs--line-height: 1.25rem;
+  --text-xs: 0.8125rem;       /* 13px */
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.9375rem;       /* 15px */
+  --text-sm--line-height: 1.5rem;
+  --text-base: 1.0625rem;     /* 17px */
+  --text-base--line-height: 1.65rem;
+  --text-lg: 1.1875rem;       /* 19px */
+  --text-lg--line-height: 1.7rem;
+  --text-xl: 1.375rem;        /* 22px */
+  --text-xl--line-height: 1.85rem;
+  --text-2xl: 1.625rem;       /* 26px */
+  --text-2xl--line-height: 2.05rem;
+  --text-3xl: 2rem;           /* 32px */
+  --text-3xl--line-height: 2.4rem;
+  --text-4xl: 2.5rem;         /* 40px */
+  --text-4xl--line-height: 2.9rem;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --radius: 0.25rem;
+
+  --background: oklch(0.982 0.003 95);
+  --foreground: oklch(0.16 0.004 95);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.16 0.004 95);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.16 0.004 95);
+
+  /* one strong accent — deep cobalt */
+  --primary: oklch(0.52 0.21 258);
+  --primary-foreground: oklch(0.985 0.002 95);
+  --secondary: oklch(0.945 0.004 95);
+  --secondary-foreground: oklch(0.22 0.004 95);
+  --muted: oklch(0.945 0.004 95);
+  --muted-foreground: oklch(0.44 0.008 95);
+  --accent: oklch(0.93 0.05 258);
+  --accent-foreground: oklch(0.5 0.2 258);
+  --destructive: oklch(0.5 0.16 27);
+  --destructive-foreground: oklch(0.985 0.002 95);
+
+  --border: oklch(0.85 0.005 95);
+  --hairline: oklch(0.16 0.004 95 / 16%);
+  --input: oklch(0.85 0.005 95);
+  --ring: oklch(0.52 0.21 258 / 50%);
+
+  --caution: oklch(0.5 0.11 68);
+  --caution-soft: oklch(0.94 0.035 80);
+  --confirmed: oklch(0.44 0.09 165);
+  --plausible: oklch(0.52 0.1 72);
+  --weak: oklch(0.5 0.006 95);
+
+  --sector-deeptech: oklch(0.5 0.18 250);
+  --sector-biotech: oklch(0.48 0.15 160);
+  --sector-defence: oklch(0.5 0.17 32);
+  --sector-ai: oklch(0.48 0.19 305);
+
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+.dark {
+  --background: oklch(0.17 0.004 95);
+  --foreground: oklch(0.94 0.003 95);
+  --card: oklch(0.22 0.004 95);
+  --card-foreground: oklch(0.94 0.003 95);
+  --popover: oklch(0.22 0.004 95);
+  --popover-foreground: oklch(0.94 0.003 95);
+
+  --primary: oklch(0.78 0.16 258);
+  --primary-foreground: oklch(0.17 0.004 95);
+  --secondary: oklch(0.25 0.004 95);
+  --secondary-foreground: oklch(0.92 0.003 95);
+  --muted: oklch(0.25 0.004 95);
+  --muted-foreground: oklch(0.7 0.006 95);
+  --accent: oklch(0.3 0.05 262);
+  --accent-foreground: oklch(0.8 0.12 262);
+  --destructive: oklch(0.68 0.15 27);
+  --destructive-foreground: oklch(0.17 0.004 95);
+
+  --border: oklch(0.35 0.005 95);
+  --hairline: oklch(0.94 0.003 95 / 18%);
+  --input: oklch(0.35 0.005 95);
+  --ring: oklch(0.78 0.16 258 / 50%);
+
+  --caution: oklch(0.76 0.1 72);
+  --caution-soft: oklch(0.32 0.045 70);
+  --confirmed: oklch(0.72 0.09 165);
+  --plausible: oklch(0.76 0.1 75);
+  --weak: oklch(0.6 0.006 95);
+
+  --sector-deeptech: oklch(0.75 0.09 250);
+  --sector-biotech: oklch(0.75 0.08 160);
+  --sector-defence: oklch(0.76 0.09 45);
+  --sector-ai: oklch(0.75 0.1 300);
+
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
   }
-}
 
-html {
-  height: 100%;
-}
-
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-body {
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-@media (prefers-color-scheme: dark) {
   html {
-    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv05" 1, "ss01" 1, "tnum" 0;
+    line-height: 1.6;
+  }
+
+  h1 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    letter-spacing: -0.025em;
+  }
+
+
+  ::selection {
+    background: var(--color-accent);
+    color: var(--color-accent-foreground);
+  }
+
+  a,
+  button {
+    transition:
+      color 140ms ease,
+      background-color 140ms ease,
+      border-color 140ms ease,
+      opacity 140ms ease;
+  }
+}
+
+@utility measure {
+  /* Full column width. This is a scanning interface rather than an essay: the
+     rows are short, and a prose measure left a ragged gap down the right of
+     every list while forcing needless wraps. */
+  max-width: none;
+}
+
+@utility hairline-t {
+  border-top: 1px solid var(--color-hairline);
+}
+
+@utility hairline-b {
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+@utility num {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility link-underline {
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in oklch, currentColor 30%, transparent);
+}
+
+/* Respect a reader who has asked for less motion. The disposition animations
+   are feedback, not content, so removing them costs nothing. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * Dense cards.
+ *
+ * CSS columns rather than a grid: a grid aligns cards into rows, so a short
+ * card leaves a gap beneath it until the tallest card in its row ends. Columns
+ * flow independently, which is what a list of unequal cards wants.
+ *
+ * Everything scales together — type, icons, bars, padding — because shrinking
+ * type alone leaves the fixed-size elements looking oversized against it. The
+ * arrangement inside a card is unchanged from the wide version; only the scale
+ * differs.
+ *
+ * Scoped to the cards, so page headers and section titles keep their size and
+ * the hierarchy between them survives.
+ */
+.dense-cards {
+  --text-2xs: 0.5625rem;      /* 9px */
+  --text-2xs--line-height: 0.8rem;
+  --text-xs: 0.5625rem;       /* 9px */
+  --text-xs--line-height: 0.8rem;
+  --text-sm: 0.6875rem;       /* 11px */
+  --text-sm--line-height: 1rem;
+  --text-base: 0.75rem;       /* 12px */
+  --text-base--line-height: 1.05rem;
+  --text-lg: 0.8125rem;       /* 13px */
+  --text-lg--line-height: 1.1rem;
+  --text-xl: 0.875rem;        /* 14px */
+  --text-xl--line-height: 1.15rem;
+  --text-2xl: 0.9375rem;      /* 15px */
+  --text-2xl--line-height: 1.2rem;
+  --text-3xl: 1rem;           /* 16px */
+  --text-3xl--line-height: 1.3rem;
+
+  /* Layout is the Masonry component's job: cards keep their natural heights
+     while rank still reads left-to-right, which neither CSS columns nor a plain
+     grid can do alone. This block only carries the type scale and the card's
+     internal sizing. */
+}
+
+/* The card keeps its wide-version arrangement; only the scale changes. */
+.dense-cards .fact-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.dense-cards .fact-grid > div {
+  padding: 0.22rem 0.3rem;
+}
+
+/* The fact grid is four cells in a narrow card, so its type runs smaller than
+   the rest of the card — these are reference figures a reader glances at, not
+   text they read through. */
+.dense-cards .fact-grid dt {
+  font-size: 0.625rem;        /* 10px */
+  line-height: 0.85rem;
+  letter-spacing: 0.06em;
+}
+
+.dense-cards .fact-grid dd {
+  font-size: 0.875rem;        /* 14px */
+  line-height: 1.15rem;
+  margin-top: 0.1rem;
+}
+
+.dense-cards .band-meters {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 0.6rem;
+  row-gap: 0.15rem;
+}
+
+.dense-cards .meter-label {
+  /* Short labels — Prio, Fit, Value, Conf — so a fixed column can be narrow
+     enough that no label leaves a gap before its value while the values still
+     align. Long labels forced a choice between a wide column with gaps and an
+     auto column with a ragged value edge. The hover carries the full sense. */
+  width: 4rem;
+  letter-spacing: 0.01em;
+}
+
+/* Bars, dots and icons are fixed sizes, so they shrink explicitly. */
+.dense-cards .meter-bar {
+  width: 0.18rem;
+  height: 0.5rem;
+}
+
+.dense-cards svg {
+  width: 0.65em;
+  height: 0.65em;
+}
+
+.dense-cards article > div {
+  padding: 0.7rem 0.85rem;
+}
+
+.dense-cards .measure {
+  max-width: none;
+}
+
+/* Tracking is set for a wide card and stays proportionally wide in a narrow
+   one, so tighten it rather than the type, which is at its floor. */
+.dense-cards .sector-tag,
+.dense-cards .subsector-tag {
+  letter-spacing: 0.06em;
+  padding-inline: 0.25rem;
+  text-indent: 0.06em;
+}
+
+.dense-cards .signal-types {
+  letter-spacing: 0;
+}
+
+/*
+ * The expanded panel is for reading, not scanning, so it drops back to the
+ * page's own type scale rather than inheriting the compressed one from the
+ * card it opened from.
+ */
+.panel-scale {
+  --text-2xs: 0.8125rem;
+  --text-2xs--line-height: 1.25rem;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.5rem;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.65rem;
+  --text-lg: 1.1875rem;
+  --text-lg--line-height: 1.7rem;
+}
+
+.panel-scale .fact-grid > div {
+  padding: 0.5rem 0.65rem;
+}
+
+.panel-scale .meter-bar {
+  width: 0.375rem;
+  height: 0.875rem;
+}
+
+.panel-scale svg {
+  width: 1em;
+  height: 1em;
+}
+
+.panel-scale > div {
+  padding: 1rem 1.25rem;
 }
