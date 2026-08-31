@@ -13,7 +13,7 @@ export const ACCOUNT_STATUSES = [
   'unknown',
   'existing_account',
   'in_conversation',
-  'prior_contact',
+  'not_an_account',
   'not_pursuing',
 ] as const;
 export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
@@ -22,7 +22,7 @@ export const ACCOUNT_STATUS_LABELS: Record<AccountStatus, string> = {
   unknown: 'Unknown',
   existing_account: 'Existing account',
   in_conversation: 'In conversation',
-  prior_contact: 'Prior contact',
+  not_an_account: 'Not an account',
   not_pursuing: 'Not pursuing',
 };
 
@@ -30,7 +30,7 @@ export const ACCOUNT_STATUS_HELP: Record<AccountStatus, string> = {
   unknown: 'No record either way. The default — absence of a record is not evidence of no relationship.',
   existing_account: 'EDB already holds this account.',
   in_conversation: 'Active discussions right now. Surfacing this as a new discovery would be wrong.',
-  prior_contact: 'Met or approached before, not currently active. Useful history for a fresh approach.',
+  not_an_account: 'Checked, and EDB does not hold this account. A fact about the relationship, not a decision about pursuing it — an unpursued company and an unheld one are different things.',
   not_pursuing: 'A deliberate decision not to pursue. Keeps the company out of featured slots without deleting it.',
 };
 

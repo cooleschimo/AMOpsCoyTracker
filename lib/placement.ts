@@ -44,7 +44,7 @@ import { ENGAGED, type AccountStatus } from './accounts';
  * trending rather than getting a block of its own.
  */
 export const SECTIONS = [
-  'worth_a_conversation', 'new_on_the_radar', 'already_in_play',
+  'worth_a_conversation', 'new_on_the_radar', 'account_activity',
   'monitoring', 'exploration', 'to_watch', 'omitted',
 ] as const;
 export type Section = (typeof SECTIONS)[number];
@@ -98,7 +98,7 @@ export function detailFor(indexInSection: number): Detail {
 export const SECTION_CAPS: Partial<Record<Section, number>> = {
   worth_a_conversation: 25,
   new_on_the_radar: 15,
-  already_in_play: 15,
+  account_activity: 15,
   exploration: 1,
 };
 
@@ -176,7 +176,7 @@ export function isDiscovery(it: PlacementInput): boolean {
  * what matters at a company already in hand is what just moved — a growth event
  * is where a joint project becomes possible.
  */
-export function isAlreadyInPlay(it: PlacementInput): boolean {
+export function isAccountActivity(it: PlacementInput): boolean {
   if (!it.accountStatus) return false;
   if (!ENGAGED.includes(it.accountStatus)) return false;
   return it.momentum >= 2 || Math.max(it.expansion, it.partnership) >= 2;
@@ -269,7 +269,7 @@ export type DigestPlan = {
     scored: number;
     placed: number;
     discovery_candidates: number;
-    already_in_play_candidates: number;
+    account_activity_candidates: number;
     excluded_existing_account: number;
     capped: number;
     company_deduped: number;
@@ -284,7 +284,7 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
     scored: input.length,
     placed: 0,
     discovery_candidates: 0,
-    already_in_play_candidates: 0,
+    account_activity_candidates: 0,
     excluded_existing_account: 0,
     capped: 0,
     company_deduped: 0,
@@ -307,18 +307,18 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
   const discovery = dedupeByCompany(discoveryPool);
   counts.company_deduped += discovery.dropped.length;
 
-  // ---- Already in play: companies EDB holds or is talking to ---------------
-  const inPlayPool = input.filter(isAlreadyInPlay)
-    .map((it) => ({ ...it, section: 'already_in_play' as Section, rank: trendingRank(it) }))
+  // ---- Account activity: companies EDB holds or is talking to --------------
+  const inPlayPool = input.filter(isAccountActivity)
+    .map((it) => ({ ...it, section: 'account_activity' as Section, rank: trendingRank(it) }))
     .sort((a, b) => b.rank - a.rank);
-  counts.already_in_play_candidates = inPlayPool.length;
+  counts.account_activity_candidates = inPlayPool.length;
   const inPlay = dedupeByCompany(inPlayPool);
   counts.company_deduped += inPlay.dropped.length;
 
   const buckets: Array<[Section, Placed[]]> = [
     ['worth_a_conversation', discovery.kept.filter((d) => d.section === 'worth_a_conversation')],
     ['new_on_the_radar', discovery.kept.filter((d) => d.section === 'new_on_the_radar')],
-    ['already_in_play', inPlay.kept],
+    ['account_activity', inPlay.kept],
   ];
   for (const [name, list] of buckets) {
     const cap = SECTION_CAPS[name]!;
@@ -342,7 +342,7 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
    * placement, so these are held back rather than featured.
    */
   const placedIds = new Set(
-    [...sections.worth_a_conversation, ...sections.new_on_the_radar, ...sections.already_in_play]
+    [...sections.worth_a_conversation, ...sections.new_on_the_radar, ...sections.account_activity]
       .map((i) => i.itemId),
   );
   for (const it of input) {
@@ -353,7 +353,7 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
   }
 
   const represented = new Set(
-    [...sections.worth_a_conversation, ...sections.new_on_the_radar, ...sections.already_in_play]
+    [...sections.worth_a_conversation, ...sections.new_on_the_radar, ...sections.account_activity]
       .map((i) => i.signalType),
   );
   const cutPool = input.filter((i) => !placedIds.has(i.itemId));
@@ -363,7 +363,7 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
     : null;
 
   counts.placed = sections.worth_a_conversation.length + sections.new_on_the_radar.length
-    + sections.already_in_play.length + (exploration ? 1 : 0);
+    + sections.account_activity.length + (exploration ? 1 : 0);
   return { sections, exploration, counts };
 }
 

@@ -75,6 +75,12 @@ export async function findWarmPaths(companyId: number): Promise<WarmPath[]> {
   const q = getSql();
   const paths: WarmPath[] = [];
 
+  // Every description names the company rather than saying "this company" or
+  // "here". A path is read next to other paths and pasted into notes, where a
+  // pronoun stops resolving to anything.
+  const [self]: any = await q`select name from companies where id = ${companyId}`;
+  const subject = String(self?.name ?? 'this company');
+
   // ── 1. PERSON-MEDIATED: someone here also sits at a company with an SG link.
   // Strongest available from public data — a named human on both sides.
   const personRows = await q`
@@ -98,7 +104,7 @@ export async function findWarmPaths(companyId: number): Promise<WarmPath[]> {
     const score = base * degreeDiscount(degree) * 1.4; // person-mediated boost
     paths.push({
       kind: 'person_role',
-      description: `Possible path: ${r.person_name} is ${r.role_here} here and also ${r.role_there} at ${r.other_company_name}${r.other_has_sg ? ', which has a Singapore link' : ''}.`,
+      description: `${r.person_name} is ${r.role_here} at ${subject} and ${r.role_there} at ${r.other_company_name}${r.other_has_sg ? ', which has a Singapore link' : ''}. One person, both sides.`,
       viaPersonId: Number(r.person_id), viaPersonName: String(r.person_name),
       viaOrgId: null, viaOrgName: null,
       targetCompanyId: Number(r.other_company_id), targetCompanyName: String(r.other_company_name),
@@ -144,7 +150,7 @@ export async function findWarmPaths(companyId: number): Promise<WarmPath[]> {
     const score = base * discount; // no person boost
     paths.push({
       kind: 'fund_portfolio',
-      description: `Possible path: ${r.org_name} backs this company and also ${r.other_company_name}${r.sg_presence ? ' (Singapore-linked fund)' : ''}.`,
+      description: `${r.org_name} has invested in both ${subject} and ${r.other_company_name}${r.sg_presence ? ', and has a Singapore presence itself' : ''}. A shared investor is a route to an introduction.`,
       viaPersonId: null, viaPersonName: null,
       viaOrgId: Number(r.org_id), viaOrgName: String(r.org_name),
       targetCompanyId: Number(r.other_company_id), targetCompanyName: String(r.other_company_name),
@@ -170,7 +176,7 @@ export async function findWarmPaths(companyId: number): Promise<WarmPath[]> {
   for (const r of edgeRows) {
     paths.push({
       kind: 'company_edge',
-      description: `Possible path: ${r.relation.replace(/_/g, ' ')} relationship with ${r.other_name}${r.other_status === 'account' ? ', an existing EDB account' : ''}.`,
+      description: `${subject} has a ${r.relation.replace(/_/g, ' ')} relationship with ${r.other_name}${r.other_status === 'account' ? ', which EDB already holds as an account' : ''}.`,
       viaPersonId: null, viaPersonName: null, viaOrgId: null, viaOrgName: null,
       targetCompanyId: Number(r.other_id), targetCompanyName: String(r.other_name),
       evidence: `Company relationship: ${r.relation}.`,
@@ -192,7 +198,7 @@ export async function findWarmPaths(companyId: number): Promise<WarmPath[]> {
   for (const r of eventRows) {
     paths.push({
       kind: 'event',
-      description: `Possible path: ${r.person_name ?? 'someone from this company'} is ${r.participation} at ${r.event_name}${r.city ? ` in ${r.city}` : ''}${r.starts_on ? ` on ${r.starts_on}` : ''}.`,
+      description: `${r.person_name ?? `Someone from ${subject}`} is ${r.participation} at ${r.event_name}${r.city ? ` in ${r.city}` : ''}${r.starts_on ? ` on ${r.starts_on}` : ''} — a chance to meet ${subject} in person.`,
       viaPersonId: r.person_id ? Number(r.person_id) : null,
       viaPersonName: (r.person_name as string) ?? null,
       viaOrgId: null, viaOrgName: null,
