@@ -1,266 +1,266 @@
 id,name,description,website,current_sectors,live
-85,"Actio Biosciences","Precision therapies for genetic diseases","actiobio.com","biotech",true
-65,"Ambi Robotics","AI parcel sorting robots","ambirobotics.com","deeptech|ai",true
-98,"Anduril Industries","Autonomous defence systems and Lattice AI","anduril.com","deeptech|defence_tech|ai",true
-1,"Anthropic","Frontier foundation-model lab (Claude)","anthropic.com","deeptech|ai",true
-2,"Anysphere","AI coding assistant (Cursor)","cursor.com","ai",true
-101,"Applied Intuition","Dual-use autonomy and vehicle software","appliedintuition.com","deeptech|defence_tech|ai",true
-32,"Baseten","Model inference infrastructure","baseten.co","ai",true
-17,"Braintrust","AI eval and observability platform","braintrust.dev","ai",true
-62,"Bright Machines","Robotic factory automation with vision","brightmachines.com","deeptech|ai",true
-103,"CHAOS Industries","Advanced radar for air and missile defence","chaosinc.com","deeptech|defence_tech",true
-108,"Castelion","Low-cost hypersonic strike weapons","castelion.com","deeptech|defence_tech",true
-22,"Chai Discovery","AI foundation models for molecular design","chaidiscovery.com","biotech|ai",true
-30,"Chroma","Vector database for AI apps","trychroma.com","ai",true
-3,"Cognition AI","Autonomous coding agent (Devin); absorbed Windsurf business","cognition.ai","ai",true
-61,"Collaborative Robotics","Human-centric collaborative mobile robots","co.bot","deeptech|ai",true
-33,"Crusoe","AI data centers and cloud","crusoe.ai","ai",true
-173,"Dare Bioscience, Inc.","Website: Daré Bioscience — At Daré Bioscience, women’s health is our mission. From clinical trials and non-hormonal contraception to therapies for menopause and vaginal dryness to vaginal health, our research is evidence-based and built exclusively for women. Dare Bioscience, Inc.: Daré Bioscience to Host Th","darebioscience.com","biotech",true
-27,"Databricks","Data and AI platform","databricks.com","ai",true
-14,"Decagon","AI customer-support agents","decagon.ai","ai",true
-7,"Deepgram","Voice AI / speech recognition API","deepgram.com","ai",true
-60,"Dexterity","AI warehouse manipulation robots","dexterity.ai","deeptech|ai",true
-25,"ElevenLabs","AI voice and audio generation","elevenlabs.io","ai",true
-80,"Epicrispr Biotechnologies","Epigenetic editing therapeutics","epicrispr.com","biotech",true
-37,"Etched","Transformer-only inference ASIC (Sohu)","etched.com","deeptech|ai",true
-59,"Field AI","Field-robotics brain software for any robot","fieldai.com","deeptech|ai",true
-5,"Fireworks AI","Fast inference platform for gen-AI","fireworks.ai","ai",true
-97,"Freenome","Blood-based cancer screening","freenome.com","biotech|ai",true
-10,"Genspark","All-in-one AI agent workspace","genspark.ai","ai",true
-31,"Glean","Enterprise AI search and agents","glean.com","ai",true
-111,"Hadrian","AI-automated precision-parts factories","hadrian.co","deeptech|defence_tech|ai",true
-15,"Harvey","Legal AI platform","harvey.ai","ai",true
-9,"Hippocratic AI","Healthcare AI agents for patient calls","hippocraticai.com","ai",true
-55,"Kinetic Technologies","Automotive and power semiconductors","kinet-ic.com","deeptech",true
-34,"Lambda","GPU cloud for AI training","lambda.ai","ai",true
-29,"LangChain","Agent orchestration and dev tools","langchain.com","ai",true
-42,"Lightmatter","Photonic interconnect for AI","lightmatter.co","deeptech|ai",true
-11,"Luma AI","Multimodal photo/video generation models","lumalabs.ai","ai",true
-48,"Lumotive","Programmable optical beam-steering chips","lumotive.com","deeptech|ai",true
-38,"MatX","LLM-optimized AI chips","matx.com","deeptech|ai",true
-67,"Matic","Autonomous home robots","maticrobots.com","deeptech|ai",true
-6,"Mercor","AI talent and data-labeling marketplace","mercor.com","ai",true
-96,"Moon Surgical","Surgical assistance robot Maestro","moonsurgical.com","biotech|deeptech",true
-109,"Neros Technologies","Mass-produced NDAA-compliant FPV drones","neros.tech","deeptech|defence_tech",true
-78,"Neuralink","Brain-computer interfaces","neuralink.com","deeptech|biotech",true
-20,"Nexthop AI","AI networking infrastructure","nexthop.ai","deeptech|ai",true
-95,"Noah Medical","Surgical robotics for bronchoscopy","noahmed.com","biotech|deeptech",true
-12,"Parallel","Web infrastructure for AI agents","parallel.ai","ai",true
-28,"Perplexity","AI answer engine","perplexity.ai","ai",true
-57,"Physical Intelligence","Robot foundation models cross-embodiment","physicalintelligence.company","deeptech|ai",true
-70,"PsiQuantum","Photonic fault-tolerant quantum computing","psiquantum.com","deeptech",true
-47,"Quilter","Physics-AI automated PCB design","quilter.ai","deeptech|ai",true
-21,"Replicate","Run and deploy open-source models via API","replicate.com","ai",true
-40,"SambaNova Systems","Dataflow AI chips and systems","sambanova.ai","deeptech|ai",true
-71,"SandboxAQ","Quantum plus AI for security and sensing","sandboxaq.com","deeptech|ai",true
-99,"Shield AI","Autonomous pilot AI Hivemind and V-BAT","shield.ai","deeptech|defence_tech|ai",true
-52,"SiFive","RISC-V processor IP","sifive.com","deeptech",true
-13,"Sierra","Enterprise conversational-AI agents","sierra.ai","ai",true
-77,"Sila Nanotechnologies","Silicon anode battery materials","silanano.com","deeptech",true
-58,"Skild AI","Omni-bodied robot foundation model","skild.ai","deeptech|ai",true
-100,"Skydio","Autonomous drones defence and public safety","skydio.com","deeptech|defence_tech|ai",true
-18,"Temporal","Durable execution and orchestration for agents","temporal.io","ai",true
-41,"Tenstorrent","RISC-V and chiplet AI compute","tenstorrent.com","deeptech|ai",true
-4,"Together AI","Cloud infra for open-source AI models","together.ai","ai",true
-8,"Twelve Labs","Video-understanding AI models","twelvelabs.io","ai",true
-69,"Zipline","Drone delivery logistics","flyzipline.com","deeptech|ai",true
-35,"d-Matrix","In-memory compute AI inference chips","d-matrix.ai","deeptech|ai",true
-113,"137 Holdings ISII, LLC","Form D industry group: Pooled Investment Fund","","",false
-114,"37360NSR-AZ, LLC","Form D industry group: Commercial","","",false
-115,"5596OSH-NY, LLC","Form D industry group: Commercial","","",false
-116,"ADELANTO LANDOWNER TWO, LLC","Form D industry group: Commercial","","",false
-164,"AE-0722 Fund I, a series of Roll Up Vehicles, LP","Form D industry group: Pooled Investment Fund","","",false
-117,"AH Drinkwater Holdings, LLC","Form D industry group: Lodging and Conventions","","",false
-139,"AIX Ventures Fund III, L.P.","Form D industry group: Pooled Investment Fund","","",false
-165,"AMPLIFICA HOLDINGS GROUP, INC.","Form D industry group: Biotechnology","","biotech",false
-216,"ANTR-5, a series of ALEXTAR VC, LLC","Form D industry group: Pooled Investment Fund","","",false
-166,"ARCADIA OUTPATIENT SURGERY CENTER LP","Form D industry group: Other Health Care","","",false
-332,"Abridge","Generative AI for clinical documentation and healthcare workflow","abridge.com","",false
-118,"Acequia Capital OCN LP","Form D industry group: Pooled Investment Fund","","",false
-217,"Acrylic Explorer Fund LP","Form D industry group: Pooled Investment Fund","","",false
-140,"Aequim Arbitrage Fund LP","Form D industry group: Pooled Investment Fund","","",false
+85,"Actio Biosciences","Precision therapies for genetic diseases","actiobio.com","therapeutics",true
+65,"Ambi Robotics","AI parcel sorting robots","ambirobotics.com","robotics",true
+98,"Anduril Industries","Autonomous defence systems and Lattice AI","anduril.com","defence_systems|defence_software",true
+1,"Anthropic","Frontier foundation-model lab (Claude)","anthropic.com","ai_models",true
+2,"Anysphere","AI coding assistant (Cursor)","cursor.com","ai_software",true
+101,"Applied Intuition","Dual-use autonomy and vehicle software","appliedintuition.com","defence_software|robotics|ai_software",true
+32,"Baseten","Model inference infrastructure","baseten.co","ai_infrastructure|ai_software",true
+17,"Braintrust","AI eval and observability platform","braintrust.dev","ai_software",true
+62,"Bright Machines","Robotic factory automation with vision","brightmachines.com","advanced_manufacturing|robotics",true
+103,"CHAOS Industries","Advanced radar for air and missile defence","chaosinc.com","defence_systems",true
+108,"Castelion","Low-cost hypersonic strike weapons","castelion.com","defence_systems",true
+22,"Chai Discovery","AI foundation models for molecular design","chaidiscovery.com","ai_models|therapeutics",true
+30,"Chroma","Vector database for AI apps","trychroma.com","ai_software",true
+3,"Cognition AI","Autonomous coding agent (Devin); absorbed Windsurf business","cognition.ai","ai_software",true
+61,"Collaborative Robotics","Human-centric collaborative mobile robots","co.bot","robotics",true
+33,"Crusoe","AI data centers and cloud","crusoe.ai","ai_infrastructure",true
+173,"Dare Bioscience, Inc.","Website: Daré Bioscience — At Daré Bioscience, women’s health is our mission. From clinical trials and non-hormonal contraception to therapies for menopause and vaginal dryness to vaginal health, our research is evidence-based and built exclusively for women. Dare Bioscience, Inc.: Daré Bioscience to Host Th","darebioscience.com","therapeutics",true
+27,"Databricks","Data and AI platform","databricks.com","ai_software",true
+14,"Decagon","AI customer-support agents","decagon.ai","ai_software",true
+7,"Deepgram","Voice AI / speech recognition API","deepgram.com","ai_software",true
+60,"Dexterity","AI warehouse manipulation robots","dexterity.ai","robotics",true
+25,"ElevenLabs","AI voice and audio generation","elevenlabs.io","ai_models|ai_software",true
+179,"Ensysce Biosciences, Inc.","Website: Home - Ensysce Biosciences","ensysce.com","therapeutics",true
+80,"Epicrispr Biotechnologies","Epigenetic editing therapeutics","epicrispr.com","therapeutics",true
+37,"Etched","Transformer-only inference ASIC (Sohu)","etched.com","semiconductors",true
+59,"Field AI","Field-robotics brain software for any robot","fieldai.com","robotics|ai_software",true
+56,"Figure AI","General-purpose humanoid robots","figure.ai","robotics",true
+106,"Firestorm Labs","Expeditionary 3D-printed modular drones","launchfirestorm.com","defence_systems",true
+5,"Fireworks AI","Fast inference platform for gen-AI","fireworks.ai","ai_infrastructure|ai_software",true
+97,"Freenome","Blood-based cancer screening","freenome.com","medtech_devices",true
+10,"Genspark","All-in-one AI agent workspace","genspark.ai","ai_software",true
+31,"Glean","Enterprise AI search and agents","glean.com","ai_software",true
+111,"Hadrian","AI-automated precision-parts factories","hadrian.co","advanced_manufacturing|defence_systems",true
+15,"Harvey","Legal AI platform","harvey.ai","ai_software",true
+16,"Hebbia","AI document search for finance and legal","hebbia.ai","ai_software",true
+9,"Hippocratic AI","Healthcare AI agents for patient calls","hippocraticai.com","ai_software|digital_health",true
+55,"Kinetic Technologies","Automotive and power semiconductors","kinet-ic.com","semiconductors",true
+34,"Lambda","GPU cloud for AI training","lambda.ai","ai_infrastructure",true
+29,"LangChain","Agent orchestration and dev tools","langchain.com","ai_software",true
+42,"Lightmatter","Photonic interconnect for AI","lightmatter.co","photonics",true
+11,"Luma AI","Multimodal photo/video generation models","lumalabs.ai","ai_models",true
+48,"Lumotive","Programmable optical beam-steering chips","lumotive.com","photonics",true
+38,"MatX","LLM-optimized AI chips","matx.com","semiconductors",true
+67,"Matic","Autonomous home robots","maticrobots.com","robotics",true
+6,"Mercor","AI talent and data-labeling marketplace","mercor.com","ai_software",true
+96,"Moon Surgical","Surgical assistance robot Maestro","moonsurgical.com","medtech_devices",true
+109,"Neros Technologies","Mass-produced NDAA-compliant FPV drones","neros.tech","defence_systems",true
+78,"Neuralink","Brain-computer interfaces","neuralink.com","medtech_devices",true
+20,"Nexthop AI","AI networking infrastructure","nexthop.ai","ai_infrastructure",true
+95,"Noah Medical","Surgical robotics for bronchoscopy","noahmed.com","medtech_devices",true
+68,"Nuro","Autonomous delivery and licensing","nuro.ai","robotics",true
+12,"Parallel","Web infrastructure for AI agents","parallel.ai","ai_software",true
+28,"Perplexity","AI answer engine","perplexity.ai","ai_software",true
+57,"Physical Intelligence","Robot foundation models cross-embodiment","physicalintelligence.company","ai_models|robotics",true
+70,"PsiQuantum","Photonic fault-tolerant quantum computing","psiquantum.com","quantum",true
+47,"Quilter","Physics-AI automated PCB design","quilter.ai","ai_software",true
+21,"Replicate","Run and deploy open-source models via API","replicate.com","ai_infrastructure|ai_software",true
+40,"SambaNova Systems","Dataflow AI chips and systems","sambanova.ai","semiconductors",true
+71,"SandboxAQ","Quantum plus AI for security and sensing","sandboxaq.com","quantum|ai_software",true
+99,"Shield AI","Autonomous pilot AI Hivemind and V-BAT","shield.ai","defence_systems|defence_software",true
+52,"SiFive","RISC-V processor IP","sifive.com","semiconductors",true
+13,"Sierra","Enterprise conversational-AI agents","sierra.ai","ai_software",true
+77,"Sila Nanotechnologies","Silicon anode battery materials","silanano.com","materials_energy",true
+58,"Skild AI","Omni-bodied robot foundation model","skild.ai","ai_models|robotics",true
+100,"Skydio","Autonomous drones defence and public safety","skydio.com","defence_systems",true
+18,"Temporal","Durable execution and orchestration for agents","temporal.io","ai_software",true
+41,"Tenstorrent","RISC-V and chiplet AI compute","tenstorrent.com","semiconductors",true
+4,"Together AI","Cloud infra for open-source AI models","together.ai","ai_infrastructure",true
+8,"Twelve Labs","Video-understanding AI models","twelvelabs.io","ai_models",true
+69,"Zipline","Drone delivery logistics","flyzipline.com","robotics",true
+35,"d-Matrix","In-memory compute AI inference chips","d-matrix.ai","semiconductors",true
+113,"137 Holdings ISII, LLC","Form D industry group: Pooled Investment Fund","","investment_funds",false
+114,"37360NSR-AZ, LLC","Form D industry group: Commercial","","real_estate",false
+115,"5596OSH-NY, LLC","Form D industry group: Commercial","","real_estate",false
+116,"ADELANTO LANDOWNER TWO, LLC","Form D industry group: Commercial","","real_estate",false
+164,"AE-0722 Fund I, a series of Roll Up Vehicles, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+117,"AH Drinkwater Holdings, LLC","Form D industry group: Lodging and Conventions","","real_estate",false
+139,"AIX Ventures Fund III, L.P.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+165,"AMPLIFICA HOLDINGS GROUP, INC.","Form D industry group: Biotechnology","","other",false
+216,"ANTR-5, a series of ALEXTAR VC, LLC","Form D industry group: Pooled Investment Fund","","investment_funds",false
+166,"ARCADIA OUTPATIENT SURGERY CENTER LP","Form D industry group: Other Health Care","","healthcare_services",false
+332,"Abridge","Generative AI for clinical documentation and healthcare workflow","abridge.com","digital_health|ai_software",false
+118,"Acequia Capital OCN LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+217,"Acrylic Explorer Fund LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+140,"Aequim Arbitrage Fund LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
 167,"Aevos AI Inc.","Website: AEVOS — AEVOS","aevos.co","ai",false
-278,"Affirm","Buy now, pay later instalment payments at point of sale","affirm.com","",false
-338,"Aledade","Data and support services for primary care practices and health centers","aledade.com","",false
-342,"Alpha-9 Oncology","Clinical-stage radiopharmaceuticals for solid and hematologic cancers","a9oncology.com","",false
-853,"Altos Labs","Cell rejuvenation research to reverse disease and injury","altoslabs.com","",false
-64,"Amp Robotics","AI recycling sorting robots","amprobotics.com","deeptech|ai",false
-82,"Ampersand Biomedicines","Addressed biologics platform","ampersandbio.com","biotech",false
-46,"Anello Photonics","Silicon-photonic optical gyroscope","anellophotonics.com","deeptech",false
-74,"Apex Space","Mass-produced satellite bus platforms","apexspace.com","deeptech|defence_tech",false
-1063,"Apron","Invoice and payroll workflow automation for accountants and bookkeepers","getapron.com","",false
-76,"Array Labs","3D radar-imaging satellite constellation","arraylabs.io","deeptech",false
-356,"Arrcus","Hyperscale networking software; ArcOS routing for datacenters and telcos","arrcus.com","",false
-1029,"Asana","Enterprise work management and project coordination","asana.com","",false
-119,"AspenView Technology Partners, Inc.","Form D industry group: Other","","",false
-19,"Assort Health","Healthcare voice-AI agentic ops","assorthealth.com","ai|biotech",false
-168,"Asterism Books &amp; Distribution Co","Form D industry group: Retailing","","",false
-72,"Atom Computing","Neutral-atom quantum computers","atom-computing.com","deeptech",false
-875,"AuthZed","Permissions as a service; SpiceDB, a Zanzibar-inspired authorization system","authzed.com","",false
-880,"Aviatrix","Multi-cloud networking platform","aviatrix.com","",false
-283,"Axonius","Cyber asset attack surface management and SaaS management","axonius.com","",false
-43,"Ayar Labs","Optical I/O chiplets for AI interconnect","ayarlabs.com","deeptech|ai",false
-141,"BAILARD REAL ESTATE INVESTMENT TRUST, INC","Form D industry group: REITS and Finance","","",false
-218,"BE FUND III, LLC","Form D industry group: Other Real Estate","","",false
-142,"BE MEZZ FUND, LLC","Form D industry group: Other Real Estate","","",false
-380,"Berry Health","Online medical consultations and medication delivery","our-berry.io","",false
-2235,"Bexorg","Whole-brain perfusion platform for CNS drug discovery","bexorg.com","",false
-169,"Bidbus, Inc.","Form D industry group: Other Technology","","",false
-1860,"Biobot Analytics","Wastewater epidemiology for public health surveillance","biobot.io","",false
-143,"BuyerCaddy, Inc.","Form D industry group: Other","","",false
-120,"CAPU FUEL ACCESS FUND FIM 100 FUND QC","Form D industry group: Pooled Investment Fund","","",false
-121,"CAPU FUEL ACCESS FUND FIM 100 FUND QP","Form D industry group: Pooled Investment Fund","","",false
-122,"CRA-ATH ASC, LLC","Form D industry group: Other Real Estate","","",false
-123,"CSS Solutions LLC","Form D industry group: Other Technology","","",false
-144,"CSVCAP LTD","Form D industry group: Other Banking and Financial Services","","",false
-104,"CX2","AI-enabled electronic warfare","cx2.com","defence_tech|ai",false
-94,"Cala Health","Wearable neuromodulation therapy","calahealth.com","biotech",false
-917,"Canva","Online visual design platform with templates and assets","canva.com","",false
-91,"Capstan Medical","Surgical robot for heart-valve implants","capstanmedical.com","biotech|deeptech",false
-406,"Cartesia","Streaming text-to-speech API for voice agents","cartesia.ai","",false
-124,"Cascade Alpine LLC","Form D industry group: Other","","",false
-44,"Celestial AI","Photonic Fabric for AI memory interconnect","celestial.ai","deeptech|ai",false
-1881,"Cellanome","Multimodal single-cell analysis combining live imaging and transcriptomics","cellanome.com","",false
-411,"Chainguard","Hardened open-source container images and libraries against supply-chain attacks","chainguard.dev","",false
-83,"Character Biosciences","AI-driven genetics for AMD therapeutics","character.bio","biotech|ai",false
-66,"Chef Robotics","Food assembly robots","chefrobotics.ai","deeptech|ai",false
-170,"Clearlake Credit Perpetual Feeder Fund A, L.P.","Form D industry group: Pooled Investment Fund","","",false
-288,"ClickHouse","Open-source column-oriented OLAP database for analytics","clickhouse.com","",false
-422,"Cohere Technologies","Universal Spectrum Multiplier software for 4G and 5G mobile networks","cohere-tech.com","",false
-171,"Colonial Strategic Income Fund, LLC","Form D industry group: REITS and Finance","","",false
-145,"Cordillera Environmental Assets Fund, LLC","Form D industry group: Pooled Investment Fund","","",false
-146,"Cordillera Investment Fund IV, L.P.","Form D industry group: Pooled Investment Fund","","",false
-147,"Cordillera Investment Fund IV-B, L.P.","Form D industry group: Pooled Investment Fund","","",false
-88,"Crystalys Therapeutics","Urate-lowering therapeutics","crystalystx.com","biotech",false
-172,"DATAH, L.P.","Form D industry group: Pooled Investment Fund","","",false
-148,"DREAM U.S. INDUSTRIAL FUND LP","Form D industry group: Pooled Investment Fund","","",false
-1443,"DataHub","Open-source metadata platform for data governance and AI","datahub.com","",false
-1125,"DeepL","Language AI for translation of text, documents and voice","deepl.com","",false
-174,"Delphi Interactive Inc","Form D industry group: Other Technology","","",false
-175,"Diamond Art Club Investment, LLC","Form D industry group: Pooled Investment Fund","","",false
-176,"Diffusion V2, LP","Form D industry group: Pooled Investment Fund","","",false
-177,"Discipulus Fund II Aggregator, LLC","Form D industry group: Pooled Investment Fund","","",false
-1129,"Discord","Voice and text chat for gaming and online communities","discord.com","",false
-178,"Dream SPV Atomic LLC","Form D industry group: Pooled Investment Fund","","",false
-45,"DreamBig Semiconductor","Chiplet platform and SmartNIC-DPU","dreambigsemi.com","deeptech|ai",false
-1460,"DroneDeploy","Reality capture with aerial drones and ground robots for construction sites","dronedeploy.com","",false
-49,"Eliyan","Chiplet interconnect PHY","eliyan.com","deeptech|ai",false
-219,"Ember LifeSciences, Inc.","Website: Ember LifeSciences | Advanced temperature management for healthcare products — Ember LifeSciences is revolutionizing the cold chain with the Ember Cube, providing sustainable cold chain solutions for drug delivery. Our cloud-based, self-refrigerated shipping technology ensures the integrity and efficacy of life-saving medicines while reducing waste.","emberlifesciences.com","deeptech|biotech",false
-36,"EnCharge AI","Analog in-memory AI accelerators for edge","enchargeai.com","deeptech|ai",false
-1917,"Enlitic","AI standardization and anonymization of medical imaging data","enlitic.com","",false
-179,"Ensysce Biosciences, Inc.","Website: Home - Ensysce Biosciences","ensysce.com","biotech",false
-102,"Epirus","High-power microwave counter-UAS Leonidas","epirusinc.com","defence_tech|deeptech",false
-220,"Etched SPV, LLC","Form D industry group: Pooled Investment Fund","","",false
-469,"EvenUp","AI document drafting and case workflow for personal injury law firms","evenuplaw.com","",false
-23,"EvolutionaryScale","Protein-design foundation models (ESM3)","evolutionaryscale.ai","ai|biotech",false
-180,"ExchangeRight Essential Income 13 DST","Form D industry group: Commercial","","",false
-125,"FP VIII Amethyst Co-Invest, L.P.","Form D industry group: Pooled Investment Fund","","",false
-1144,"Factual","Location data platform; merged with Foursquare in 2020","factual.com","",false
-293,"Faire","Wholesale marketplace connecting retailers with brands","faire.com","",false
-481,"Farther","Technology-led wealth management and financial planning","farther.com","",false
-1477,"Fieldguide","AI advisory and audit automation software","fieldguide.io","",false
-232,"Figma","Collaborative interface design and prototyping","figma.com","",false
-56,"Figure AI","General-purpose humanoid robots","figure.ai","deeptech|ai",false
-106,"Firestorm Labs","Expeditionary 3D-printed modular drones","launchfirestorm.com","defence_tech|deeptech",false
-181,"Fund II, a series of Mishpacha Fund, LP","Form D industry group: Pooled Investment Fund","","",false
-126,"GC&amp;H INVESTMENTS, LLC","Form D industry group: Pooled Investment Fund","","",false
-182,"HA-0806 Fund I, a series of Platform Funds 2026, LP","Form D industry group: Pooled Investment Fund","","",false
-149,"HCM-SOF II, LLC","Form D industry group: Pooled Investment Fund","","",false
-183,"HI-0701 Fund II, a series of SaxeCap, LP","Form D industry group: Pooled Investment Fund","","",false
-184,"HI-1126 Fund II, a series of AX-RN-Funds, LP","Form D industry group: Pooled Investment Fund","","",false
-185,"HOPE Ventures I, LLC","Form D industry group: Pooled Investment Fund","","",false
-186,"HU-0707 Fund II, a series of DVC, LP","Form D industry group: Pooled Investment Fund","","",false
-16,"Hebbia","AI document search for finance and legal","hebbia.ai","ai",false
-150,"Hopkins Bannock LLC","Form D industry group: Commercial","","",false
-151,"Hopkins Capital Fund, L.L.C.","Form D industry group: Other Real Estate","","",false
-152,"Hopkins Weaver Springs, LLC","Form D industry group: Other Real Estate","","",false
-187,"IN-06091 Fund I, a series of Roll Up Vehicles, LP","Form D industry group: Pooled Investment Fund","","",false
-188,"IWF MDR Hotel II, LLC","Form D industry group: Commercial","","",false
-84,"Iambic Therapeutics","Generative-AI drug discovery","iambic.ai","biotech|ai",false
-75,"K2 Space","Mega-class satellite buses","k2space.com","deeptech|defence_tech",false
-189,"KIMAMI, INC","Form D industry group: Manufacturing","","",false
-153,"KKR Global Credit Opportunities Feeder II L.P.","Form D industry group: Pooled Investment Fund","","",false
-154,"KKR Global Credit Opportunities Fund (Overseas) L.P.","Form D industry group: Pooled Investment Fund","","",false
-155,"KKR Global Credit Opportunities Fund L.P.","Form D industry group: Pooled Investment Fund","","",false
-221,"KR Investment Partners IV, LLC","Form D industry group: Pooled Investment Fund","","",false
-222,"Kamal Ravikant Capital, LP - F3","Form D industry group: Pooled Investment Fund","","",false
-190,"Karl-LU-0714 Fund I, a series of Platform Funds 2026, LP","Form D industry group: Pooled Investment Fund","","",false
-191,"Kera Ventures IX, LLC","Form D industry group: Pooled Investment Fund","","",false
-192,"LGF I - Allocate Access, L.P.","Form D industry group: Pooled Investment Fund","","",false
-127,"LIONHEART LUCID SPV I, LP","Form D industry group: Pooled Investment Fund","","",false
-193,"Lake Como Funding Issuer, L.P.","Form D industry group: Pooled Investment Fund","","",false
-194,"Latitude Health, Inc.","Form D industry group: Other Technology","","",false
-223,"M1 Loan Fund, LLC","Form D industry group: Other Real Estate","","",false
-195,"MA-0622 Fund I, a series of Sajid Rahman Angel Funds, LP","Form D industry group: Pooled Investment Fund","","",false
-196,"METABODY AI INC.","Form D industry group: Other Technology","","",false
-197,"MVP Ventures III AI LP","Form D industry group: Pooled Investment Fund","","",false
-198,"MVP Ventures III QP LP","Form D industry group: Pooled Investment Fund","","",false
-107,"Mach Industries","Vertically integrated defence manufacturing","machindustries.com","defence_tech|deeptech",false
-81,"Marea Therapeutics","Cardiometabolic therapeutics","mareatx.com","biotech",false
-199,"Matt-WI-0615 Fund I, a series of Platform Funds 2026, LP","Form D industry group: Pooled Investment Fund","","",false
-224,"NZS Global Growth Fund LP","Form D industry group: Pooled Investment Fund","","",false
-86,"Neomorph","Molecular-glue degraders","neomorph.com","biotech",false
-616,"Nominal","AI finance and accounting; multi-entity consolidation and month-end close","nominal.so","",false
-128,"Noria Energy, Inc.","Website: New Website - Aug 2026 - Noria Energy — Noria Energy is one of the nation&#039;s leading floating solar developers. We help customers achieve their energy goals through rooftop, ground mount and floating solar.","noriaenergy.com","deeptech",false
-68,"Nuro","Autonomous delivery and licensing","nuro.ai","deeptech|ai",false
-200,"OBSIDIAN PRIME INC","Form D industry group: Other Technology","","",false
-201,"OM-0715 Fund I, a series of LMNT Ventures I, LP","Form D industry group: Pooled Investment Fund","","",false
-225,"Ocean Park Ventures VI, LLC","Form D industry group: Commercial","","",false
-226,"One Fin Capital LP","Form D industry group: Pooled Investment Fund","","",false
-311,"Orca Bio","Clinical-stage allogeneic cell therapy for blood and immune disease","orcabio.com","",false
-105,"Overland AI","Off-road ground autonomy stack","overland.ai","defence_tech|ai",false
-129,"PACIFIC TOXICOLOGY LABORATORIES","Form D industry group: Other Health Care","","biotech",false
-227,"PFD MANAGEMENT FUND 1006, LLC","Form D industry group: Other Banking and Financial Services","","",false
-156,"PFD MANAGEMENT FUND 1008, LLC","Form D industry group: Other Banking and Financial Services","","",false
-228,"PFD Management Opportunity Fund 3001, LLC","Form D industry group: Other Banking and Financial Services","","",false
-202,"PL-0529 Fund II, a series of Roll Up Vehicles, LP","Form D industry group: Pooled Investment Fund","","",false
-203,"Pathway Private Equity Fund III-Co, LP","Form D industry group: Pooled Investment Fund","","",false
-110,"Picogrid","Universal integration layer for defence C2","picogrid.com","defence_tech|ai",false
-54,"Point2 Technology","RF interconnect for AI datacenters","point2tech.com","deeptech|ai",false
-130,"Pontiac Street Industrial, LLC","Form D industry group: Commercial","","",false
-39,"Positron AI","Transformer inference accelerators","positron.ai","deeptech|ai",false
-131,"Powerlaw Corp.","Form D industry group: Pooled Investment Fund","","",false
-132,"ProjectButterfly2, PBC","Form D industry group: Other Banking and Financial Services","","",false
-157,"Prospect Title Insurance Agency, LLC","Form D industry group: Insurance","","",false
-204,"RE-0611 Fund I, a series of Jolt VC, LP","Form D industry group: Pooled Investment Fund","","",false
-687,"Ramp","Corporate cards and spend management for finance teams","ramp.com","",false
-205,"Rapidflare, Inc.","Form D industry group: Other Technology","","",false
-87,"RayThera","Small-molecule immunology","raythera.com","biotech",false
-206,"Relational Capital I, LP","Form D industry group: Pooled Investment Fund","","",false
-53,"Retym","DSP for AI datacenter connectivity","retym.com","deeptech|ai",false
-50,"Rivos","RISC-V server silicon","rivosinc.com","deeptech|ai",false
-207,"Robbins Capital I, L.P.","Form D industry group: Pooled Investment Fund","","",false
-208,"S26, a series of Latitude Fund, LP","Form D industry group: Pooled Investment Fund","","",false
-133,"SSFGP27 LLC","Form D industry group: Other Real Estate","","",false
-712,"Saronic","Autonomous surface vessels for defence maritime operations","saronic.com","",false
-79,"Science Corporation","Neural interfaces and biostack","science.xyz","biotech|deeptech",false
-134,"Sentinel KES Fund, LP","Form D industry group: Other Real Estate","","",false
-89,"Sidewinder Therapeutics","Bispecific antibody-drug conjugates","","biotech",false
-135,"Spectrum Effect, Inc.","Form D industry group: Other Technology","","",false
-26,"Sprinter Health","In-home nursing and care ops","sprinterhealth.com","ai|biotech",false
-63,"Standard Bots","Affordable 6-axis robotic arms","standardbots.com","deeptech|ai",false
-209,"Standard Cognition, Corp.","Web search: Standard Cognition Completes $5M Seed Round — SAN FRANCISCO, CA, Standard Cognition, an AI-powered checkout provider, has raised $5 million in seed funding.","","ai",false
-210,"Stonepeak Claremont Holdings LP","Form D industry group: Other Technology","","",false
-258,"Stripe","Payment processing and financial infrastructure for businesses","stripe.com","",false
-158,"TCW EM Local Currency Absolute Return Fund, L.P.","Form D industry group: Pooled Investment Fund","","",false
-159,"TCW Emerging Markets Income Focus Fund, L.P.","Form D industry group: Pooled Investment Fund","","",false
-160,"TCW Securitized Opportunities, L.P.","Form D industry group: Pooled Investment Fund","","",false
-161,"TCW Sepulveda Focused Value Fund, L.P.","Form D industry group: Pooled Investment Fund","","",false
-162,"TCW Sepulveda Long/Short Equity Fund I LP","Form D industry group: Pooled Investment Fund","","",false
-163,"TCW Sepulveda Long/Short Equity Fund II LP","Form D industry group: Pooled Investment Fund","","",false
-211,"TH-0201 Fund I, a series of Roll Up Vehicles, LP","Form D industry group: Pooled Investment Fund","","",false
-212,"TH-0805 Fund II, a series of Roll Up Vehicles, LP","Form D industry group: Pooled Investment Fund","","",false
-90,"Terray Therapeutics","AI small-molecule discovery","terraytx.com","biotech|ai",false
-791,"Unconventional AI","Energy-efficient AI compute using analog circuits and neuroscience","unconv.ai","",false
-136,"Universal Graphene Products, Inc.","Website: universalgrapheneproducts.com — placeholder page, ""Launching Soon"", no product detail. Form D industry group: Other Technology. First filing 2026-08-19, $800K. Corvallis OR (Oregon State University town) — profile consistent with a very early spinout.","universalgrapheneproducts.com","deeptech",false
-213,"VA-0515 Fund I, a series of InvestInData, LP","Form D industry group: Pooled Investment Fund","","",false
-214,"VM-1229 Fund II, a series of Roll Up Vehicles, LP","Form D industry group: Pooled Investment Fund","","",false
-112,"Vannevar Labs","AI intelligence software for national security","vannevarlabs.com","defence_tech|ai",false
-73,"Varda Space Industries","In-space manufacturing and reentry capsules","varda.com","deeptech",false
-137,"Vellora, Inc.","Form D industry group: Other Technology","","",false
-51,"Ventana Micro Systems","RISC-V datacenter CPUs","ventanamicro.com","deeptech|ai",false
-92,"Virtual Incision","Miniaturized surgical robot MIRA","virtualincision.com","biotech|deeptech",false
-93,"XCath","Neurovascular surgical robotics","xcath.com","biotech|deeptech",false
-24,"Xaira Therapeutics","AI-driven drug discovery platform","xaira.com","ai|biotech",false
-138,"Yellowstone Funding LLC","Form D industry group: REITS and Finance","","",false
-215,"iodyne, Inc.","Form D industry group: Other Technology","","",false
+278,"Affirm","Buy now, pay later instalment payments at point of sale","affirm.com","fintech",false
+338,"Aledade","Data and support services for primary care practices and health centers","aledade.com","digital_health",false
+342,"Alpha-9 Oncology","Clinical-stage radiopharmaceuticals for solid and hematologic cancers","a9oncology.com","therapeutics",false
+853,"Altos Labs","Cell rejuvenation research to reverse disease and injury","altoslabs.com","therapeutics",false
+64,"Amp Robotics","AI recycling sorting robots","amprobotics.com","robotics",false
+82,"Ampersand Biomedicines","Addressed biologics platform","ampersandbio.com","biotech_platforms|therapeutics",false
+46,"Anello Photonics","Silicon-photonic optical gyroscope","anellophotonics.com","photonics",false
+74,"Apex Space","Mass-produced satellite bus platforms","apexspace.com","space",false
+1063,"Apron","Invoice and payroll workflow automation for accountants and bookkeepers","getapron.com","fintech",false
+76,"Array Labs","3D radar-imaging satellite constellation","arraylabs.io","space",false
+356,"Arrcus","Hyperscale networking software; ArcOS routing for datacenters and telcos","arrcus.com","networking_connectivity",false
+1029,"Asana","Enterprise work management and project coordination","asana.com","software_platforms",false
+119,"AspenView Technology Partners, Inc.","Form D industry group: Other","","other",false
+19,"Assort Health","Healthcare voice-AI agentic ops","assorthealth.com","ai_software|digital_health",false
+168,"Asterism Books &amp; Distribution Co","Form D industry group: Retailing","","commerce_marketplaces",false
+72,"Atom Computing","Neutral-atom quantum computers","atom-computing.com","quantum",false
+875,"AuthZed","Permissions as a service; SpiceDB, a Zanzibar-inspired authorization system","authzed.com","cybersecurity",false
+880,"Aviatrix","Multi-cloud networking platform","aviatrix.com","networking_connectivity",false
+283,"Axonius","Cyber asset attack surface management and SaaS management","axonius.com","cybersecurity",false
+43,"Ayar Labs","Optical I/O chiplets for AI interconnect","ayarlabs.com","photonics",false
+141,"BAILARD REAL ESTATE INVESTMENT TRUST, INC","Form D industry group: REITS and Finance","","real_estate",false
+218,"BE FUND III, LLC","Form D industry group: Other Real Estate","","real_estate",false
+142,"BE MEZZ FUND, LLC","Form D industry group: Other Real Estate","","real_estate",false
+380,"Berry Health","Online medical consultations and medication delivery","our-berry.io","digital_health",false
+2235,"Bexorg","Whole-brain perfusion platform for CNS drug discovery","bexorg.com","biotech_platforms",false
+169,"Bidbus, Inc.","Form D industry group: Other Technology","","other",false
+1860,"Biobot Analytics","Wastewater epidemiology for public health surveillance","biobot.io","digital_health|medtech_devices",false
+143,"BuyerCaddy, Inc.","Form D industry group: Other","","other",false
+120,"CAPU FUEL ACCESS FUND FIM 100 FUND QC","Form D industry group: Pooled Investment Fund","","investment_funds",false
+121,"CAPU FUEL ACCESS FUND FIM 100 FUND QP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+122,"CRA-ATH ASC, LLC","Form D industry group: Other Real Estate","","real_estate",false
+123,"CSS Solutions LLC","Form D industry group: Other Technology","","other",false
+144,"CSVCAP LTD","Form D industry group: Other Banking and Financial Services","","financial_services",false
+104,"CX2","AI-enabled electronic warfare","cx2.com","defence_systems|defence_software",false
+94,"Cala Health","Wearable neuromodulation therapy","calahealth.com","medtech_devices",false
+917,"Canva","Online visual design platform with templates and assets","canva.com","software_platforms",false
+91,"Capstan Medical","Surgical robot for heart-valve implants","capstanmedical.com","medtech_devices",false
+406,"Cartesia","Streaming text-to-speech API for voice agents","cartesia.ai","ai_models|ai_software",false
+124,"Cascade Alpine LLC","Form D industry group: Other","","other",false
+44,"Celestial AI","Photonic Fabric for AI memory interconnect","celestial.ai","photonics",false
+1881,"Cellanome","Multimodal single-cell analysis combining live imaging and transcriptomics","cellanome.com","biotech_platforms",false
+411,"Chainguard","Hardened open-source container images and libraries against supply-chain attacks","chainguard.dev","cybersecurity",false
+83,"Character Biosciences","AI-driven genetics for AMD therapeutics","character.bio","therapeutics|ai_models",false
+66,"Chef Robotics","Food assembly robots","chefrobotics.ai","robotics",false
+170,"Clearlake Credit Perpetual Feeder Fund A, L.P.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+288,"ClickHouse","Open-source column-oriented OLAP database for analytics","clickhouse.com","software_platforms",false
+422,"Cohere Technologies","Universal Spectrum Multiplier software for 4G and 5G mobile networks","cohere-tech.com","networking_connectivity",false
+171,"Colonial Strategic Income Fund, LLC","Form D industry group: REITS and Finance","","real_estate",false
+145,"Cordillera Environmental Assets Fund, LLC","Form D industry group: Pooled Investment Fund","","investment_funds",false
+146,"Cordillera Investment Fund IV, L.P.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+147,"Cordillera Investment Fund IV-B, L.P.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+88,"Crystalys Therapeutics","Urate-lowering therapeutics","crystalystx.com","therapeutics",false
+172,"DATAH, L.P.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+148,"DREAM U.S. INDUSTRIAL FUND LP","Form D industry group: Pooled Investment Fund","","investment_funds|real_estate",false
+1443,"DataHub","Open-source metadata platform for data governance and AI","datahub.com","ai_software",false
+1125,"DeepL","Language AI for translation of text, documents and voice","deepl.com","ai_software",false
+174,"Delphi Interactive Inc","Form D industry group: Other Technology","","other",false
+175,"Diamond Art Club Investment, LLC","Form D industry group: Pooled Investment Fund","","investment_funds",false
+176,"Diffusion V2, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+177,"Discipulus Fund II Aggregator, LLC","Form D industry group: Pooled Investment Fund","","investment_funds",false
+1129,"Discord","Voice and text chat for gaming and online communities","discord.com","software_platforms",false
+178,"Dream SPV Atomic LLC","Form D industry group: Pooled Investment Fund","","investment_funds",false
+45,"DreamBig Semiconductor","Chiplet platform and SmartNIC-DPU","dreambigsemi.com","semiconductors",false
+1460,"DroneDeploy","Reality capture with aerial drones and ground robots for construction sites","dronedeploy.com","robotics",false
+49,"Eliyan","Chiplet interconnect PHY","eliyan.com","semiconductors",false
+219,"Ember LifeSciences, Inc.","Website: Ember LifeSciences | Advanced temperature management for healthcare products — Ember LifeSciences is revolutionizing the cold chain with the Ember Cube, providing sustainable cold chain solutions for drug delivery. Our cloud-based, self-refrigerated shipping technology ensures the integrity and efficacy of life-saving medicines while reducing waste.","emberlifesciences.com","logistics_supply_chain|healthcare_services",false
+36,"EnCharge AI","Analog in-memory AI accelerators for edge","enchargeai.com","semiconductors",false
+1917,"Enlitic","AI standardization and anonymization of medical imaging data","enlitic.com","digital_health|ai_software",false
+102,"Epirus","High-power microwave counter-UAS Leonidas","epirusinc.com","defence_systems",false
+220,"Etched SPV, LLC","Form D industry group: Pooled Investment Fund","","investment_funds",false
+469,"EvenUp","AI document drafting and case workflow for personal injury law firms","evenuplaw.com","ai_software",false
+23,"EvolutionaryScale","Protein-design foundation models (ESM3)","evolutionaryscale.ai","ai_models|biotech_platforms",false
+180,"ExchangeRight Essential Income 13 DST","Form D industry group: Commercial","","real_estate",false
+125,"FP VIII Amethyst Co-Invest, L.P.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+1144,"Factual","Location data platform; merged with Foursquare in 2020","factual.com","software_platforms",false
+293,"Faire","Wholesale marketplace connecting retailers with brands","faire.com","commerce_marketplaces",false
+481,"Farther","Technology-led wealth management and financial planning","farther.com","fintech",false
+1477,"Fieldguide","AI advisory and audit automation software","fieldguide.io","ai_software",false
+232,"Figma","Collaborative interface design and prototyping","figma.com","software_platforms",false
+181,"Fund II, a series of Mishpacha Fund, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+126,"GC&amp;H INVESTMENTS, LLC","Form D industry group: Pooled Investment Fund","","investment_funds",false
+182,"HA-0806 Fund I, a series of Platform Funds 2026, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+149,"HCM-SOF II, LLC","Form D industry group: Pooled Investment Fund","","investment_funds",false
+183,"HI-0701 Fund II, a series of SaxeCap, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+184,"HI-1126 Fund II, a series of AX-RN-Funds, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+185,"HOPE Ventures I, LLC","Form D industry group: Pooled Investment Fund","","investment_funds",false
+186,"HU-0707 Fund II, a series of DVC, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+150,"Hopkins Bannock LLC","Form D industry group: Commercial","","real_estate",false
+151,"Hopkins Capital Fund, L.L.C.","Form D industry group: Other Real Estate","","real_estate",false
+152,"Hopkins Weaver Springs, LLC","Form D industry group: Other Real Estate","","real_estate",false
+187,"IN-06091 Fund I, a series of Roll Up Vehicles, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+188,"IWF MDR Hotel II, LLC","Form D industry group: Commercial","","real_estate",false
+84,"Iambic Therapeutics","Generative-AI drug discovery","iambic.ai","therapeutics|ai_models",false
+75,"K2 Space","Mega-class satellite buses","k2space.com","space",false
+189,"KIMAMI, INC","Form D industry group: Manufacturing","","other",false
+153,"KKR Global Credit Opportunities Feeder II L.P.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+154,"KKR Global Credit Opportunities Fund (Overseas) L.P.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+155,"KKR Global Credit Opportunities Fund L.P.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+221,"KR Investment Partners IV, LLC","Form D industry group: Pooled Investment Fund","","investment_funds",false
+222,"Kamal Ravikant Capital, LP - F3","Form D industry group: Pooled Investment Fund","","investment_funds",false
+190,"Karl-LU-0714 Fund I, a series of Platform Funds 2026, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+191,"Kera Ventures IX, LLC","Form D industry group: Pooled Investment Fund","","investment_funds",false
+192,"LGF I - Allocate Access, L.P.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+127,"LIONHEART LUCID SPV I, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+193,"Lake Como Funding Issuer, L.P.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+194,"Latitude Health, Inc.","Form D industry group: Other Technology","","digital_health|ai_software",false
+223,"M1 Loan Fund, LLC","Form D industry group: Other Real Estate","","real_estate",false
+195,"MA-0622 Fund I, a series of Sajid Rahman Angel Funds, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+196,"METABODY AI INC.","Form D industry group: Other Technology","","other",false
+197,"MVP Ventures III AI LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+198,"MVP Ventures III QP LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+107,"Mach Industries","Vertically integrated defence manufacturing","machindustries.com","defence_systems|advanced_manufacturing",false
+81,"Marea Therapeutics","Cardiometabolic therapeutics","mareatx.com","therapeutics",false
+199,"Matt-WI-0615 Fund I, a series of Platform Funds 2026, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+224,"NZS Global Growth Fund LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+86,"Neomorph","Molecular-glue degraders","neomorph.com","therapeutics",false
+616,"Nominal","AI finance and accounting; multi-entity consolidation and month-end close","nominal.so","fintech",false
+128,"Noria Energy, Inc.","Website: New Website - Aug 2026 - Noria Energy — Noria Energy is one of the nation&#039;s leading floating solar developers. We help customers achieve their energy goals through rooftop, ground mount and floating solar.","noriaenergy.com","materials_energy",false
+200,"OBSIDIAN PRIME INC","Form D industry group: Other Technology","","other",false
+201,"OM-0715 Fund I, a series of LMNT Ventures I, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+225,"Ocean Park Ventures VI, LLC","Form D industry group: Commercial","","real_estate",false
+226,"One Fin Capital LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+311,"Orca Bio","Clinical-stage allogeneic cell therapy for blood and immune disease","orcabio.com","therapeutics",false
+105,"Overland AI","Off-road ground autonomy stack","overland.ai","defence_software|robotics",false
+129,"PACIFIC TOXICOLOGY LABORATORIES","Form D industry group: Other Health Care","","medtech_devices",false
+227,"PFD MANAGEMENT FUND 1006, LLC","Form D industry group: Other Banking and Financial Services","","investment_funds|financial_services",false
+156,"PFD MANAGEMENT FUND 1008, LLC","Form D industry group: Other Banking and Financial Services","","investment_funds|financial_services",false
+228,"PFD Management Opportunity Fund 3001, LLC","Form D industry group: Other Banking and Financial Services","","investment_funds|financial_services",false
+202,"PL-0529 Fund II, a series of Roll Up Vehicles, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+203,"Pathway Private Equity Fund III-Co, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+110,"Picogrid","Universal integration layer for defence C2","picogrid.com","defence_software",false
+54,"Point2 Technology","RF interconnect for AI datacenters","point2tech.com","semiconductors",false
+130,"Pontiac Street Industrial, LLC","Form D industry group: Commercial","","real_estate",false
+39,"Positron AI","Transformer inference accelerators","positron.ai","semiconductors",false
+131,"Powerlaw Corp.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+132,"ProjectButterfly2, PBC","Form D industry group: Other Banking and Financial Services","","financial_services",false
+157,"Prospect Title Insurance Agency, LLC","Form D industry group: Insurance","","financial_services",false
+204,"RE-0611 Fund I, a series of Jolt VC, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+687,"Ramp","Corporate cards and spend management for finance teams","ramp.com","fintech",false
+205,"Rapidflare, Inc.","Form D industry group: Other Technology","","other",false
+87,"RayThera","Small-molecule immunology","raythera.com","therapeutics",false
+206,"Relational Capital I, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+53,"Retym","DSP for AI datacenter connectivity","retym.com","semiconductors",false
+50,"Rivos","RISC-V server silicon","rivosinc.com","semiconductors",false
+207,"Robbins Capital I, L.P.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+208,"S26, a series of Latitude Fund, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+133,"SSFGP27 LLC","Form D industry group: Other Real Estate","","real_estate",false
+712,"Saronic","Autonomous surface vessels for defence maritime operations","saronic.com","defence_systems|robotics",false
+79,"Science Corporation","Neural interfaces and biostack","science.xyz","medtech_devices|biotech_platforms",false
+134,"Sentinel KES Fund, LP","Form D industry group: Other Real Estate","","real_estate",false
+89,"Sidewinder Therapeutics","Bispecific antibody-drug conjugates","","therapeutics",false
+135,"Spectrum Effect, Inc.","Form D industry group: Other Technology","","other",false
+26,"Sprinter Health","In-home nursing and care ops","sprinterhealth.com","digital_health",false
+63,"Standard Bots","Affordable 6-axis robotic arms","standardbots.com","robotics",false
+209,"Standard Cognition, Corp.","Web search: Standard Cognition Completes $5M Seed Round — SAN FRANCISCO, CA, Standard Cognition, an AI-powered checkout provider, has raised $5 million in seed funding.","","ai_software",false
+210,"Stonepeak Claremont Holdings LP","Form D industry group: Other Technology","","other",false
+258,"Stripe","Payment processing and financial infrastructure for businesses","stripe.com","fintech",false
+158,"TCW EM Local Currency Absolute Return Fund, L.P.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+159,"TCW Emerging Markets Income Focus Fund, L.P.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+160,"TCW Securitized Opportunities, L.P.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+161,"TCW Sepulveda Focused Value Fund, L.P.","Form D industry group: Pooled Investment Fund","","investment_funds",false
+162,"TCW Sepulveda Long/Short Equity Fund I LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+163,"TCW Sepulveda Long/Short Equity Fund II LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+211,"TH-0201 Fund I, a series of Roll Up Vehicles, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+212,"TH-0805 Fund II, a series of Roll Up Vehicles, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+90,"Terray Therapeutics","AI small-molecule discovery","terraytx.com","therapeutics|ai_models",false
+791,"Unconventional AI","Energy-efficient AI compute using analog circuits and neuroscience","unconv.ai","semiconductors",false
+136,"Universal Graphene Products, Inc.","Website: universalgrapheneproducts.com — placeholder page, ""Launching Soon"", no product detail. Form D industry group: Other Technology. First filing 2026-08-19, $800K. Corvallis OR (Oregon State University town) — profile consistent with a very early spinout.","universalgrapheneproducts.com","other",false
+213,"VA-0515 Fund I, a series of InvestInData, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+214,"VM-1229 Fund II, a series of Roll Up Vehicles, LP","Form D industry group: Pooled Investment Fund","","investment_funds",false
+112,"Vannevar Labs","AI intelligence software for national security","vannevarlabs.com","defence_software",false
+73,"Varda Space Industries","In-space manufacturing and reentry capsules","varda.com","space",false
+137,"Vellora, Inc.","Form D industry group: Other Technology","","other",false
+51,"Ventana Micro Systems","RISC-V datacenter CPUs","ventanamicro.com","semiconductors",false
+92,"Virtual Incision","Miniaturized surgical robot MIRA","virtualincision.com","medtech_devices",false
+93,"XCath","Neurovascular surgical robotics","xcath.com","medtech_devices",false
+24,"Xaira Therapeutics","AI-driven drug discovery platform","xaira.com","therapeutics|ai_models",false
+138,"Yellowstone Funding LLC","Form D industry group: REITS and Finance","","real_estate",false
+215,"iodyne, Inc.","Form D industry group: Other Technology","","other",false

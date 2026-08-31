@@ -18,54 +18,65 @@
  * carries the secondary reading.
  */
 
+/** `short` is the tag a reader scans; `label` is the definition a classifier reads. */
 export const BROAD_SECTOR_DEFS = [
   {
     id: 'ai',
+    short: 'AI',
     label: 'AI products and infrastructure',
     includes: 'AI product companies, model labs, AI application software and AI compute infrastructure',
   },
   {
     id: 'compute',
+    short: 'Compute',
     label: 'Advanced compute and enabling hardware',
     includes: 'semiconductors, photonics and quantum systems',
   },
   {
     id: 'industrial',
+    short: 'Industrial',
     label: 'Industrial and physical systems',
     includes: 'robotics, advanced manufacturing, materials, batteries and energy systems',
   },
   {
     id: 'aerospace',
+    short: 'Aerospace',
     label: 'Aerospace and space',
     includes: 'space systems, launch, satellites and related infrastructure',
   },
   {
     id: 'defence',
+    short: 'Defence',
     label: 'Defence and national security',
     includes: 'defence hardware, autonomous defence systems and national-security software',
   },
   {
     id: 'health',
+    short: 'Health',
     label: 'Life sciences and health',
     includes: 'therapeutics, biotech tools, medical devices, digital health and care services',
   },
   {
     id: 'digital',
+    short: 'Digital',
     label: 'Digital infrastructure and software',
     includes: 'general software platforms, cybersecurity and networking/connectivity',
   },
   {
     id: 'commerce',
+    short: 'Commerce',
     label: 'Commerce and logistics',
     includes: 'marketplaces, distribution, commerce enablement and supply-chain operations',
   },
   {
     id: 'finance',
+    short: 'Finance',
     label: 'Finance and real assets',
     includes: 'fintech, financial services, investment funds and real estate vehicles',
   },
   {
     id: 'other',
+    short: 'Other',
     label: 'Other',
     includes: 'companies that do not fit the defined broad sectors',
   },
@@ -77,6 +88,8 @@ export type SectorDef = {
   id: string;
   broad: BroadSectorId;
   label: string;
+  /** One or two words. What goes on a tag, where the full label will not fit. */
+  short: string;
   /** What a company here would need from Singapore. */
   needs: string;
   /** Named so a classifier and a reader draw the same line. */
@@ -88,6 +101,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   // ---- compute and semiconductors ------------------------------------------
   {
     id: 'semiconductors',
+    short: 'Semiconductors',
     broad: 'compute',
     label: 'Semiconductors and chip design',
     needs: 'fab access, packaging capacity, IP protection, process engineers',
@@ -96,6 +110,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'photonics',
+    short: 'Photonics',
     broad: 'compute',
     label: 'Photonics and optical interconnect',
     needs: 'advanced packaging, optics fabrication, precision assembly',
@@ -103,6 +118,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'quantum',
+    short: 'Quantum',
     broad: 'compute',
     label: 'Quantum computing and sensing',
     needs: 'research partners, national programme demand, specialist talent',
@@ -110,6 +126,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'ai_infrastructure',
+    short: 'AI compute',
     broad: 'ai',
     label: 'AI compute infrastructure',
     needs: 'power, land, grid connection, data-centre siting, cooling',
@@ -118,6 +135,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'ai_models',
+    short: 'Models',
     broad: 'ai',
     label: 'Foundation models and research labs',
     needs: 'compute, research talent, data agreements, government relationships',
@@ -125,6 +143,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'ai_software',
+    short: 'AI software',
     broad: 'ai',
     label: 'AI applications and developer tools',
     needs: 'office space, sales and support staff, enterprise reference customers',
@@ -135,6 +154,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   // ---- robotics and physical systems ---------------------------------------
   {
     id: 'robotics',
+    short: 'Robotics',
     broad: 'industrial',
     label: 'Robotics and autonomous systems',
     needs: 'manufacturing space, field trial sites, systems and controls engineers',
@@ -143,6 +163,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'space',
+    short: 'Space',
     broad: 'aerospace',
     label: 'Space systems',
     needs: 'launch access, ground stations, spectrum, export-control clearance',
@@ -150,6 +171,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'advanced_manufacturing',
+    short: 'Manufacturing',
     broad: 'industrial',
     label: 'Advanced manufacturing and industrial technology',
     needs: 'industrial land, plant capacity, skilled production workforce',
@@ -157,6 +179,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'materials_energy',
+    short: 'Materials',
     broad: 'industrial',
     label: 'Advanced materials, batteries and energy',
     needs: 'pilot plant, industrial land, utilities, offtake agreements',
@@ -166,6 +189,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   // ---- defence -------------------------------------------------------------
   {
     id: 'defence_systems',
+    short: 'Defence systems',
     broad: 'defence',
     label: 'Defence systems and hardware',
     needs: 'export-control clearance, government customer, secure facilities',
@@ -174,6 +198,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'defence_software',
+    short: 'Defence software',
     broad: 'defence',
     label: 'Defence and national-security software',
     needs: 'security clearance, government relationships, secure hosting',
@@ -183,6 +208,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   // ---- life sciences -------------------------------------------------------
   {
     id: 'therapeutics',
+    short: 'Therapeutics',
     broad: 'health',
     label: 'Therapeutics and drug development',
     needs: 'clinical trial sites, regulatory pathway, manufacturing capacity, research partners',
@@ -190,6 +216,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'biotech_platforms',
+    short: 'Biotech tools',
     broad: 'health',
     label: 'Biotech platforms and tools',
     needs: 'lab space, research partners, instrument manufacturing',
@@ -198,6 +225,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'medtech_devices',
+    short: 'Medical devices',
     broad: 'health',
     label: 'Medical devices and diagnostics',
     needs: 'regulatory approval, clinical partners, device manufacturing',
@@ -205,6 +233,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'digital_health',
+    short: 'Digital health',
     broad: 'health',
     label: 'Digital health and care delivery',
     needs: 'health system partners, clinical data agreements, local operations',
@@ -215,6 +244,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   // ---- other ---------------------------------------------------------------
   {
     id: 'fintech',
+    short: 'Fintech',
     broad: 'finance',
     label: 'Financial technology',
     needs: 'regulatory licensing, banking partners, local entity',
@@ -222,6 +252,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'software_platforms',
+    short: 'Software',
     broad: 'digital',
     label: 'General software platforms',
     needs: 'office space, engineering talent, sales and support staff',
@@ -230,6 +261,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'cybersecurity',
+    short: 'Cybersecurity',
     broad: 'digital',
     label: 'Cybersecurity and trust infrastructure',
     needs: 'security talent, enterprise reference customers, regulated-sector buyers',
@@ -237,6 +269,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'networking_connectivity',
+    short: 'Networking',
     broad: 'digital',
     label: 'Networking and connectivity',
     needs: 'datacentre and telco partners, enterprise buyers, systems engineers',
@@ -244,6 +277,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'commerce_marketplaces',
+    short: 'Marketplaces',
     broad: 'commerce',
     label: 'Commerce, marketplaces and distribution',
     needs: 'merchant networks, regional operations, logistics partners',
@@ -251,6 +285,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'logistics_supply_chain',
+    short: 'Logistics',
     broad: 'commerce',
     label: 'Logistics and supply chain',
     needs: 'operations sites, carrier partners, regulated logistics approvals',
@@ -258,6 +293,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'healthcare_services',
+    short: 'Care services',
     broad: 'health',
     label: 'Healthcare services',
     needs: 'clinical partnerships, healthcare licensing, local operations',
@@ -266,6 +302,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'financial_services',
+    short: 'Financial services',
     broad: 'finance',
     label: 'Financial and insurance services',
     needs: 'regulatory licensing, local entity, banking and insurance partners',
@@ -274,6 +311,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'investment_funds',
+    short: 'Funds',
     broad: 'finance',
     label: 'Investment funds and holding vehicles',
     needs: 'fund registration, LP relationships, financial regulatory review',
@@ -281,6 +319,7 @@ export const SECTOR_DEFS: SectorDef[] = [
   },
   {
     id: 'real_estate',
+    short: 'Real estate',
     broad: 'finance',
     label: 'Real estate and property vehicles',
     needs: 'land, property approvals, local partners, financing',
@@ -296,6 +335,10 @@ const BROAD_BY_ID = new Map(BROAD_SECTOR_DEFS.map((s) => [s.id, s]));
 const BY_ID = new Map(SECTOR_DEFS.map((s) => [s.id, s]));
 export const broadSectorLabel = (id: string) => BROAD_BY_ID.get(id as BroadSectorId)?.label ?? id;
 export const sectorLabel = (id: string) => BY_ID.get(id)?.label ?? id;
+
+/** The tag form: one or two words. Falls back to the id read as words. */
+export const sectorShort = (id: string) =>
+  BY_ID.get(id)?.short ?? BROAD_BY_ID.get(id as BroadSectorId)?.short ?? id.replace(/_/g, ' ');
 export const isSector = (id: string) => BY_ID.has(id);
 export const isBroadSector = (id: string): id is BroadSectorId => BROAD_BY_ID.has(id as BroadSectorId);
 export const sectorBroadSector = (id: string): BroadSectorId | undefined => BY_ID.get(id)?.broad;
