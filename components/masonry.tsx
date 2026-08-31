@@ -30,9 +30,9 @@ const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : us
  * back from roughly 300px a card plus the gaps.
  */
 function columnsForWidth(width: number): number {
-  if (width >= 1240) return 4;
-  if (width >= 940) return 3;
-  if (width >= 620) return 2;
+  if (width >= 1320) return 4;
+  if (width >= 1000) return 3;
+  if (width >= 660) return 2;
   return 1;
 }
 
@@ -107,7 +107,7 @@ export function Masonry({ children, className }: { children: ReactNode; classNam
   if (cols < 2 || !order) {
     return (
       <div ref={hostRef} className={className}>
-        <div ref={measureRef} className="flex flex-col gap-5">
+        <div ref={measureRef} className="flex flex-col gap-8">
           {items}
         </div>
       </div>
@@ -116,9 +116,9 @@ export function Masonry({ children, className }: { children: ReactNode; classNam
 
   return (
     <div ref={hostRef} className={className}>
-      <div className="flex gap-5">
+      <div className="flex gap-8">
         {order.map((column, c) => (
-          <div key={c} className="flex min-w-0 flex-1 flex-col gap-5">
+          <div key={c} className="flex min-w-0 flex-1 flex-col gap-8">
             {column.map((i) => items[i])}
           </div>
         ))}
