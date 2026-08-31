@@ -304,6 +304,47 @@ export function hiringItemIsMaterial(h: HiringPattern): boolean {
   return false;
 }
 
+/**
+ * Is the hiring itself the news, rather than evidence supporting other news.
+ *
+ * Most hiring corroborates: "you are hiring nine people in Singapore" tells a
+ * founder we have been reading their job board and says nothing they do not
+ * know, so it belongs in why-now behind a real headline. But some hiring IS the
+ * event, and burying it behind a weaker story loses the strongest thing that
+ * happened that week.
+ *
+ * Three cases qualify, each one a fact a person would actually open with:
+ *
+ *   - A named senior regional role. "You are hiring a Head of APAC" names the
+ *     decision-maker and the intent in one sentence.
+ *   - A first Singapore role at a company with no entity here. The first hire
+ *     in a market is a decision; the tenth is a trend.
+ *   - Aggressive APAC growth, meaning §5.5's volume trigger — 25% week on week
+ *     AND at least five new roles on a base of at least twenty. The floors are
+ *     what stop a small team's ordinary churn reading as a ramp; three roles
+ *     becoming four is 33% and means nothing.
+ *
+ * A bare count never qualifies however large. Anduril's 67 open APAC roles are
+ * a standing fact about a big company, not something that happened this week.
+ */
+export function hiringIsTheNews(
+  h: HiringPattern,
+  ctx: { volumeTriggerFired: boolean; hasSgEntity: boolean },
+): boolean {
+  // A senior role owning Singapore or APAC. The region matters: a Global Head
+  // of Sales sitting in San Francisco is an org chart, where a Head of APJ in
+  // Singapore is a decision about this region.
+  const REGIONAL = /singapore|apac|apj|asia|japan|korea|taiwan|australia|anz|india|sea\b/i;
+  if (h.execHires.some((e) => REGIONAL.test(`${e.region ?? ''} ${e.location ?? ''} ${e.title}`))) {
+    return true;
+  }
+  if (ctx.hasSgEntity === false && h.singaporeCount >= 1) return true;
+  // Aggressive APAC growth, on §5.5's definition and only when the growth is
+  // actually in APAC — a US hiring ramp is not a regional expansion signal.
+  if (ctx.volumeTriggerFired && h.apac >= 3) return true;
+  return false;
+}
+
 /** The digest-candidate headline. One line, specific, no invented numbers. */
 export function buildHiringTitle(company: string, h: HiringPattern): string {
   // An executive hire leads, because it names who will own the decision.
