@@ -14,6 +14,7 @@ import { eq } from 'drizzle-orm';
 import { getDb, withRetry } from '../lib/db';
 import { items, runs, sourceHealth } from '../lib/schema';
 import { CONTEXT_SOURCES, fetchFeed } from '../lib/news-sources';
+import { NEWSLETTERS, fetchNewsletter } from '../lib/newsletters';
 import { canonicalizeUrl, splitGoogleTitle } from '../lib/news-ingest';
 
 const arg = (n: string, d?: string) => {
@@ -30,8 +31,54 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   const [run] = await db.insert(runs).values({ stage: 'ingest_context' }).returning();
   const counts: Record<string, number> = {
-    sources: 0, source_errors: 0, fetched: 0, inserted: 0, duplicates: 0, unusable: 0,
+    sources: 0, source_errors: 0, stale_sources: 0,
+    fetched: 0, inserted: 0, duplicates: 0, unusable: 0,
   };
+
+  /**
+   * Newsletters are read alongside the feeds, into the same table.
+   *
+   * A newsletter's landing page is a list of other people's articles, so each
+   * story is stored with the PUBLISHER's url — the source credited is whoever
+   * wrote it, and the newsletter is only how we came to see it. That also means
+   * a story we already have from its own feed dedupes against it rather than
+   * arriving twice.
+   */
+  const newsletterRows: any[] = [];
+  for (const nl of NEWSLETTERS) {
+    if (only && nl.id !== only) continue;
+    if (!nl.enabled) {
+      await markHealth(db, nl.id, 'newsletter', 0, nl.note ?? 'disabled');
+      continue;
+    }
+    const { stories, error } = await fetchNewsletter(nl);
+    counts.sources++;
+    if (error && !stories.length) counts.source_errors++;
+    console.log(`  ${nl.name}: ${stories.length} stories${error ? ` (${error})` : ''}`);
+    await markHealth(db, nl.id, 'newsletter', stories.length, error ?? undefined);
+
+    for (const st of stories) {
+      const canonical = canonicalizeUrl(st.url ?? '');
+      if (!canonical || !st.title.trim()) { counts.unusable++; continue; }
+      newsletterRows.push({
+        url: st.url!,
+        canonicalUrl: canonical,
+        title: st.title,
+        snippet: null,
+        // The publisher, read off the link, not the newsletter that carried it.
+        source: hostOf(st.url!) ?? nl.name,
+        sourceType: 'context',
+        publishedAt: null,
+        companyId: null,
+        contextKind: 'trade',
+        sectors: nl.sectors.length ? nl.sectors : null,
+        status: 'fetched',
+        runId: run.id,
+      });
+    }
+  }
+  counts.fetched += newsletterRows.length;
+  if (!dry && newsletterRows.length) await insertItems(db, newsletterRows, counts);
 
   try {
     for (const src of CONTEXT_SOURCES) {
@@ -70,22 +117,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
       }
       counts.fetched += rows.length;
 
-      if (!dry && rows.length) {
-        const seen = new Set<string>();
-        const unique = rows.filter((r) => {
-          if (seen.has(r.canonicalUrl)) return false;
-          seen.add(r.canonicalUrl); return true;
-        });
-        let insertedHere = 0;
-        for (let i = 0; i < unique.length; i += 200) {
-          const ins = await withRetry(() => db.insert(items).values(unique.slice(i, i + 200))
-            .onConflictDoNothing({ target: items.canonicalUrl })
-            .returning({ id: items.id }));
-          insertedHere += ins.length;
-        }
-        counts.inserted += insertedHere;
-        counts.duplicates += rows.length - insertedHere;
-      }
+      if (!dry && rows.length) await insertItems(db, rows, counts);
 
       await markHealth(db, src.id, src.kind, feed.length, error);
       await sleep(1200);
@@ -103,20 +135,64 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 })();
 
 /** A source returning zero is a health event, not a silent skip. */
+/** Insert a batch, deduped on canonical url within the batch and against the table. */
+async function insertItems(db: any, rows: any[], counts: Record<string, number>) {
+  const seen = new Set<string>();
+  const unique = rows.filter((r) => {
+    if (seen.has(r.canonicalUrl)) return false;
+    seen.add(r.canonicalUrl); return true;
+  });
+  let insertedHere = 0;
+  for (let i = 0; i < unique.length; i += 200) {
+    const ins: any[] = await withRetry(() => db.insert(items).values(unique.slice(i, i + 200))
+      .onConflictDoNothing({ target: items.canonicalUrl })
+      .returning({ id: items.id }));
+    insertedHere += ins.length;
+  }
+  counts.inserted += insertedHere;
+  counts.duplicates += rows.length - insertedHere;
+}
+
+/** The publisher, read off the link. */
+function hostOf(url: string): string | null {
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return null; }
+}
+
+/**
+ * How long a feed may go without publishing before it is treated as abandoned.
+ *
+ * A dead feed does not 404. StrictlyVC has served a valid 200 with fifty items
+ * since April 2020, and SemiAnalysis since September 2025 — a check that reads
+ * only the status code passes both of them forever, and the pipeline quietly
+ * ingests six-year-old news as though it were this week's.
+ */
+const STALE_DAYS = 30;
+
 async function markHealth(
   db: ReturnType<typeof getDb>,
   source: string, kind: string, count: number, error: string | null | undefined,
+  newest?: Date | null,
 ) {
   const now = new Date();
-  const status = error ? 'down' : count === 0 ? 'zero_volume' : 'ok';
+  const ageDays = newest ? Math.floor((now.getTime() - newest.getTime()) / 86400_000) : null;
+  const stale = ageDays !== null && ageDays > STALE_DAYS;
+  const status = error ? 'down'
+    : count === 0 ? 'zero_volume'
+    : stale ? 'stale'
+    : 'ok';
+  if (stale) {
+    console.warn(`  ${source}: STALE — newest item is ${ageDays} days old, not ingesting`);
+  }
   await withRetry(() => db.insert(sourceHealth).values({
     source, sourceType: `context:${kind}`, lastRunAt: now,
     lastSuccessAt: error ? undefined : now,
-    lastCount: count, status, note: error ?? null,
+    lastCount: count, status,
+    note: error ?? (stale ? `newest item is ${ageDays} days old` : null),
   }).onConflictDoUpdate({
     target: sourceHealth.source,
     set: {
-      lastRunAt: now, lastCount: count, status, note: error ?? null,
+      lastRunAt: now, lastCount: count, status,
+      note: error ?? (stale ? `newest item is ${ageDays} days old` : null),
       sourceType: `context:${kind}`,
       ...(error ? {} : { lastSuccessAt: now }),
     },
