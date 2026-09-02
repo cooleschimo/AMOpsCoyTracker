@@ -11,7 +11,7 @@
  *     (target_priority, singapore_fit) and on account status: a company EDB
  *     already holds as an account does not belong in a discovery list.
  *     'in_conversation' stays in, since active discussions still need
- *     surfacing, while 'existing_account' and 'not_pursuing' drop out.
+ *     surfacing, while 'known' and 'not_known' drop out.
  *
  *   Trending — activity-centred. "What just happened that we could build on?"
  *     Still a company, selected on its activity rather than its profile: ranks
@@ -25,7 +25,8 @@
  * the scoped exception: momentum never lifts a company into discovery.
  */
 import type { Band } from './company-rubric';
-import { ENGAGED, type AccountStatus } from './accounts';
+import { ENGAGED, type Familiarity } from './familiarity';
+import { parseFundraise } from './fundraise';
 
 /**
  * Discovery splits in two by whether the company is actionable now. Both are
@@ -97,10 +98,105 @@ export function detailFor(indexInSection: number): Detail {
  */
 export const SECTION_CAPS: Partial<Record<Section, number>> = {
   worth_a_conversation: 25,
-  new_on_the_radar: 15,
+  new_on_the_radar: 25,
   account_activity: 15,
   exploration: 1,
 };
+
+/**
+ * Early-stage discovery: the companies an RD would not already be tracking.
+ *
+ * The main threshold asks for a siting decision, which favours companies large
+ * enough to be making one — so the section fills with names an RD already
+ * knows and is already scheduling calls with. Seeing them is useful, because it
+ * confirms the judgment, but it is not discovery.
+ *
+ * This section asks less: a real event at a company small enough that its
+ * fundraise is itself the news. Series A and B are the core. Seed is admitted
+ * only with genuine traction, because a seed round is a plan rather than a
+ * business. Series C is admitted only when the company has not broken through
+ * despite the money — measured first by the RD's own marking of whether they
+ * know it, and falling back to valuation, since a company past a few billion is
+ * not a discovery whatever its round is called.
+ *
+ * Round and valuation come from THIS WEEK'S HEADLINE first and the stored
+ * fields second. Only 55% of scored companies carry a valuation and 70% a
+ * round, so a rule reading the stored fields alone is guessing for a third of
+ * them — and the guess falls the permissive way, admitting companies it cannot
+ * size. The headline usually states both outright, and it is also more current:
+ * the item is this week's evidence where the stored field is whenever someone
+ * last looked. When neither source knows the round, the company is not placed
+ * here — not knowing is not the same as qualifying.
+ */
+export const EARLY_STAGE = {
+  /** Rounds that qualify outright. */
+  core: ['series_a', 'series_b', 'series_a_ext', 'series_b_ext'],
+  /** Admitted on evidence rather than by right. */
+  conditional: ['seed', 'launch', 'series_c', 'series_c_ext'],
+  /** Past this, a company is known whatever its round is called. */
+  maxValuationUsd: 5e9,
+  /**
+   * And past this in a single round. Most headlines name an amount without
+   * naming the series — "Reframe Systems raises $40M" — so the amount decides
+   * when the label is missing, which is most of the time. A round at or under
+   * this is an early-stage company by any reading; above it, the company is
+   * established enough to be raising growth money.
+   */
+  maxRoundUsd: 150e6,
+  /** A seed round needs this many outlets before it counts as traction. */
+  seedMinOutlets: 3,
+  /** Something real happened, even if it is not a siting decision. */
+  minTopAxis: 2,
+} as const;
+
+const LATE_ROUNDS = [
+  'series_d', 'series_e', 'series_f', 'series_g', 'series_h',
+  'series_d_ext', 'series_e_ext', 'series_f_ext',
+  'growth', 'late', 'ipo', 'strategic', 'multiple',
+] as const;
+
+/**
+ * An early-stage find: small enough that an RD would not already know the name.
+ *
+ * Size is read from whatever the evidence actually carries, in order of how
+ * much it settles. A valuation is decisive. A named round is nearly so. An
+ * amount without a series is the common case — most headlines write "$40M"
+ * without writing "Series B" — and it is enough on its own, because nobody
+ * raising forty million is a household name.
+ *
+ * A company none of those describe is NOT early stage by default. Absence of
+ * evidence about size is not evidence of smallness, and the alternative reading
+ * fills this section with large firms whose rounds simply were not reported.
+ */
+export function isEarlyStageFind(it: PlacementInput): boolean {
+  if (it.companyId === null) return false;
+  if (it.familiarity && NOT_DISCOVERABLE.includes(it.familiarity)) return false;
+  if (Math.max(it.expansion, it.partnership) < EARLY_STAGE.minTopAxis) return false;
+  // Someone has said they know this company, which settles it whatever the
+  // numbers say.
+  if (it.familiarity === 'known') return false;
+
+  const news = it.title ? parseFundraise(it.title, it.snippet ?? null) : null;
+  const valuation = news?.valuationUsd ?? it.valuationUsd ?? null;
+  if (valuation !== null) return valuation <= EARLY_STAGE.maxValuationUsd;
+
+  const stage = (news?.round ?? it.roundStage ?? '').toLowerCase();
+  if (LATE_ROUNDS.includes(stage as never)) return false;
+  if (EARLY_STAGE.core.includes(stage as never)) return true;
+  if (stage === 'seed' || stage === 'launch') {
+    // A seed round is a plan rather than a business, so it needs the market to
+    // have noticed before it is worth an RD's attention.
+    return it.clusterSize >= EARLY_STAGE.seedMinOutlets;
+  }
+  if (stage === 'series_c' || stage === 'series_c_ext') return true;
+
+  // No round named. The amount raised says as much, and is far more often
+  // present: a company raising at or under the cap is early stage.
+  const amount = news?.amountUsd ?? (it.roundAmountMusd ? it.roundAmountMusd * 1e6 : null);
+  if (amount !== null) return amount <= EARLY_STAGE.maxRoundUsd;
+
+  return false;
+}
 
 export type PlacementInput = {
   itemId: number;
@@ -116,10 +212,22 @@ export type PlacementInput = {
   sourceType: string;
   targetPriority: Band | null;
   singaporeFit: Band | null;
-  accountStatus: AccountStatus | null;
+  familiarity: Familiarity | null;
   publishedAt: Date | null;
   /** How many outlets carried this story — corroboration, and a momentum input. */
   clusterSize: number;
+  /** Round label, for the early-stage section. Read from the news when stated. */
+  roundStage?: string | null;
+  /** Latest valuation in USD, the fallback for "already well known". */
+  valuationUsd?: number | null;
+  /** Latest round size in USD millions — the size signal most often present. */
+  roundAmountMusd?: number | null;
+  /** Where the company is. Singapore companies are not targets for inbound FDI. */
+  hqCountry?: string | null;
+  hqCity?: string | null;
+  /** The headline, so a round or valuation it states beats a stale stored one. */
+  title?: string | null;
+  snippet?: string | null;
 };
 
 export type Placed = PlacementInput & { section: Section; rank: number };
@@ -129,34 +237,55 @@ const priorityScore = (b: Band | null) => (b ? PRIORITY_RANK[b] ?? 0 : 0);
 const daysOld = (d: Date) => Math.floor((Date.now() - d.getTime()) / 86400_000);
 
 /**
- * Account statuses that DISQUALIFY an item from discovery.
+ * Familiarity values that disqualify a company from discovery.
  *
- * 'in_conversation' is deliberately absent: talks in progress are still a
- * company worth putting in front of an RD. Only a held account (nothing to
- * discover) and an explicit decision not to pursue are excluded.
+ * A company EDB already knows, or is already talking to, is not a find — it
+ * belongs under account activity instead. 'not_known' is deliberately absent:
+ * a company someone checked and does not know is precisely what discovery is
+ * for, and 'no_status' means nobody has said, which is no reason to exclude it.
  */
-const NOT_DISCOVERABLE: AccountStatus[] = ['existing_account', 'in_conversation', 'not_pursuing'];
+const NOT_DISCOVERABLE: Familiarity[] = ['known', 'in_conversation'];
 
 /**
- * Which discovery tier, or null if not a discovery candidate at all.
+ * Which discovery section, or null if not a discovery candidate at all.
  *
- * The dividing line is whether the tool can make an ARGUMENT: a company with an
- * assessed priority earns the full treatment, an unassessed or low-priority one
- * with a strong trigger is a find worth showing but not yet worth arguing for.
+ * The dividing line is whether the tool can make an ARGUMENT. A company with an
+ * assessed priority and a real trigger earns the full opportunity structure;
+ * one with a strong trigger the tool cannot yet argue for is a find worth
+ * showing but not worth arguing.
+ *
+ * Company SIZE deliberately does not decide the section. A Micron fab decision
+ * and a Series A both belong wherever the argument puts them — an RD reads for
+ * what EDB could do about a company, not for how famous it is, and splitting on
+ * size separated companies the same conversation would cover.
  */
 export function discoveryTier(it: PlacementInput): 'worth_a_conversation' | 'new_on_the_radar' | null {
   if (!isDiscovery(it)) return null;
-  const p = priorityScore(it.targetPriority);
-  // High or medium priority with a real trigger: we can say why EDB cares.
-  if (p >= 2) return 'worth_a_conversation';
-  // Otherwise it is a strong trigger at a company we cannot yet argue for.
-  return 'new_on_the_radar';
+  return priorityScore(it.targetPriority) >= 2 ? 'worth_a_conversation' : 'new_on_the_radar';
+}
+
+/**
+ * Singapore companies are not FDI targets.
+ *
+ * The tool exists to attract activity INTO Singapore, so a company already
+ * based there has nothing to move. They stay in the graph — a Singapore firm is
+ * often the partner, customer or investor that makes a foreign company's
+ * approach work, which is exactly what §8's warm paths are built from — but
+ * they are never surfaced as a company to approach.
+ */
+export function isSingaporeBased(it: PlacementInput): boolean {
+  // The city carries it as often as the country: a Singapore company is stored
+  // as "Singapore" with no state, because the city and the country are the
+  // same word and there is no state between them.
+  const where = `${it.hqCountry ?? ''} ${it.hqCity ?? ''}`;
+  return /\bsingapore\b/i.test(where);
 }
 
 /** A discovery candidate needs a real why-now AND a company worth pursuing. */
 export function isDiscovery(it: PlacementInput): boolean {
   if (it.companyId === null) return false;
-  if (it.accountStatus && NOT_DISCOVERABLE.includes(it.accountStatus)) return false;
+  if (isSingaporeBased(it)) return false;
+  if (it.familiarity && NOT_DISCOVERABLE.includes(it.familiarity)) return false;
   // §7a: presence always requires a why-now. Expansion or partnership is what
   // makes a company actionable; a company with neither is held back whatever
   // its standing assessment says. QUALIFY is the bar, and it does not move with
@@ -177,8 +306,8 @@ export function isDiscovery(it: PlacementInput): boolean {
  * is where a joint project becomes possible.
  */
 export function isAccountActivity(it: PlacementInput): boolean {
-  if (!it.accountStatus) return false;
-  if (!ENGAGED.includes(it.accountStatus)) return false;
+  if (!it.familiarity) return false;
+  if (!ENGAGED.includes(it.familiarity)) return false;
   return it.momentum >= 2 || Math.max(it.expansion, it.partnership) >= 2;
 }
 
@@ -201,7 +330,7 @@ export function discoveryRank(it: PlacementInput): number {
     Math.max(it.expansion, it.partnership) * 10_000 +
     // A live conversation is slightly below a cold company here: the point of
     // this section is finding what EDB does not already have in hand.
-    (it.accountStatus === 'in_conversation' ? -5_000 : 0) +
+    (it.familiarity === 'in_conversation' ? -5_000 : 0) +
     Math.min(it.clusterSize, 30) * 100 +
     (it.publishedAt ? Math.max(0, 30 - daysOld(it.publishedAt)) : 10)
   );
@@ -270,6 +399,9 @@ export type DigestPlan = {
     placed: number;
     discovery_candidates: number;
     account_activity_candidates: number;
+    early_stage_candidates: number;
+    /** Entries carrying a full argument, in either section. */
+    worth_a_conversation: number;
     excluded_existing_account: number;
     capped: number;
     company_deduped: number;
@@ -285,6 +417,8 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
     placed: 0,
     discovery_candidates: 0,
     account_activity_candidates: 0,
+    early_stage_candidates: 0,
+    worth_a_conversation: 0,
     excluded_existing_account: 0,
     capped: 0,
     company_deduped: 0,
@@ -292,22 +426,25 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
   };
 
   counts.excluded_existing_account = input.filter(
-    (i) => i.accountStatus && NOT_DISCOVERABLE.includes(i.accountStatus),
+    (i) => i.familiarity && NOT_DISCOVERABLE.includes(i.familiarity),
   ).length;
 
-  // ---- Discovery: company-centred, account-status aware, two tiers --------
+  /*
+   * Discovery, split on company size. `isWorthAConversation` marks the entries
+   * carrying a full argument, in either section — that is emphasis inside a
+   * section, not a section of its own.
+   */
   const discoveryPool = input
     .map((it) => ({ it, tier: discoveryTier(it) }))
     .filter((x): x is { it: PlacementInput; tier: 'worth_a_conversation' | 'new_on_the_radar' } => x.tier !== null)
     .map(({ it, tier }) => ({ ...it, section: tier as Section, rank: discoveryRank(it) }))
     .sort((a, b) => b.rank - a.rank);
   counts.discovery_candidates = discoveryPool.length;
-  // Deduped ACROSS both tiers: one company should not appear as both a
-  // conversation and a radar entry.
+  // Deduped across both, so one company cannot be both argued for and a find.
   const discovery = dedupeByCompany(discoveryPool);
   counts.company_deduped += discovery.dropped.length;
 
-  // ---- Account activity: companies EDB holds or is talking to --------------
+  // ---- Account activity: companies EDB already holds or is talking to ------
   const inPlayPool = input.filter(isAccountActivity)
     .map((it) => ({ ...it, section: 'account_activity' as Section, rank: trendingRank(it) }))
     .sort((a, b) => b.rank - a.rank);

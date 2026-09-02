@@ -48,7 +48,7 @@ export type RenderRow = Placed & {
     /** 'organised_demand' when commercial access is the way into the engagement. */
     framedBy?: string | null;
   } | null;
-  /** The model's own reasoning, shown in new_on_the_radar so it can be corrected. */
+  /** The model's own reasoning, shown when there is no full argument, so it can be corrected. */
   assessmentRationale?: string | null;
   assessmentConfidence?: string | null;
 };
@@ -228,7 +228,7 @@ function itemHtml(r: RenderRow, appBaseUrl: string): string {
                   + whyPoints(r.why).map((w) => `<tr><td style="${FONT} font-size:13px; line-height:19px; color:#3A3A36; padding:0 0 0 14px;">&bull;&nbsp;${esc(w)}</td></tr>`).join('')
                 : line('Why now:', esc(r.why))}
               ${r.section !== 'new_on_the_radar' ? line('Why EDB:',
-                  `${esc(String(r.targetPriority ?? 'unassessed'))} priority · Singapore fit ${esc(String(r.singaporeFit ?? 'unassessed'))}${r.accountStatus === 'in_conversation' ? ' · already in conversation' : ''}`
+                  `${esc(String(r.targetPriority ?? 'unassessed'))} priority · Singapore fit ${esc(String(r.singaporeFit ?? 'unassessed'))}${r.familiarity === 'in_conversation' ? ' · already in conversation' : ''}`
                   + (r.assessmentRationale ? `<br><span style="color:#3A3A36;">${esc(r.assessmentRationale)}</span>` : ''))
                 : ''}
               ${r.section !== 'new_on_the_radar' && r.proposition ? line('Singapore could offer:',
@@ -404,7 +404,7 @@ export function renderText(input: RenderInput): string {
     // argue for. A lighter entry that borrowed it would imply a case that has
     // not been made.
     if (r.section !== 'new_on_the_radar') {
-      out.push(`    Why EDB: ${r.targetPriority ?? 'unassessed'} priority · Singapore fit ${r.singaporeFit ?? 'unassessed'}${r.accountStatus === 'in_conversation' ? ' · already in conversation' : ''}`);
+      out.push(`    Why EDB: ${r.targetPriority ?? 'unassessed'} priority · Singapore fit ${r.singaporeFit ?? 'unassessed'}${r.familiarity === 'in_conversation' ? ' · already in conversation' : ''}`);
       if (r.assessmentRationale) out.push(`      ${r.assessmentRationale}`);
       if (r.proposition) {
         const note = statusNote(r.proposition.status);

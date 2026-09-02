@@ -19,7 +19,7 @@ import { renderHtml, renderText, type RenderRow } from '../lib/digest-render';
 import { assembleWhyNow, hasCoOccurrence, type WhyNowInput } from '../lib/why-now';
 import { env } from '../lib/env';
 import type { Band } from '../lib/company-rubric';
-import type { AccountStatus } from '../lib/accounts';
+import type { Familiarity } from '../lib/familiarity';
 import { writeProposition, findPrecedent, STATUS_NOTE } from '../lib/proposition';
 import { Budget } from '../lib/budget';
 
@@ -54,7 +54,7 @@ function weekOfMonday(): string {
    */
   const rows: any = await sqlc`
     select
-      cs.company_id, c.name as company_name, c.account_status, c.sectors,
+      cs.company_id, c.name as company_name, c.familiarity, c.sectors,
       cs.expansion, cs.momentum, cs.partnership, cs.signal_type,
       cs.expansion_language, cs.why, cs.week_of,
       i.id as item_id, i.title, i.url, i.source, i.source_type, i.published_at,
@@ -90,7 +90,7 @@ function weekOfMonday(): string {
     expansion: Number(r.expansion),
     momentum: Number(r.momentum),
     partnership: Number(r.partnership),
-    accountStatus: (r.account_status ?? null) as AccountStatus | null,
+    familiarity: (r.familiarity ?? null) as Familiarity | null,
     signalType: r.signal_type,
     sourceType: r.source_type,
     targetPriority: (r.target_priority ?? null) as Band | null,
@@ -181,7 +181,7 @@ function weekOfMonday(): string {
   // Singapore's proposition, for the featured tier ONLY. One call per item,
   // at most four, so this costs a handful of requests rather than a run.
   const budget = new Budget();
-  for (const p of [...plan.sections.worth_a_conversation, ...plan.sections.account_activity]) {
+  for (const p of [...plan.sections.worth_a_conversation, ...plan.sections.new_on_the_radar, ...plan.sections.account_activity]) {
     const r = renderRows.get(p.itemId);
     if (!r) continue;
     // What Singapore has already done in this space, from the public record.
