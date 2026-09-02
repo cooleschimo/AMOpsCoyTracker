@@ -40,11 +40,20 @@ export const companies = pgTable('companies', {
   seedFlags: text('seed_flags').array().default([]),
   valuationEst: numeric('valuation_est'),
   valuationSource: text('valuation_source'),
-  // Tri-state. 'unknown' is the seed default because whether EDB holds the
-  // account is internal knowledge this tool cannot verify.
-  accountStatus: text('account_status').notNull().default('unknown'),
-  accountStatusSource: text('account_status_source'),
-  accountStatusReviewedAt: timestamp('account_status_reviewed_at', { withTimezone: true }),
+  /**
+   * How well EDB knows this company — no_status | known | in_conversation |
+   * not_known. See lib/familiarity.ts.
+   *
+   * Replaced an account-status field: whether EDB holds an account is
+   * commercially sensitive and belongs in the systems that own it, while how
+   * well a company is known is a judgment an RD can make from memory and is the
+   * part that bears on ranking. 'no_status' is the default and is deliberately
+   * distinct from 'not_known' — nobody having said is not the same as someone
+   * having checked.
+   */
+  familiarity: text('familiarity').notNull().default('no_status'),
+  familiaritySource: text('familiarity_source'),
+  familiarityReviewedAt: timestamp('familiarity_reviewed_at', { withTimezone: true }),
   sgEntity: boolean('sg_entity'),
   sgEntityUen: text('sg_entity_uen'),
   sgMatchStatus: text('sg_match_status'),

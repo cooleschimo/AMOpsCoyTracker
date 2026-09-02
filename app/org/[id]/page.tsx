@@ -12,7 +12,7 @@
 import { getSql } from '../../../lib/db';
 import { sectorLabel } from '../../../lib/subsectors';
 import { hasDashboard } from '../../../lib/auth';
-import { ACCOUNT_STATUS_LABELS, type AccountStatus } from '../../../lib/accounts';
+import { FAMILIARITY_LABELS, type Familiarity } from '../../../lib/familiarity';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,7 +65,7 @@ export default async function OrgPage(
   const [portfolio, people, sectorMix, stageMix]: any = await Promise.all([
     // One row per company. A fund that led three rounds in the same company is
     // one portfolio company, not three, and counting rows would say otherwise.
-    sql`select c.id, c.name, c.sectors, c.account_status,
+    sql`select c.id, c.name, c.sectors, c.familiarity,
                bool_or(i.is_lead) as is_lead,
                max(i.announced_date) as latest_date,
                (array_remove(array_agg(i.round order by i.announced_date desc nulls last), 'portfolio'))[1] as round,
@@ -76,7 +76,7 @@ export default async function OrgPage(
                    and cs.week_of > current_date - 35) as recent_signal
         from investments i join companies c on c.id = i.company_id
         where i.org_id = ${orgId}
-        group by c.id, c.name, c.sectors, c.account_status
+        group by c.id, c.name, c.sectors, c.familiarity
         order by c.name`,
     sql`select p.id, p.name, p.title, a.role
         from affiliations a join people p on p.id = a.person_id
@@ -111,12 +111,12 @@ export default async function OrgPage(
   const t = sp.token ?? '';
   const surfaced = portfolio.filter((c: any) => (c.recent_signal ?? 0) >= 2);
   const accounts = portfolio.filter((c: any) =>
-    c.account_status === 'existing_account' || c.account_status === 'in_conversation');
+    c.familiarity === 'existing_account' || c.familiarity === 'in_conversation');
   const sgCompanies = portfolio.filter((c: any) => c.has_sg);
   // The rows worth reading: everything else is a name in a long list.
   const notable = portfolio.filter((c: any) =>
     c.has_sg || (c.recent_signal ?? 0) >= 2
-    || (c.account_status && c.account_status !== 'unknown'));
+    || (c.familiarity && c.familiarity !== 'unknown'));
   const rest = portfolio.filter((c: any) => !notable.includes(c));
   const totalStage = stageMix.reduce((n: number, s: any) => n + s.n, 0) || 1;
   const STAGE_ORDER = ['seed', 'series A', 'series B', 'growth'];
@@ -180,9 +180,9 @@ export default async function OrgPage(
           <a href={`/company/${c.id}?token=${t}`} className={LINK}>{c.name}</a>
           {c.is_lead ? <span className={META}> · lead</span> : null}
           {c.round ? <span className={META}> · {c.round}</span> : null}
-          {c.account_status && c.account_status !== 'unknown' ? (
-            <span className={`${TAG} ${TAG_COLOURS[c.account_status] ?? TAG_COLOURS.not_pursuing}`}>
-              {ACCOUNT_STATUS_LABELS[c.account_status as AccountStatus] ?? c.account_status}
+          {c.familiarity && c.familiarity !== 'unknown' ? (
+            <span className={`${TAG} ${TAG_COLOURS[c.familiarity] ?? TAG_COLOURS.not_pursuing}`}>
+              {FAMILIARITY_LABELS[c.familiarity as Familiarity] ?? c.familiarity}
             </span>
           ) : null}
           {(c.recent_signal ?? 0) >= 2 ? <span className={`${TAG} ${TAG_COLOURS.surfaced}`}>surfaced</span> : null}

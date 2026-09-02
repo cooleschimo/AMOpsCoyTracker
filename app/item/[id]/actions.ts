@@ -11,7 +11,7 @@
  *   irrelevant_company -> entity resolution, or the company rubric
  *   too_early          -> timing weights in the rubric
  *   no_sg_angle        -> the item rubric
- *   already_tracked    -> updates account_status, which the tool cannot know
+ *   already_tracked    -> updates familiarity, which the tool cannot know
  * Without a reason a dismissal is just a lost item.
  */
 import { cookies } from 'next/headers';
@@ -60,9 +60,9 @@ export async function recordDisposition(formData: FormData) {
   // history. Record it with its provenance rather than inferring it.
   if (companyId && reasons.includes('already_tracked')) {
     await withRetry(() => db.update(companies).set({
-      accountStatus: 'existing_account',
-      accountStatusSource: 'rd_review',
-      accountStatusReviewedAt: new Date(),
+      familiarity: 'existing_account',
+      familiaritySource: 'rd_review',
+      familiarityReviewedAt: new Date(),
     }).where(eq(companies.id, companyId)));
   }
 

@@ -128,7 +128,7 @@ export async function findWarmPaths(companyId: number): Promise<WarmPath[]> {
     join investments i2 on i2.org_id = o.id and i2.company_id <> i1.company_id
     join companies c2 on c2.id = i2.company_id
     where i1.company_id = ${companyId}
-      and (c2.account_status = 'account' or o.sg_presence = true
+      and (c2.familiarity = 'account' or o.sg_presence = true
            or exists(select 1 from sg_links s where s.subject_type='company' and s.subject_id = i2.company_id))
     limit 400`;
 
@@ -167,7 +167,7 @@ export async function findWarmPaths(companyId: number): Promise<WarmPath[]> {
     select ce.relation, ce.source_url, ce.directed,
            case when ce.from_company_id = ${companyId} then ce.to_company_id else ce.from_company_id end as other_id,
            case when ce.from_company_id = ${companyId} then c2.name else c1.name end as other_name,
-           case when ce.from_company_id = ${companyId} then c2.account_status else c1.account_status end as other_status
+           case when ce.from_company_id = ${companyId} then c2.familiarity else c1.familiarity end as other_status
     from company_edges ce
     join companies c1 on c1.id = ce.from_company_id
     join companies c2 on c2.id = ce.to_company_id

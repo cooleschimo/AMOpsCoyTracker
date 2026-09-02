@@ -53,7 +53,7 @@ export default async function PersonPage(
 
   const [roles, affiliations, sgCompanies]: any = await Promise.all([
     sql`select r.role, r.role_raw, r.source, r.source_url, r.first_seen, r.last_seen,
-               c.id as company_id, c.name as company, c.sectors, c.account_status
+               c.id as company_id, c.name as company, c.sectors, c.familiarity
         from roles r join companies c on c.id = r.company_id
         where r.person_id = ${personId}
         order by r.last_seen desc nulls last`,
@@ -114,7 +114,7 @@ export default async function PersonPage(
           <p className={BODY}>
             <b>{r.role_raw ?? r.role}</b> at{' '}
             <a href={`/company/${r.company_id}?token=${t}`} className={LINK}>{r.company}</a>
-            {r.account_status && r.account_status !== 'unknown' ? ` · ${String(r.account_status).replace(/_/g, ' ')}` : ''}
+            {r.familiarity && r.familiarity !== 'unknown' ? ` · ${String(r.familiarity).replace(/_/g, ' ')}` : ''}
           </p>
           <p className={META}>
             {r.source}

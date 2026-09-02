@@ -12,7 +12,7 @@
  * carry the delta since the page loaded.
  */
 import { useSyncExternalStore } from 'react';
-import type { AccountStatus } from './accounts';
+import type { Familiarity } from './familiarity';
 import type { Disposition, Reason as DismissReason } from './dispositions';
 import * as server from '../app/actions';
 
@@ -30,14 +30,14 @@ export interface DispositionRecord {
 
 type State = {
   dispositions: Record<string, DispositionRecord>;
-  accountStatus: Record<string, AccountStatus>;
+  familiarity: Record<string, Familiarity>;
   pathReviews: Record<string, { status: PathReviewStatus; by: string; at: string }>;
   droppedFromMonitoring: Record<string, string>;
 };
 
 let state: State = {
   dispositions: {},
-  accountStatus: {},
+  familiarity: {},
   pathReviews: {},
   droppedFromMonitoring: {},
 };
@@ -92,17 +92,17 @@ export const actions = {
     });
   },
 
-  setAccountStatus(companyId: string, status: AccountStatus) {
-    const previous = state.accountStatus[companyId];
-    state = { ...state, accountStatus: { ...state.accountStatus, [companyId]: status } };
+  setFamiliarity(companyId: string, status: Familiarity) {
+    const previous = state.familiarity[companyId];
+    state = { ...state, familiarity: { ...state.familiarity, [companyId]: status } };
     emit();
 
-    void server.setAccountStatus(numericId(companyId), status).then((res) => {
+    void server.setFamiliarity(numericId(companyId), status).then((res) => {
       if (res.ok) return;
-      const next = { ...state.accountStatus };
+      const next = { ...state.familiarity };
       if (previous) next[companyId] = previous;
       else delete next[companyId];
-      state = { ...state, accountStatus: next };
+      state = { ...state, familiarity: next };
       emit();
     });
   },

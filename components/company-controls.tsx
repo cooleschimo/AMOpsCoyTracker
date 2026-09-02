@@ -3,28 +3,28 @@
 import { useEffect, useState, useTransition } from "react";
 import { cn } from "@/lib/utils";
 import { actions, useDisposition, useStore } from "@/lib/dashboard-store";
-import type { AccountStatus, DismissReason } from "@/lib/ui-types";
+import type { Familiarity, DismissReason } from "@/lib/ui-types";
 import type { DashboardCompany as Company } from "@/lib/ui-types";
 import {
   QuietButton,
-  accountStatusHelp,
-  accountStatusLabel,
+  familiarityHelp,
+  familiarityLabel,
   dismissReasonFeedback,
   dismissReasonLabel,
 } from "./primitives";
 
-const ACCOUNT_STATUSES: AccountStatus[] = [
-  "unknown",
-  "existing_account",
+const FAMILIARITY_ORDER: Familiarity[] = [
+  "no_status",
+  "known",
   "in_conversation",
-  "not_pursuing",
+  "not_known",
 ];
 
 const DISMISS_REASONS: DismissReason[] = ["irrelevant_company", "too_early", "no_sg_angle"];
 
-export function AccountStatusControl({ company }: { company: Company }) {
-  const stored = useStore((s) => s.accountStatus[company.id]);
-  const value = stored ?? company.accountStatus;
+export function FamiliarityControl({ company }: { company: Company }) {
+  const stored = useStore((s) => s.familiarity[company.id]);
+  const value = stored ?? company.familiarity;
 
   // A select rather than four buttons: the labels do not fit one line in a
   // ~300px card, and wrapping them cost two rows for a field that is set once
@@ -36,19 +36,19 @@ export function AccountStatusControl({ company }: { company: Company }) {
       </span>
       <select
         value={value}
-        onChange={(e) => actions.setAccountStatus(company.id, e.target.value as AccountStatus)}
-        title={accountStatusHelp[value]}
+        onChange={(e) => actions.setFamiliarity(company.id, e.target.value as Familiarity)}
+        title={familiarityHelp[value]}
         className={cn(
           "min-w-0 flex-1 cursor-pointer rounded-sm border border-border/60 bg-transparent px-1.5 py-0.5 text-2xs transition-colors hover:border-primary/50",
           "focus-visible:outline focus-visible:outline-1 focus-visible:outline-ring",
-          value === "unknown"
+          value === "no_status"
             ? "text-muted-foreground hover:border-border hover:text-foreground"
             : "border-primary/30 bg-primary/10 font-medium text-primary",
         )}
       >
-        {ACCOUNT_STATUSES.map((s) => (
-          <option key={s} value={s} title={accountStatusHelp[s]}>
-            {accountStatusLabel[s]}
+        {FAMILIARITY_ORDER.map((s) => (
+          <option key={s} value={s} title={familiarityHelp[s]}>
+            {familiarityLabel[s]}
           </option>
         ))}
       </select>

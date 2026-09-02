@@ -6,7 +6,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { cn } from "@/lib/utils";
 import { broadSectorLabel, sectorBroadSector, sectorLabel, sectorShort } from "@/lib/subsectors";
 import type {
-  AccountStatus,
+  Familiarity,
   Band,
   DismissReason,
   EvidencePoint,
@@ -46,20 +46,18 @@ export const bandLabel: Record<Band, string> = {
  */
 export { sectorLabel, sectorShort, broadSectorLabel };
 
-export const accountStatusLabel: Record<AccountStatus, string> = {
-  unknown: "Unknown",
-  existing_account: "Existing account",
+export const familiarityLabel: Record<Familiarity, string> = {
+  no_status: "No status",
+  known: "Known",
   in_conversation: "In conversation",
-  not_an_account: "Not an account",
-  not_pursuing: "Not pursuing",
+  not_known: "Not known",
 };
 
-export const accountStatusHelp: Record<AccountStatus, string> = {
-  unknown: "We have no record either way.",
-  existing_account: "Already an account with an assigned owner.",
-  in_conversation: "An active exchange is running right now.",
-  not_an_account: "Checked, and not an EDB account. Different from a decision not to pursue.",
-  not_pursuing: "A deliberate decision not to approach.",
+export const familiarityHelp: Record<Familiarity, string> = {
+  no_status: "Nobody has said either way. Not the same as having checked.",
+  known: "Engaged with a few times and known reasonably well.",
+  in_conversation: "Talking to them right now.",
+  not_known: "Checked — no real relationship here.",
 };
 
 export const dismissReasonLabel: Record<DismissReason, string> = {

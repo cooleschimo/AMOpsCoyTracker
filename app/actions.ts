@@ -16,7 +16,7 @@ import { revalidatePath } from 'next/cache';
 import { eq } from 'drizzle-orm';
 import { getDb, getSql, withRetry } from '../lib/db';
 import { companies, dispositions, monitoring, opportunities } from '../lib/schema';
-import { isAccountStatus, type AccountStatus } from '../lib/accounts';
+import { isFamiliarity, type Familiarity } from '../lib/familiarity';
 import { DISPOSITIONS, REASONS, type Disposition, type Reason } from '../lib/dispositions';
 
 const VOTER_COOKIE = 'voter_key';
@@ -137,19 +137,19 @@ export async function dropFromMonitoring(companyId: number): Promise<ActionResul
  * Account status is a separate axis from disposition: it answers "do we already
  * know this company", and the placement logic reads it directly (§10).
  */
-export async function setAccountStatus(
+export async function setFamiliarity(
   companyId: number,
-  status: AccountStatus,
+  status: Familiarity,
 ): Promise<ActionResult> {
-  if (!isAccountStatus(status)) return { ok: false, error: 'unknown account status' };
+  if (!isFamiliarity(status)) return { ok: false, error: 'unknown account status' };
   try {
     await withRetry(() =>
       getDb()
         .update(companies)
         .set({
-          accountStatus: status,
-          accountStatusSource: 'rd_review',
-          accountStatusReviewedAt: new Date(),
+          familiarity: status,
+          familiaritySource: 'rd_review',
+          familiarityReviewedAt: new Date(),
         })
         .where(eq(companies.id, companyId)),
     );

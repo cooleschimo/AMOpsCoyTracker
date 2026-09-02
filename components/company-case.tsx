@@ -18,7 +18,7 @@ import {
   bandLabel,
   offerTierLabel,
 } from "./primitives";
-import { AccountStatusControl, DispositionControls } from "./company-controls";
+import { FamiliarityControl, DispositionControls } from "./company-controls";
 
 export function CompanyHeading({ company, note }: { company: Company; note?: string | undefined }) {
   return (
@@ -180,7 +180,7 @@ export function CompanyCase({
           the pilot measures, and a disposition that costs an extra click to
           reach is a disposition that does not get recorded. */}
       <div className="space-y-2.5 rounded-b-md border-t border-[color:var(--hairline)] bg-muted/30 p-5 sm:px-7">
-        <AccountStatusControl company={company} />
+        <FamiliarityControl company={company} />
         <DispositionControls company={company} preselect={preselect} />
       </div>
 

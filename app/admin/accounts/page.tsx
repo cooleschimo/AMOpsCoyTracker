@@ -1,7 +1,8 @@
 /**
- * /admin/accounts — record which companies EDB already engages with.
+ * /admin/accounts — record how well EDB knows each company.
  *
- * The tool cannot derive this (§14): EDB account history is internal and stays
+ * The tool cannot derive this (§14): how well a company is known is internal
+ * knowledge and stays
  * off personal infrastructure, so it arrives only by a person typing it. Until
  * it does, the digest cannot tell a new discovery from a company already in
  * conversation.
@@ -11,10 +12,10 @@
  */
 import { getSql } from '../../../lib/db';
 import { hasAdmin } from '../../../lib/auth';
-import { setAccountStatus } from './actions';
+import { setFamiliarity } from './actions';
 import {
-  ACCOUNT_STATUSES, ACCOUNT_STATUS_LABELS, ACCOUNT_STATUS_HELP, type AccountStatus,
-} from '../../../lib/accounts';
+  FAMILIARITIES, FAMILIARITY_LABELS, FAMILIARITY_HELP, type Familiarity,
+} from '../../../lib/familiarity';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,7 @@ const FIELD = 'mr-2 rounded-sm border border-input bg-card px-2 py-1.5 text-xs';
 const BTN = 'cursor-pointer rounded-sm border border-primary bg-primary px-3.5 py-1.5 text-xs text-primary-foreground hover:bg-primary/90';
 const LINK = 'text-primary link-underline hover:text-foreground';
 
-export default async function AccountsPage(
+export default async function FamiliarityPage(
   { searchParams }: { searchParams: Promise<{ token?: string; q?: string }> },
 ) {
   const sp = await searchParams;
@@ -42,14 +43,14 @@ export default async function AccountsPage(
   // Companies that have surfaced a real signal, strongest first. A search box
   // reaches anything else — the full list is 2,824 rows and not worth paging.
   const rows: any = q
-    ? await sql`select c.id, c.name, c.account_status, c.account_status_source,
-                       c.account_status_reviewed_at, c.discovered_via, c.sectors,
+    ? await sql`select c.id, c.name, c.familiarity, c.familiarity_source,
+                       c.familiarity_reviewed_at, c.discovered_via, c.sectors,
                        0 as best_score, 0 as n_items
                 from companies c
                 where c.name ilike ${'%' + q + '%'}
                 order by c.name limit 60`
-    : await sql`select c.id, c.name, c.account_status, c.account_status_source,
-                       c.account_status_reviewed_at, c.discovered_via, c.sectors,
+    : await sql`select c.id, c.name, c.familiarity, c.familiarity_source,
+                       c.familiarity_reviewed_at, c.discovered_via, c.sectors,
                        max(s.score)::int as best_score, count(distinct i.id)::int as n_items
                 from companies c
                 join items i on i.company_id = c.id and i.status = 'kept'
@@ -61,12 +62,12 @@ export default async function AccountsPage(
                 order by max(s.score) desc, count(*) desc, c.name
                 limit 60`;
 
-  const counts: any = await sql`select account_status, count(*)::int n
+  const counts: any = await sql`select familiarity, count(*)::int n
     from companies group by 1 order by n desc`;
 
   return (
     <main className={MAIN}>
-      <h1 className={H1}>Account status</h1>
+      <h1 className={H1}>Company familiarity</h1>
       <p className={SUB}>
         The one thing this tool cannot work out for itself. Whether EDB already holds an
         account, is mid-conversation, or has decided not to pursue a company lives in EDB&rsquo;s
@@ -75,15 +76,15 @@ export default async function AccountsPage(
       </p>
 
       <p className="mb-[18px] text-xs leading-relaxed text-muted-foreground">
-        {ACCOUNT_STATUSES.map((s) => (
+        {FAMILIARITIES.map((s) => (
           <span key={s} className="block">
-            <b>{ACCOUNT_STATUS_LABELS[s]}</b> — {ACCOUNT_STATUS_HELP[s]}
+            <b>{FAMILIARITY_LABELS[s]}</b> — {FAMILIARITY_HELP[s]}
           </span>
         ))}
       </p>
 
       <p className={META}>
-        {counts.map((c: any) => `${ACCOUNT_STATUS_LABELS[c.account_status as AccountStatus] ?? c.account_status}: ${c.n}`).join(' · ')}
+        {counts.map((c: any) => `${FAMILIARITY_LABELS[c.familiarity as Familiarity] ?? c.familiarity}: ${c.n}`).join(' · ')}
       </p>
 
       <form method="get" className="mb-1.5 mt-3.5">
@@ -102,20 +103,20 @@ export default async function AccountsPage(
             {c.best_score ? <span className={META}> · best score {c.best_score} · {c.n_items} items</span> : null}
           </p>
           <p className={META}>
-            {(c.sectors ?? []).join(', ') || 'no sectors'} · discovered via {c.discovered_via ?? 'unknown'}
+            {(c.sectors ?? []).join(', ') || 'no sectors'} · discovered via {c.discovered_via ?? 'no_status'}
           </p>
-          {c.account_status && c.account_status !== 'unknown' ? (
+          {c.familiarity && c.familiarity !== 'no_status' ? (
             <p className={META}>
-              Currently <b>{ACCOUNT_STATUS_LABELS[c.account_status as AccountStatus] ?? c.account_status}</b>
-              {c.account_status_source ? ` — ${c.account_status_source}` : ''}
-              {c.account_status_reviewed_at ? ` · recorded ${new Date(c.account_status_reviewed_at).toISOString().slice(0, 10)}` : ''}
+              Currently <b>{FAMILIARITY_LABELS[c.familiarity as Familiarity] ?? c.familiarity}</b>
+              {c.familiarity_source ? ` — ${c.familiarity_source}` : ''}
+              {c.familiarity_reviewed_at ? ` · recorded ${new Date(c.familiarity_reviewed_at).toISOString().slice(0, 10)}` : ''}
             </p>
           ) : null}
-          <form action={setAccountStatus} className="mt-2">
+          <form action={setFamiliarity} className="mt-2">
             <input type="hidden" name="companyId" value={c.id} />
-            <select name="status" defaultValue={c.account_status ?? 'unknown'} className={FIELD}>
-              {ACCOUNT_STATUSES.map((s) => (
-                <option key={s} value={s}>{ACCOUNT_STATUS_LABELS[s]}</option>
+            <select name="status" defaultValue={c.familiarity ?? 'no_status'} className={FIELD}>
+              {FAMILIARITIES.map((s) => (
+                <option key={s} value={s}>{FAMILIARITY_LABELS[s]}</option>
               ))}
             </select>
             <input name="note" placeholder="Who, when, context (optional)" className={`${FIELD} w-60`} />

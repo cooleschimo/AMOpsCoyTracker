@@ -31,8 +31,8 @@ const hr = (t: string) => console.log(`\n${'='.repeat(78)}\n${t}\n${'='.repeat(7
     where s.subject_type='company' order by s.match_status, c.name`;
   console.table(links);
 
-  hr('3. TRI-STATE INTEGRITY — account_status must be 100% unknown after seed');
-  console.table(await sql`select account_status, count(*)::int as n from companies group by 1 order by 2 desc`);
+  hr('3. TRI-STATE INTEGRITY — familiarity must be 100% unknown after seed');
+  console.table(await sql`select familiarity, count(*)::int as n from companies group by 1 order by 2 desc`);
 
   hr('4. FORM D — companies discovered, with named people and source URLs');
   const rows = await sql`

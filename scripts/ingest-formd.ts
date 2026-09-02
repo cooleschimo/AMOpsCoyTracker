@@ -144,8 +144,8 @@ async function main() {
         hqCity: f.city, hqState: f.stateOrCountry, hqRegion: region,
         cik: f.cik,
         foundedYear: f.yearOfInc ? Number(f.yearOfInc) || null : null,
-        accountStatus: 'unknown',        // tri-state; nothing asserted yet
-        accountStatusSource: 'seed',
+        familiarity: 'no_status',        // tri-state; nothing asserted yet
+        familiaritySource: 'seed',
         discoveredVia: 'form_d',
         description: f.industryGroup ? `Form D industry group: ${f.industryGroup}` : null,
       }).returning({ id: companies.id });

@@ -7,7 +7,7 @@
  * component tree has no dependency on anything that touches the database.
  */
 export type { Band } from './company-rubric';
-export type { AccountStatus } from './accounts';
+export type { Familiarity } from './familiarity';
 export type { Disposition, Reason as DismissReason } from './dispositions';
 export type { SignalType } from './rubric';
 export type { Source, EvidencePoint, Assessment, DashboardCompany } from './dashboard-data';

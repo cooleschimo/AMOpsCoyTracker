@@ -10,7 +10,7 @@
  *   review either way.
  * - Carries `flags` into companies.seed_flags, which gate what the UI may assert.
  * - Loads excluded_companies.csv into the discovery guard table.
- * - account_status stays 'unknown' (tri-state): whether EDB holds the account is
+ * - familiarity stays 'no_status' (tri-state): whether EDB holds the account is
  *   internal knowledge this tool cannot verify. No boolean, no silent FALSE.
  *
  * Idempotent: re-running updates rather than duplicating.
@@ -92,13 +92,14 @@ async function main() {
         issues.push({ row: rowNum, company: name, field: 'flags', value: bad, note: 'not in SEED_FLAGS enum - dropped' });
       }
 
-      // account_status: tri-state. Seed default is 'unknown' and the CSV should
-      // only ever carry 'unknown' — anything else is flagged, not silently trusted.
-      const acct = r.account_status?.trim() || 'unknown';
-      if (!['unknown', 'account', 'not_account'].includes(acct)) {
-        issues.push({ row: rowNum, company: name, field: 'account_status', value: acct, note: 'invalid tri-state - forced to unknown' });
+      // familiarity: how well EDB knows the company. The seed CSV has no
+      // business asserting this, so anything other than the default is flagged
+      // rather than silently trusted.
+      const acct = r.familiarity?.trim() || 'no_status';
+      if (!['no_status', 'known', 'in_conversation', 'not_known'].includes(acct)) {
+        issues.push({ row: rowNum, company: name, field: 'familiarity', value: acct, note: 'unrecognised value - forced to no_status' });
       }
-      const accountStatus = ['unknown', 'account', 'not_account'].includes(acct) ? acct : 'unknown';
+      const familiarity = ['no_status', 'account', 'not_account'].includes(acct) ? acct : 'no_status';
 
       const values = {
         name,
@@ -116,8 +117,8 @@ async function main() {
         roundValMusd: parseMusd(r.round_val_musd),
         roundDate: validRoundDate(r.round_date),
         seedFlags,
-        accountStatus,
-        accountStatusSource: 'seed',
+        familiarity,
+        familiaritySource: 'seed',
         atsType: r.ats_type || null,
         atsSlug: r.ats_slug || null,
         discoveredVia: 'seed',

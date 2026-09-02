@@ -47,7 +47,7 @@ export default async function ItemPage(
 
   const sql = getSql();
   const [it]: any = await sql`
-    select i.*, c.name as company_name, c.id as cid, c.account_status, c.sectors,
+    select i.*, c.name as company_name, c.id as cid, c.familiarity, c.sectors,
            s.score, s.momentum, s.signal_type, s.why, s.expansion_language, s.rubric_version, s.model
     from items i
     left join companies c on c.id = i.company_id
@@ -112,8 +112,8 @@ export default async function ItemPage(
         </p>
       ) : null}
 
-      {it.account_status && it.account_status !== 'unknown' ? (
-        <p className={CAUTION}>Account status: <b>{it.account_status}</b> — recorded by a person, not derived by the tool.</p>
+      {it.familiarity && it.familiarity !== 'unknown' ? (
+        <p className={CAUTION}>Account status: <b>{it.familiarity}</b> — recorded by a person, not derived by the tool.</p>
       ) : null}
 
       {/* ---- Why it surfaced ---- */}

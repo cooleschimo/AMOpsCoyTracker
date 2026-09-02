@@ -141,7 +141,7 @@ const arg = (n: string, d?: string) => {
           website: site,
           // The fund's sector tags describe the fund, not this company.
           sectors: [],
-          accountStatus: 'unknown',
+          familiarity: 'no_status',
           discoveredVia: 'portfolio',
           // Nothing has judged this company. Portfolio scraping populates the
           // graph so §5.2's reverse index can answer which funds touch a
