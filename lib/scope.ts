@@ -1,3 +1,5 @@
+import { and, ne, sql } from 'drizzle-orm';
+
 /**
  * Scope definitions. Brief §2.
  *
@@ -66,3 +68,41 @@ export const isExclusionReason = (v: string): v is ExclusionReason =>
   (EXCLUSION_REASONS as readonly string[]).includes(v);
 export const isSgApacRole = (v: string): v is SgApacRole =>
   (SG_APAC_ROLES as readonly string[]).includes(v);
+
+/**
+ * The companies the pipeline actually watches.
+ *
+ * Every enrichment and ingest stage works on this same set, because a company
+ * that reaches the digest needs its website, people, hiring and location filled
+ * in whatever route found it. The stages used to name their own origins — seed
+ * plus assessed Form D — which quietly excluded everything news discovery found
+ * and left those companies scored on evidence nobody had gathered.
+ *
+ * Portfolio companies are the deliberate exception. Portfolio scraping fills
+ * the graph with thousands of names so §5.2's reverse index can answer which
+ * funds touch a sector; they are connections rather than targets, and fetching
+ * news or job boards for all of them would cost far more than it returns. One
+ * becomes a target the ordinary way, by being discovered again through a route
+ * that watches it.
+ *
+ * A company the assessment marked out of scope drops out, which is what stops
+ * the set growing without limit. 'unknown' is not a judgment and stays in.
+ */
+export const TRACKED_ORIGINS = ['seed', 'form_d', 'news'] as const;
+
+/**
+ * Drizzle form. Takes the `companies` table so lib/scope.ts stays free of a
+ * schema import — scope is vocabulary, and importing the schema here would make
+ * every consumer of a sector constant pull in the database layer.
+ */
+export const trackedCompanies = (c: {
+  discoveredVia: unknown; scopeStatus: unknown;
+}) => and(
+  ne(sql`coalesce(${c.discoveredVia}, '')`, 'portfolio'),
+  ne(sql`coalesce(${c.scopeStatus}, 'unknown')`, 'out_of_scope'),
+);
+
+/** Raw-SQL form, for the query builders that assemble strings. */
+export const TRACKED_COMPANIES_SQL = `
+  coalesce(c.discovered_via, '') <> 'portfolio'
+  and coalesce(c.scope_status, 'unknown') <> 'out_of_scope'`;

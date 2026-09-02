@@ -12,6 +12,7 @@ import '../lib/loadenv';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { getDb } from '../lib/db';
 import { companies, runs } from '../lib/schema';
+import { trackedCompanies } from '../lib/scope';
 import { resolveWebsite } from '../lib/enrich';
 import { researchCompany } from '../lib/websearch';
 
@@ -25,11 +26,13 @@ const arg = (n: string, d?: string) => {
   const limit = Number(arg('limit', '0'));
   const dry = process.argv.includes('--dry');
 
+  // Every watched company (lib/scope.ts). A website is the gate on people and
+  // therefore on warm paths, so restricting this to one discovery route left
+  // whole origins without either.
   const targets = await db.select({ id: companies.id, name: companies.name, description: companies.description })
     .from(companies)
     .where(and(
-      eq(companies.discoveredVia, 'form_d'),
-      eq(companies.scopeStatus, 'in_scope'),
+      trackedCompanies(companies),
       isNull(companies.website),
     ));
   const list = limit ? targets.slice(0, limit) : targets;

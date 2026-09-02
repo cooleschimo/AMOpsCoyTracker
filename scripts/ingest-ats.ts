@@ -24,6 +24,7 @@ import '../lib/loadenv';
 import { and, desc, eq, isNotNull, lt, or, sql } from 'drizzle-orm';
 import { getDb, withRetry } from '../lib/db';
 import { companies, items, jobPostings, jobSnapshots, runs, sgLinks, sourceHealth } from '../lib/schema';
+import { trackedCompanies } from '../lib/scope';
 import {
   ATS_TYPES, APAC_TITLE_RE, candidateSlugs, discoverFromCareersPage, fetchAts,
   isApacLocation, isNonUsLocation,
@@ -74,15 +75,14 @@ const PROBE_DELAY_MS = 350;
   };
 
   try {
-    // Same target set as step 8: seed list + assessed Form D discoveries.
+    // Every company the pipeline watches (lib/scope.ts), not a named list of
+    // origins: hiring is an input to the momentum axis, so a company excluded
+    // here is scored on evidence that was never gathered.
     const targets = await db.select({
       id: companies.id, name: companies.name, website: companies.website,
       atsType: companies.atsType, atsSlug: companies.atsSlug,
     }).from(companies)
-      .where(or(
-        eq(companies.discoveredVia, 'seed'),
-        and(eq(companies.discoveredVia, 'form_d'), eq(companies.scopeStatus, 'in_scope')),
-      ))
+      .where(trackedCompanies(companies))
       .orderBy(companies.id);
 
     const list = limit ? targets.slice(0, limit) : targets;

@@ -39,12 +39,30 @@ type Stage = {
 const STAGES: Stage[] = [
   { name: 'news', script: 'ingest-news.ts', timeoutMin: 25,
     why: 'Google News per company plus the press wires' },
-  { name: 'ats', script: 'ingest-ats.ts', timeoutMin: 30,
-    why: 'job boards; the hiring snapshot score-companies reads' },
   { name: 'context', script: 'ingest-context.ts', timeoutMin: 15,
     why: 'policy and sector moves that shift a company without it acting' },
   { name: 'discover', script: 'discover-news.ts', timeoutMin: 10,
     why: 'companies named in untargeted news that we do not track yet' },
+  /*
+   * Enrichment, in dependency order and placed after discovery so a company
+   * found this run is filled in on the same run rather than waiting a week.
+   *
+   * websites before people: ingest-people only considers a company that has a
+   * website, so running it first would skip everything discovery just added.
+   * location after news, because it reads a company's accumulated headlines
+   * rather than the single one that surfaced it.
+   */
+  { name: 'websites', script: 'enrich-websites.ts', timeoutMin: 20,
+    why: 'a website is what the assessment reads, and what people scraping needs' },
+  { name: 'people', script: 'ingest-people.ts', timeoutMin: 25,
+    why: 'the named people §8 builds warm paths from' },
+  { name: 'location', script: 'enrich-location.ts', timeoutMin: 15,
+    why: 'a discovered hq is one headline\'s guess until the rest are read' },
+  // After discovery and websites: a board is found from the company's site, and
+  // hiring feeds the momentum axis, so a company discovered this run would
+  // otherwise be scored with no hiring evidence at all.
+  { name: 'ats', script: 'ingest-ats.ts', timeoutMin: 30,
+    why: 'job boards; the hiring snapshot score-companies reads' },
   { name: 'filter', script: 'filter-score.ts', timeoutMin: 45,
     why: 'canonicalise, drop, cluster, score the items' },
   { name: 'rescue', script: 'rescue-mismatch.ts', timeoutMin: 20,

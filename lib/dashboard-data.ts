@@ -635,10 +635,12 @@ export async function getWeeklyDigest(
   // Companies actually watched, not every row in the table. Portfolio scraping
   // fills the graph with thousands of names that are never fetched for news or
   // scored, and counting those would claim coverage the tool does not have.
+  // Everything else counts, whatever route found it — naming origins here made
+  // the figure drift every time ingestion grew.
   const [{ companies = 0 } = {}]: any = await sql`
-    select count(*)::int as companies from companies
-    where discovered_via = 'seed'
-       or (discovered_via = 'form_d' and scope_status = 'in_scope')`;
+    select count(*)::int as companies from companies c
+    where coalesce(c.discovered_via, '') <> 'portfolio'
+      and coalesce(c.scope_status, 'unknown') <> 'out_of_scope'`;
   const [{ signals = 0 } = {}]: any =
     await sql`select count(*)::int as signals from items where status <> 'fetched'`;
 

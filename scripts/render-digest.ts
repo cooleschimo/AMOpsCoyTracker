@@ -207,7 +207,11 @@ function weekOfMonday(): string {
     };
   }
 
-  const mon: any = await sqlc`select count(*)::int n from companies where discovered_via in ('seed','form_d')`;
+  // Watched companies, matching lib/dashboard-data.ts so the digest and the
+  // dashboard cannot report different coverage for the same week.
+  const mon: any = await sqlc`select count(*)::int n from companies c
+    where coalesce(c.discovered_via, '') <> 'portfolio'
+      and coalesce(c.scope_status, 'unknown') <> 'out_of_scope'`;
   const proc: any = await sqlc`select count(*)::int n from items`;
   const coverage = coverageLine(mon[0].n, proc[0].n, plan.counts.placed);
   const weekOf = weekOfMonday();

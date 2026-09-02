@@ -119,6 +119,11 @@ async function doCompanies(limit: number, dry: boolean) {
    * Without an order a limited run picks arbitrarily, and the companies that
    * matter are the ones surfacing in the digest — a warm path is only worth
    * having for a company somebody is about to approach.
+   *
+   * The signal is the whole ordering. It used to break ties toward the seed
+   * list, which pushed every discovered company behind 112 others on a limited
+   * run — the companies with the freshest triggers waited longest for the
+   * people that make a warm path possible.
    */
   const targets: any = await getSql()`
     select c.id, c.name, c.website,
@@ -126,8 +131,10 @@ async function doCompanies(limit: number, dry: boolean) {
                        from company_signals cs where cs.company_id = c.id), 0) as signal
     from companies c
     where c.website is not null
+      and coalesce(c.discovered_via, '') <> 'portfolio'
+      and coalesce(c.scope_status, 'unknown') <> 'out_of_scope'
       and not exists (select 1 from roles r where r.company_id = c.id)
-    order by signal desc, c.discovered_via = 'seed' desc, c.name
+    order by signal desc, c.name
     limit ${limit || 40}`;
 
   console.log(`${targets.length} companies with a website and no people, strongest signal first`);
