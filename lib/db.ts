@@ -20,9 +20,25 @@ export function getDb() {
   return _db;
 }
 
-/** Raw SQL escape hatch for the health queries in DEBUGGING.md §4. */
+/**
+ * Raw SQL, retried through transient network failures.
+ *
+ * Every caller gets the retry rather than each remembering to ask for it. The
+ * dashboard made fourteen queries with none, so one dropped connection —
+ * Neon's HTTP endpoint returns "fetch failed" under concurrent load — blanked
+ * the whole page for a fault that clears on the next attempt.
+ *
+ * The tagged-template call is wrapped; `.unsafe` and the driver's other
+ * properties pass through untouched, so nothing that reaches for them breaks.
+ */
 export function getSql() {
-  return neon(env.databaseUrl());
+  const raw = neon(env.databaseUrl());
+  const wrapped = ((strings: TemplateStringsArray, ...values: unknown[]) =>
+    withRetry(() => (raw as any)(strings, ...values))) as typeof raw;
+  return new Proxy(wrapped, {
+    get: (target, prop, receiver) =>
+      prop in target ? Reflect.get(target, prop, receiver) : (raw as any)[prop],
+  });
 }
 
 /**
