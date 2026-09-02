@@ -557,6 +557,11 @@ async function signalRows(signalVersion: string): Promise<Row[]> {
       order by a.assessed_at desc limit 1
     ) ca on true
     where cs.signal_version = ${signalVersion}
+      -- The latest week only. Signals accumulate week on week, and without this
+      -- the dashboard showed every week at once: a company scored a fortnight
+      -- ago sat beside one scored today, both reading as current.
+      and cs.week_of = (select max(week_of) from company_signals
+                        where signal_version = ${signalVersion})
     order by cs.expansion desc, cs.momentum desc`;
   return rows as Row[];
 }
@@ -615,23 +620,23 @@ export async function getWeeklyDigest(
   const [{ signals = 0 } = {}]: any =
     await sql`select count(*)::int as signals from items where status <> 'fetched'`;
 
-  const worth = pick(plan.sections.worth_a_conversation);
-  const radar = pick(plan.sections.new_on_the_radar);
+  const worthAConversation = pick(plan.sections.worth_a_conversation);
+  const newOnTheRadar = pick(plan.sections.new_on_the_radar);
   // Account activity: companies EDB already holds or is talking to, where
   // something moved this week.
   const accountActivity = pick(plan.sections.account_activity);
   const monitoring = await getMonitoredCompanies(signalVersion);
 
   return {
-    weekLabel: weekLabel(),
-    coverage: coverageLine(Number(companies), Number(signals), worth.length + radar.length),
+    weekLabel: weekLabel(rows[0]?.week_of as string | undefined),
+    coverage: coverageLine(Number(companies), Number(signals), worthAConversation.length + newOnTheRadar.length),
     coverageStats: {
       monitored: Number(companies),
       processed: Number(signals),
-      surfaced: worth.length + radar.length,
+      surfaced: worthAConversation.length + newOnTheRadar.length,
     },
-    worthAConversation: worth,
-    newOnTheRadar: radar,
+    worthAConversation,
+    newOnTheRadar,
     accountActivity,
     monitoring,
   };
@@ -645,11 +650,17 @@ export async function getWeeklyDigest(
  * repeated when a range spans two — "29 September – 5 October" reads wrong
  * without it.
  */
-function weekLabel(): string {
-  const now = new Date();
-  const day = (now.getUTCDay() + 6) % 7;
-  const thisMonday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day);
-  const mon = new Date(thisMonday - 7 * 86400_000);
+function weekLabel(weekOf?: string | Date | null): string {
+  // The week the SIGNALS are from, not the week it happens to be read in. A
+  // label computed from today drifts away from the data it sits above the
+  // moment a run lands on a different day than the reader opens the page.
+  const mon = weekOf
+    ? new Date(weekOf)
+    : (() => {
+        const now = new Date();
+        const day = (now.getUTCDay() + 6) % 7;
+        return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day) - 7 * 86400_000);
+      })();
   const sun = new Date(mon.getTime() + 6 * 86400_000);
   const fmt = (d: Date, opts: Intl.DateTimeFormatOptions) =>
     d.toLocaleDateString('en-GB', { timeZone: 'UTC', ...opts });
