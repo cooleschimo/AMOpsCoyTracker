@@ -15,6 +15,7 @@ import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { eq } from 'drizzle-orm';
 import { getDb, getSql, withRetry } from '../lib/db';
+import { refineCaRegion, regionForState } from '@/lib/edgar';
 import { companies, dispositions, monitoring, opportunities } from '../lib/schema';
 import { isFamiliarity, type Familiarity } from '../lib/familiarity';
 import { DISPOSITIONS, REASONS, type Disposition, type Reason } from '../lib/dispositions';
@@ -150,6 +151,51 @@ export async function setFamiliarity(
           familiarity: status,
           familiaritySource: 'rd_review',
           familiarityReviewedAt: new Date(),
+        })
+        .where(eq(companies.id, companyId)),
+    );
+    revalidatePath('/');
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/**
+ * Correct a company's location.
+ *
+ * Where a company sits decides which geography tab it appears under, and for
+ * news-discovered companies it is the model's reading of a headline rather than
+ * anything filed — right often enough to be useful, wrong often enough that
+ * Implantica came through as San Diego. So it is editable, and a correction is
+ * marked 'manual' so the next automated pass leaves it alone.
+ *
+ * A US state sets the region; anything else clears it, since hq_region is a US
+ * concept and a stale region on a company that moved abroad is worse than none.
+ */
+export async function setLocation(
+  companyId: number,
+  city: string,
+  state: string,
+): Promise<ActionResult> {
+  const c = city.trim().slice(0, 120);
+  const st = state.trim().slice(0, 60);
+  if (!c) return { ok: false, error: 'a city is required' };
+
+  const isUsState = /^[A-Za-z]{2}$/.test(st);
+  const region = isUsState
+    ? (st.toUpperCase() === 'CA' ? refineCaRegion(c) : regionForState(st.toUpperCase()))
+    : null;
+
+  try {
+    await withRetry(() =>
+      getDb()
+        .update(companies)
+        .set({
+          hqCity: c,
+          hqState: isUsState ? st.toUpperCase() : (st || null),
+          hqRegion: region,
+          hqSource: 'manual',
         })
         .where(eq(companies.id, companyId)),
     );

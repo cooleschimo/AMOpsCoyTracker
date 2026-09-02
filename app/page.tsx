@@ -10,6 +10,7 @@
  * so the two cannot disagree about which company sits where.
  */
 import { CompanyCase } from '@/components/company-case';
+import { GeographySection } from '@/components/geography-tabs';
 import { Building2, Radio, Sparkles } from 'lucide-react';
 import { Masonry } from '@/components/masonry';
 import { SectionHeading } from '@/components/primitives';
@@ -107,12 +108,12 @@ export default async function Dashboard() {
       </header>
 
       <div className="space-y-14">
-        <Section
+        <GeographySection
           title="Worth a conversation"
           companies={d.worthAConversation}
           empty="Nothing cleared the bar this week."
         />
-        <Section
+        <GeographySection
           title="New on the radar"
           companies={d.newOnTheRadar}
           empty="No new finds this week."

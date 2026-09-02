@@ -16,7 +16,7 @@ import { assembleWhyNow, type WhyNowInput } from './why-now';
 import { candidateProps } from './proposition';
 import { sectorBroadSector, isBroadSector } from './subsectors';
 import type { Band } from './company-rubric';
-import type { AccountStatus } from './accounts';
+import type { Familiarity } from './familiarity';
 import { EXPORT_CONTROLLED } from './subsectors';
 
 export type Source = { name: string; url: string; date: string };
@@ -53,6 +53,8 @@ export type DashboardCompany = {
   sectors: string[];
   oneLiner: string;
   hq: string;
+  /** bay_area | other_us | non_us — the dashboard filters on this. */
+  geography: 'bay_area' | 'other_us' | 'non_us';
   fundingTotal: string;
   headcount: string;
   founded: number | null;
@@ -78,7 +80,7 @@ export type DashboardCompany = {
     momentum: number;
   };
   whyNow: EvidencePoint[];
-  accountStatus: AccountStatus;
+  familiarity: Familiarity;
   momentum: string | null;
   warmPath: string | null;
   clusterSize: number;
@@ -267,6 +269,14 @@ function toCompany(
     sectors,
     oneLiner: String(r.description ?? ''),
     hq: [r.hq_city, r.hq_state].filter(Boolean).join(', ') || 'Unknown',
+  /**
+   * Three buckets, because that is how the geography is actually read: the Bay
+   * Area is the core, the rest of the US is in scope, and everything else is
+   * worth seeing but is a different conversation.
+   */
+  geography: (r.hq_region === 'bay_area' ? 'bay_area'
+    : typeof r.hq_state === 'string' && /^[A-Z]{2}$/.test(r.hq_state) ? 'other_us'
+    : 'non_us') as 'bay_area' | 'other_us' | 'non_us',
     fundingTotal: money(r.total_raised),
     headcount: r.headcount_est ? String(r.headcount_est) : 'Unknown',
     founded: r.founded_year ? Number(r.founded_year) : null,
@@ -335,7 +345,7 @@ function toCompany(
       String(r.signal_type ?? 'other'),
       source,
     ),
-    accountStatus: (r.account_status as AccountStatus) ?? 'unknown',
+    familiarity: (r.familiarity as Familiarity) ?? 'unknown',
     momentum: r.momentum !== null && r.momentum !== undefined ? `${r.momentum}/3` : null,
     warmPath: (r.warm_path as string | null) ?? null,
     clusterSize: Number(r.cluster_size ?? 0),
@@ -499,9 +509,9 @@ async function signalRows(signalVersion: string): Promise<Row[]> {
   const sql = getSql();
   const rows: any = await sql`
     select
-      cs.company_id, c.name as company_name, c.account_status, c.sectors,
-      c.description, c.hq_city, c.hq_state, c.total_raised, c.headcount_est,
-      c.founded_year, c.round_date, c.round_amount_musd, c.valuation_est, c.valuation_source,
+      cs.company_id, c.name as company_name, c.familiarity, c.sectors,
+      c.description, c.hq_city, c.hq_state, c.hq_region, c.total_raised, c.headcount_est,
+      c.founded_year, c.round_date, c.round_stage, c.round_amount_musd, c.valuation_est, c.valuation_source,
       cs.expansion, cs.momentum, cs.partnership, cs.signal_type,
       cs.expansion_language, cs.why, cs.why_item_ids, cs.week_of,
       i.id as item_id, i.title, i.url, i.source, i.source_type, i.published_at,
@@ -577,9 +587,19 @@ const toPlacementInput = (r: Row): PlacementInput => ({
   sourceType: String(r.source_type ?? 'news'),
   targetPriority: (r.target_priority as Band) ?? null,
   singaporeFit: (r.singapore_fit as Band) ?? null,
-  accountStatus: (r.account_status as AccountStatus) ?? null,
+  familiarity: (r.familiarity as Familiarity) ?? null,
   publishedAt: r.published_at ? new Date(r.published_at as string) : null,
   clusterSize: Number(r.cluster_size ?? 0),
+  roundStage: (r.round_stage as string | null) ?? null,
+  valuationUsd: r.valuation_est != null ? Number(r.valuation_est) : null,
+  roundAmountMusd: r.round_amount_musd != null ? Number(r.round_amount_musd) : null,
+  // A two-letter tail is a US state; anything else is the country, which is
+  // what marks a Singapore company as not a target.
+  hqCountry: typeof r.hq_state === 'string' && /^[A-Z]{2}$/.test(r.hq_state)
+    ? 'United States' : (r.hq_state as string | null) ?? null,
+  hqCity: (r.hq_city as string | null) ?? null,
+  title: (r.title as string | null) ?? null,
+  snippet: (r.snippet as string | null) ?? null,
 });
 
 export type WeeklyDigest = {
@@ -587,7 +607,9 @@ export type WeeklyDigest = {
   coverage: string;
   /** The same three numbers as `coverage`, for a stat row rather than a sentence. */
   coverageStats: { monitored: number; processed: number; surfaced: number };
+  /** A real trigger at a company the tool can argue for. */
   worthAConversation: DashboardCompany[];
+  /** A strong trigger the tool cannot yet argue for. */
   newOnTheRadar: DashboardCompany[];
   accountActivity: DashboardCompany[];
   monitoring: DashboardCompany[];
@@ -675,9 +697,9 @@ export async function getMonitoredCompanies(
 ): Promise<DashboardCompany[]> {
   const sql = getSql();
   const rows: any = await sql`
-    select c.id as company_id, c.name as company_name, c.account_status, c.sectors,
-           c.description, c.hq_city, c.hq_state, c.total_raised, c.headcount_est,
-           c.founded_year, c.round_date, c.round_amount_musd, c.valuation_est, c.valuation_source,
+    select c.id as company_id, c.name as company_name, c.familiarity, c.sectors,
+           c.description, c.hq_city, c.hq_state, c.hq_region, c.total_raised, c.headcount_est,
+           c.founded_year, c.round_date, c.round_stage, c.round_amount_musd, c.valuation_est, c.valuation_source,
            m.added_at, m.note,
            cs.expansion, cs.momentum, cs.partnership, cs.signal_type, cs.why,
            cs.why_item_ids,
