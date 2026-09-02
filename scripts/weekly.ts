@@ -12,7 +12,17 @@
  * the summary at the end says which stages failed so the gap is visible rather
  * than silent.
  *
- * Usage: npx tsx scripts/weekly.ts [--from <stage>] [--only <a,b>] [--skip <a,b>] [--dry]
+ * Two cadences, one script.
+ *
+ * --daily runs everything that finds and scores: ingest, discover, filter,
+ * rescue, score, assess. Discovery has to be daily because a feed holds a story
+ * for a day or two and a weekly pull silently misses whatever fell off — and a
+ * company found on Tuesday should be scored by the time the digest is written.
+ *
+ * The default is the full run, digest included, for the day the digest goes out.
+ *
+ * Usage: npx tsx scripts/weekly.ts [--daily] [--from <stage>] [--only <a,b>]
+ *          [--skip <a,b>] [--dry]
  */
 import '../lib/loadenv';
 import { spawn } from 'node:child_process';
@@ -33,6 +43,8 @@ const STAGES: Stage[] = [
     why: 'job boards; the hiring snapshot score-companies reads' },
   { name: 'context', script: 'ingest-context.ts', timeoutMin: 15,
     why: 'policy and sector moves that shift a company without it acting' },
+  { name: 'discover', script: 'discover-news.ts', timeoutMin: 10,
+    why: 'companies named in untargeted news that we do not track yet' },
   { name: 'filter', script: 'filter-score.ts', timeoutMin: 45,
     why: 'canonicalise, drop, cluster, score the items' },
   { name: 'rescue', script: 'rescue-mismatch.ts', timeoutMin: 20,
@@ -89,6 +101,8 @@ function run(stage: Stage, dry: boolean): Promise<{ ok: boolean; ms: number; not
   const only = argOf('only')?.split(',').map((s) => s.trim());
   const skip = argOf('skip')?.split(',').map((s) => s.trim()) ?? [];
   const from = argOf('from');
+  // The digest is the only weekly-only stage; everything before it is daily.
+  const daily = flag('daily');
 
   let stages = STAGES;
   if (from) {
@@ -97,9 +111,10 @@ function run(stage: Stage, dry: boolean): Promise<{ ok: boolean; ms: number; not
     stages = stages.slice(i);
   }
   if (only) stages = stages.filter((s) => only.includes(s.name));
+  if (daily) stages = stages.filter((s) => s.name !== 'digest');
   stages = stages.filter((s) => !skip.includes(s.name));
 
-  console.log(`weekly run — ${stages.length} stages${dry ? ' (DRY)' : ''}\n`);
+  console.log(`${daily ? 'daily' : 'weekly'} run — ${stages.length} stages${dry ? ' (DRY)' : ''}\n`);
   const results: Array<{ stage: string; ok: boolean; ms: number; note: string }> = [];
 
   for (const stage of stages) {

@@ -61,9 +61,20 @@ type Assessment = {
 
   const withSignals = flag('with-signals');
 
-  // Default target: in-scope Form D discoveries with no sectors yet — the
-  // genuinely ambiguous set left after the EDGAR industry mapping.
-  // --with-signals: any company holding a scored item at 2+ and no assessment.
+  /**
+   * Default target: any company with activity this window and no assessment at
+   * the current rubric version.
+   *
+   * It used to be in-scope Form D discoveries with no sectors yet, which had
+   * two consequences neither of them intended. Seed companies were never
+   * eligible at all — nine of them reached the digest unassessed, which put
+   * them in "new on the radar" as though the tool had judged them marginal when
+   * it had simply never looked. And once classify-sectors.ts took over sector
+   * classification, "no sectors yet" became false for everything, so no company
+   * could ever be re-assessed.
+   *
+   * --with-signals narrows to companies holding a scored item at 2+.
+   */
   const pending = withSignals
     ? await db.select({
         id: companies.id, name: companies.name, hqState: companies.hqState,
@@ -85,9 +96,14 @@ type Assessment = {
         website: companies.website, description: companies.description,
       }).from(companies)
         .where(and(
-          eq(companies.discoveredVia, 'form_d'),
-          eq(companies.scopeStatus, 'in_scope'),
-          force ? sql`true` : or(isNull(companies.sectors), sql`array_length(${companies.sectors}, 1) is null`),
+          // Confidently out of scope stays out; 'unknown' is not a judgment.
+          sql`coalesce(${companies.scopeStatus}, 'unknown') <> 'out_of_scope'`,
+          sql`exists (select 1 from company_signals cs
+                      where cs.company_id = ${companies.id}
+                        and cs.week_of > current_date - 60)`,
+          force ? sql`true` : sql`not exists (select 1 from company_assessments ca
+                      where ca.company_id = ${companies.id}
+                        and ca.rubric_version = ${COMPANY_RUBRIC_VERSION})`,
         ));
 
   const targets = limit ? pending.slice(0, limit) : pending;

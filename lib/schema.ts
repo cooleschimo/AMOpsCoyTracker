@@ -26,6 +26,14 @@ export const companies = pgTable('companies', {
   hqCity: text('hq_city'),
   hqState: text('hq_state'),
   hqRegion: text('hq_region'),
+  /**
+   * Where the location came from, so a reader can tell a filed address from a
+   * guess. 'seed' and 'form_d' are researched or filed; 'news' is the model's
+   * reading of a headline — often right, never checked, and the reason
+   * Implantica arrived as San Diego. 'manual' is a person's correction and
+   * outranks every automatic source.
+   */
+  hqSource: text('hq_source'),
   website: text('website'),
   cik: text('cik'),
   foundedYear: integer('founded_year'),
@@ -87,7 +95,13 @@ export const companies = pgTable('companies', {
   normalizedName: text('normalized_name'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 }, (t) => [
-  index('companies_normalized_name_idx').on(t.normalizedName),
+  /*
+   * Unique, not merely indexed. Without it `onConflictDoNothing` has no
+   * conflict to detect, so every discovery run that saw a company again
+   * inserted it again — 105 duplicated names before this was noticed, and each
+   * one splits a company's items, signals and scores across two rows.
+   */
+  uniqueIndex('companies_normalized_name_key').on(t.normalizedName),
   index('companies_cik_idx').on(t.cik),
 ]);
 

@@ -82,6 +82,7 @@ type ScoreOut = {
   const db = getDb();
   const batchSize = Number(arg('batch', '12'));
   const limit = Number(arg('limit', '0'));
+  const via = arg('via');
   const dry = flag('dry');
   const filterOnly = flag('filter-only');
 
@@ -120,7 +121,18 @@ type ScoreOut = {
       canonicalUrl: items.canonicalUrl, source: items.source,
       sourceType: items.sourceType, publishedAt: items.publishedAt,
       companyId: items.companyId, status: items.status,
-    }).from(items).where(eq(items.status, 'fetched')).orderBy(items.id);
+    }).from(items)
+      .where(and(
+        eq(items.status, 'fetched'),
+        // --via narrows to items belonging to companies found a particular way,
+        // so a newly discovered set can be brought current without re-running
+        // the whole backlog.
+        via
+          ? sql`exists (select 1 from companies c
+                        where c.id = ${items.companyId} and c.discovered_via = ${via})`
+          : sql`true`,
+      ))
+      .orderBy(items.id);
 
     const input: Row[] = limit ? pending.slice(0, limit) : pending;
     counts.input = input.length;

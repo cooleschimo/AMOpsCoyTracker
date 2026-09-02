@@ -453,6 +453,409 @@ export const CONTEXT_SOURCES: ContextSource[] = [
     sectors: ['deeptech', 'ai'],
     enabled: true,
   },
+  /**
+   * Feeds carried for discovery rather than context.
+   *
+   * The mastheads above say what is happening in a sector; these name the
+   * companies it is happening to, which is what step 16 mines. A funding
+   * publication reports a Series A that no general outlet covers, and a sector
+   * title covers the companies in that sector before anyone else does.
+   *
+   * Every URL below was fetched and returned same-day items on 2026-08-31.
+   * Several obvious candidates are absent because they refuse server requests:
+   * DealStreetAsia (503), e27 and Tech Wire Asia (403), Axios Pro Rata and
+   * Fortune Term Sheet (404 on every documented path).
+   */
+  /**
+   * General tech press. Thin for discovery — The Register returned 0 fundraises
+   * in 50 items where Semiconductor Digest returns several in 30 — but a
+   * business-desk story sometimes carries a siting or partnership event the
+   * trade titles miss, and polling costs nothing.
+   *
+   * Which of the aggregator's outlets are worth carrying was decided by asking
+   * the model, per outlet, how many of its headlines name a company doing
+   * something. That is the criterion — company activity of any kind, not
+   * fundraises — and it separates them sharply:
+   *
+   *   Techmeme                  5 of 15   Anthropic's $35bn Nvidia deal, Clay
+   *                                       raising at $7bn, Reframe's $40M
+   *                                       Series A, Hyperliquid entering the US
+   *   these trade feeds        10 of 25   Sword Health buying Headspace, Diodes
+   *                                       completing a semiconductor acquisition
+   *   Ars Technica              6 of 20   mostly litigation and platform news
+   *   The Verge                 1 of 10   a projector review
+   *   Hacker News, 150+ points  1 of 20   a graphics-card vendor page
+   *
+   * So Techmeme is carried and the consumer titles are not. Techmeme is an
+   * editor-curated business wire in feed form, where The Verge, Engadget, CNET,
+   * TechRadar and Android Authority cover products and deals — real journalism,
+   * but about things rather than companies, and a headline about a discounted
+   * monitor names no one to approach.
+   *
+   * Scraping brutalist.report itself was considered and rejected on the same
+   * measurement rather than on difficulty: plain curl returns the whole page,
+   * no headless browser needed, but it interleaves Techmeme with Hackaday and
+   * CNET deals, so taking the aggregate means paying to read ~340 headlines to
+   * reach the ~15 that Techmeme's own feed gives directly.
+   */
+  /**
+   * TechCrunch by category.
+   *
+   * The densest source measured: 13 of 25 of its headlines name a company doing
+   * something, against 10 of 25 for the sector trade press and 5 of 15 for
+   * Techmeme. It is also the one that names companies nobody has heard of —
+   * Inherent, Clipto, Hoomanely, Liux — where the trade press writes about
+   * firms already established in their sector.
+   *
+   * The category feeds are carried alongside the main one because each returns
+   * ~20 items of its own: the main feed is what the editors led with, and a
+   * category is everything in that beat. Climate returned 9 of 20 (Pacific
+   * Fusion, Apollo Atomics, Anthro Energy) and hardware 8 of 18, which is a
+   * better ratio than the general feed.
+   */
+  {
+    id: 'techcrunch_venture',
+    name: 'TechCrunch — Venture',
+    url: 'https://techcrunch.com/category/venture/feed/',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'techcrunch_fundraising',
+    name: 'TechCrunch — Fundraising',
+    url: 'https://techcrunch.com/category/fundraising/feed/',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'techcrunch_robotics',
+    name: 'TechCrunch — Robotics',
+    url: 'https://techcrunch.com/category/robotics/feed/',
+    kind: 'trade',
+    sectors: ['robotics', 'industrial'],
+    enabled: true,
+  },
+  {
+    id: 'techcrunch_hardware',
+    name: 'TechCrunch — Hardware',
+    url: 'https://techcrunch.com/category/hardware/feed/',
+    kind: 'trade',
+    sectors: ['semiconductors', 'compute'],
+    enabled: true,
+  },
+  {
+    id: 'techcrunch_climate',
+    name: 'TechCrunch — Climate',
+    url: 'https://techcrunch.com/category/climate/feed/',
+    kind: 'trade',
+    sectors: ['materials_energy', 'industrial'],
+    enabled: true,
+  },
+  {
+    id: 'techcrunch_space',
+    name: 'TechCrunch — Space',
+    url: 'https://techcrunch.com/category/space/feed/',
+    kind: 'trade',
+    sectors: ['space', 'aerospace'],
+    enabled: true,
+  },
+  {
+    id: 'techcrunch_transportation',
+    name: 'TechCrunch — Transportation',
+    url: 'https://techcrunch.com/category/transportation/feed/',
+    kind: 'trade',
+    sectors: ['robotics', 'industrial'],
+    enabled: true,
+  },
+  {
+    id: 'techcrunch_enterprise',
+    name: 'TechCrunch — Enterprise',
+    url: 'https://techcrunch.com/category/enterprise/feed/',
+    kind: 'trade',
+    sectors: ['ai_software', 'software_platforms'],
+    enabled: true,
+  },
+  {
+    id: 'techcrunch_security',
+    name: 'TechCrunch — Security',
+    url: 'https://techcrunch.com/category/security/feed/',
+    kind: 'trade',
+    sectors: ['cybersecurity'],
+    enabled: true,
+  },
+  /**
+   * Tech business desks.
+   *
+   * Business Insider's markets feed is the densest of these at 7 of 10 — it
+   * carries company press releases, which is why: Lunar Cyber, Bloom Healthcare
+   * and AEVEX all arrived from it. CNBC's technology desk runs 5 of 20.
+   *
+   * Absent, having been tried: The Information (403, paywalled), Reuters (no
+   * working feed on any documented path, and a Google News site: query returned
+   * nothing), Wired business (2 of 20, and its own feed yields one item),
+   * CNBC's general business desk (1 of 20, mostly consumer brands), CNN
+   * Business (4 of 20, and those were Toys 'R' Us and Tinder), r/technews (1 of
+   * 20). r/TechTrendSignals rate-limits anonymous requests outright.
+   */
+  {
+    id: 'businessinsider_markets',
+    name: 'Business Insider — Markets',
+    url: 'https://markets.businessinsider.com/rss/news',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'cnbc_tech',
+    name: 'CNBC — Technology',
+    url: 'https://www.cnbc.com/id/19854910/device/rss/rss.html',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  /**
+   * US site selection and economic development.
+   *
+   * The densest sources measured anywhere: Area Development returned 20 of 20
+   * headlines naming a company, because that is what it publishes — one entry
+   * per facility announcement, with the company, the town and the activity.
+   * "ProVia Plans Tuscarawas County, Ohio, Manufacturing Operations" is a
+   * siting decision in a headline, which is the expansion axis's whole subject.
+   *
+   * They also correct a skew. World news is mostly not American, so the trade
+   * and regional feeds were surfacing Japanese, Chinese and European companies
+   * faster than US ones; these are US by construction.
+   *
+   * Site Selection magazine is absent despite the name — it publishes analysis
+   * ("The 2026 Global Groundwork Index") rather than announcements, and scored
+   * 0 of 10.
+   */
+  {
+    id: 'area_development',
+    name: 'Area Development',
+    url: 'https://www.areadevelopment.com/rss/newsitems.xml',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'business_facilities',
+    name: 'Business Facilities',
+    url: 'https://businessfacilities.com/feed/',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'trade_industry_dev',
+    name: 'Trade & Industry Development',
+    url: 'https://www.tradeandindustrydev.com/rss.xml',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'crunchbase_news',
+    name: 'Crunchbase News',
+    url: 'https://news.crunchbase.com/feed/',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'techfundingnews',
+    name: 'TechFundingNews',
+    url: 'https://techfundingnews.com/feed/',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'biopharma_dive',
+    name: 'BioPharma Dive',
+    url: 'https://www.biopharmadive.com/feeds/news/',
+    kind: 'trade',
+    sectors: ['therapeutics', 'health'],
+    enabled: true,
+  },
+  {
+    id: 'supplychain_dive',
+    name: 'Supply Chain Dive',
+    url: 'https://www.supplychaindive.com/feeds/news/',
+    kind: 'trade',
+    sectors: ['logistics_supply_chain', 'industrial'],
+    enabled: true,
+  },
+  {
+    id: 'utility_dive',
+    name: 'Utility Dive',
+    url: 'https://www.utilitydive.com/feeds/news/',
+    kind: 'trade',
+    sectors: ['materials_energy'],
+    enabled: true,
+  },
+  {
+    id: 'techmeme',
+    name: 'Techmeme',
+    url: 'https://www.techmeme.com/feed.xml',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'ars_technica',
+    name: 'Ars Technica',
+    url: 'https://feeds.arstechnica.com/arstechnica/index',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'wsj_tech',
+    name: 'WSJ — Technology',
+    url: 'https://feeds.a.dj.com/rss/RSSWSJD.xml',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'the_register',
+    name: 'The Register',
+    url: 'https://www.theregister.com/headlines.atom',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'siliconangle',
+    name: 'SiliconANGLE',
+    url: 'https://siliconangle.com/feed/',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'techcrunch_startups',
+    name: 'TechCrunch — Startups',
+    url: 'https://techcrunch.com/category/startups/feed/',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'venturebeat',
+    name: 'VentureBeat',
+    url: 'https://venturebeat.com/feed/',
+    kind: 'trade',
+    sectors: ['ai'],
+    enabled: true,
+  },
+  {
+    id: 'tech_eu',
+    name: 'Tech.eu',
+    url: 'https://tech.eu/feed/',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'eu_startups',
+    name: 'EU-Startups',
+    url: 'https://www.eu-startups.com/feed/',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'spacenews',
+    name: 'SpaceNews',
+    url: 'https://spacenews.com/feed/',
+    kind: 'trade',
+    sectors: ['space', 'aerospace'],
+    enabled: true,
+  },
+  {
+    id: 'payload_space',
+    name: 'Payload Space',
+    url: 'https://payloadspace.com/feed/',
+    kind: 'trade',
+    sectors: ['space', 'aerospace'],
+    enabled: true,
+  },
+  {
+    id: 'quantum_insider',
+    name: 'The Quantum Insider',
+    url: 'https://thequantuminsider.com/feed/',
+    kind: 'trade',
+    sectors: ['quantum', 'compute'],
+    enabled: true,
+  },
+  {
+    id: 'canary_media',
+    name: 'Canary Media',
+    url: 'https://www.canarymedia.com/feed',
+    kind: 'trade',
+    sectors: ['materials_energy', 'industrial'],
+    enabled: true,
+  },
+  {
+    id: 'fierce_electronics',
+    name: 'Fierce Electronics',
+    url: 'https://www.fierceelectronics.com/rss/xml',
+    kind: 'trade',
+    sectors: ['semiconductors', 'compute'],
+    enabled: true,
+  },
+  {
+    id: 'medtech_dive',
+    name: 'MedTech Dive',
+    url: 'https://www.medtechdive.com/feeds/news/',
+    kind: 'trade',
+    sectors: ['medtech_devices', 'health'],
+    enabled: true,
+  },
+  {
+    id: 'stat_news',
+    name: 'STAT News',
+    url: 'https://www.statnews.com/feed/',
+    kind: 'trade',
+    sectors: ['therapeutics', 'health'],
+    enabled: true,
+  },
+  {
+    id: 'genengnews',
+    name: 'Genetic Engineering News',
+    url: 'https://www.genengnews.com/feed/',
+    kind: 'trade',
+    sectors: ['biotech_platforms', 'health'],
+    enabled: true,
+  },
+  {
+    id: 'defensescoop',
+    name: 'DefenseScoop',
+    url: 'https://defensescoop.com/feed/',
+    kind: 'trade',
+    sectors: ['defence_software', 'defence'],
+    enabled: true,
+  },
+  {
+    id: 'manufacturing_dive',
+    name: 'Manufacturing Dive',
+    url: 'https://www.manufacturingdive.com/feeds/news/',
+    kind: 'trade',
+    sectors: ['advanced_manufacturing', 'industrial'],
+    enabled: true,
+  },
+  {
+    id: 'ieee_spectrum',
+    name: 'IEEE Spectrum',
+    url: 'https://spectrum.ieee.org/feeds/feed.rss',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
   {
     id: 'techcrunch',
     name: 'TechCrunch',

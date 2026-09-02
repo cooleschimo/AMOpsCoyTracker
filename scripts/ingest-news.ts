@@ -145,18 +145,35 @@ async function insertItems(db: ReturnType<typeof getDb>, rows: PendingItem[]): P
   try {
     // ---- Company-directed Google News -------------------------------------
     if (!wiresOnly) {
-      // Seed list + Form D discoveries that passed the company assessment.
+      /**
+       * Everything the pipeline is actually watching.
+       *
+       * The seed list and assessed Form D filings, and — the addition that
+       * matters — companies news discovery found. Those arrived with exactly
+       * one item, the headline that surfaced them, and were never searched
+       * again: they could not accumulate a second. That starves the scoring,
+       * which reads a company's whole window to judge momentum and to build a
+       * why-now, so a genuine find was being scored on a single sentence.
+       *
+       * A discovered company is searched once it is in scope, or while nothing
+       * has judged it either way. One the assessment marked out of scope is
+       * dropped, which is what stops the target list growing without limit.
+       */
       const targets = await db.select({
         id: companies.id, name: companies.name, aliases: companies.aliases,
       }).from(companies)
         .where(or(
           eq(companies.discoveredVia, 'seed'),
           and(eq(companies.discoveredVia, 'form_d'), eq(companies.scopeStatus, 'in_scope')),
+          and(
+            eq(companies.discoveredVia, 'news'),
+            sql`coalesce(${companies.scopeStatus}, 'unknown') <> 'out_of_scope'`,
+          ),
         ))
         .orderBy(companies.id);
 
       const list = limit ? targets.slice(0, limit) : targets;
-      console.log(`Google News: ${list.length} companies (seed + assessed Form D)`);
+      console.log(`Google News: ${list.length} companies (seed, assessed Form D, discovered)`);
 
       for (const [idx, c] of list.entries()) {
         const url = googleNewsUrl(c.name);

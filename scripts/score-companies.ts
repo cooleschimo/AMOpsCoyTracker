@@ -12,7 +12,8 @@
  * data that is ~120 calls rather than 451, and each one sees the co-occurrence
  * (§7) that no single-item view can.
  *
- * Usage: npx tsx scripts/score-companies.ts [--limit N] [--week YYYY-MM-DD] [--dry] [--force]
+ * Usage: npx tsx scripts/score-companies.ts [--limit N] [--week YYYY-MM-DD]
+ *          [--via news] [--dry] [--force]
  */
 import '../lib/loadenv';
 import { eq } from 'drizzle-orm';
@@ -56,6 +57,9 @@ type Out = {
   const limit = Number(arg('limit', '0'));
   const dry = flag('dry');
   const force = flag('force');
+  // Narrows to companies found a particular way, so a newly discovered set can
+  // be brought current without re-scoring everything that already has a signal.
+  const via = arg('via');
 
   // Companies with kept items in the window. An ATS aggregate has no published
   // date by construction, so it is included on its fetch date instead.
@@ -66,6 +70,7 @@ type Out = {
     from companies c
     join items i on i.company_id = c.id and i.status = 'kept'
     where coalesce(i.published_at, i.fetched_at) > now() - make_interval(days => ${WINDOW_DAYS})
+      and (${via === undefined} or c.discovered_via = ${via ?? ''})
       and (${force} or not exists (
         select 1 from company_signals cs
         where cs.company_id = c.id and cs.week_of = ${weekOf}

@@ -44,6 +44,8 @@ The test that settles a hard case: what would this company need from a governmen
 
 Every company gets a broad sector. Give a subsector too when the description supports one; leave it empty when the family is clear but the child is not.
 
+Some entries give a news headline rather than a company summary — "Freeman Automation to Establish New Operation in Graves County". Classify from what the headline reveals about the business, and return low confidence when it reveals little. A headline about a company's activity is not the same evidence as a description of what it sells.
+
 Return the ids exactly as written. If no broad sector fits, use "other". Do not invent an id and do not stretch a definition to avoid "other".
 
 Return JSON only:
@@ -78,15 +80,24 @@ ${batch.map((c) => `id ${c.id}: ${c.name}
   const dry = flag('dry');
 
   /**
-   * Companies worth classifying: a real description to read, and either no
-   * sector yet or an explicit re-run. Ordered so the ones that reach the digest
-   * are done first — a partial run then still covers what matters.
+   * Companies worth classifying: something to read, and either no sector yet or
+   * an explicit re-run. Ordered so the ones that reach the digest are done
+   * first — a partial run then still covers what matters.
+   *
+   * A news-discovered company has no description, because that route stores a
+   * name and the headline that surfaced it. The headline usually classifies
+   * well enough on its own: "Freeman Automation to Establish New Operation in
+   * Graves County" says manufacturing, "Epson launches AX6 cobot" says robotics.
+   * So it stands in, and the prompt is told it may be reading one.
    */
   const rows: any = await sqlc`
-    select c.id, c.name, c.description, c.website
+    select c.id, c.name, c.website,
+           coalesce(nullif(c.description, ''), c.scope_reason) as description
     from companies c
-    where c.description is not null and c.description <> ''
-      and c.description not ilike 'Website:%'
+    where (
+        (c.description is not null and c.description <> '' and c.description not ilike 'Website:%')
+        or (c.discovered_via = 'news' and c.scope_reason is not null)
+      )
       ${all ? sqlc`` : sqlc`and (c.sectors is null or array_length(c.sectors, 1) is null
                                or not exists (select 1 from unnest(c.sectors) s
                                               where s in ('ai','deeptech','biotech','defence_tech')))`}
