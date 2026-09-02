@@ -204,6 +204,19 @@ async function callWithFailover(opts: CallOpts, stricter: boolean): Promise<RawO
     if (!('error' in res)) return res;
     last = res;
     if (!res.exhausted) return res;   // a real error: do not mask it by retrying elsewhere
+
+    /*
+     * Record the exhaustion, so the next call skips this provider instead of
+     * rediscovering it.
+     *
+     * Without this the budget only knows what its own counters saw, and a
+     * provider whose daily cap the API itself reported was retried from the top
+     * on every subsequent call. In a 212-company run that meant two spent keys
+     * were re-attempted hundreds of times — one of them burning thirty seconds
+     * of backoff each pass — while six configured keys further down the chain
+     * were never reached at all.
+     */
+    opts.budget?.markExhausted(who, res.error);
     if (providers.length > 1) console.warn(`[llm] ${who} exhausted; trying next provider`);
   }
   // Only now is the run genuinely out of capacity.
