@@ -270,10 +270,9 @@
   --text-3xl: 1rem;           /* 16px */
   --text-3xl--line-height: 1.3rem;
 
-  /* Layout is the Masonry component's job: cards keep their natural heights
-     while rank still reads left-to-right, which neither CSS columns nor a plain
-     grid can do alone. This block only carries the type scale and the card's
-     internal sizing. */
+  /* Layout is the card grid's job — rank reads left to right and each card
+     keeps its own height. This block carries only the type scale and the
+     card's internal sizing. */
 }
 
 /* The card keeps its wide-version arrangement; only the scale changes. */
