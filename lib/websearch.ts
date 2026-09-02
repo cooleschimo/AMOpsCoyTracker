@@ -103,12 +103,18 @@ export async function findCompanyWebsite(companyName: string): Promise<{ host: s
     if (!h.host || NON_COMPANY.test(h.host)) continue;
     const hostCompact = h.host.replace(/\.[a-z.]+$/, '').replace(/[^a-z0-9]/g, '');
     // The host must contain the compacted name, or the first two tokens.
-    if (hostCompact.includes(compact)) return { host: h.host, why: `host matches full name (${h.host})` };
+    // Exact host, or containment only when the name is long enough to be
+    // distinctive — see the note in researchCompany.
+    if (hostCompact === compact) return { host: h.host, why: `host matches full name (${h.host})` };
+    if (compact.length >= 8 && hostCompact.includes(compact)) {
+      return { host: h.host, why: `host matches full name (${h.host})` };
+    }
     if (tokens.length >= 2) {
       const two = tokens.slice(0, 2).join('');
-      if (hostCompact.includes(two)) return { host: h.host, why: `host matches "${tokens.slice(0, 2).join(' ')}" (${h.host})` };
+      if (two.length >= 8 && hostCompact.includes(two)) {
+        return { host: h.host, why: `host matches "${tokens.slice(0, 2).join(' ')}" (${h.host})` };
+      }
     }
-    if (tokens.length === 1 && hostCompact === tokens[0]) return { host: h.host, why: `host equals name (${h.host})` };
   }
   return null;
 }
@@ -163,13 +169,27 @@ export async function researchCompany(companyName: string): Promise<CompanyResea
     return hay.includes(bare.toLowerCase()) || hostCompact.includes(compact);
   });
 
+  /*
+   * SUBSTRING CONTAINMENT IS NOT A MATCH FOR A SHORT NAME.
+   *
+   * `hostCompact.includes(compact)` reads "air-burkina" as a match for AIR,
+   * because a three-letter name is a substring of half the web — that is how
+   * Burkina Faso's national airline came back as a US defence company's site.
+   * A short name has to equal the host, where a longer one can be contained in
+   * it (mistral.ai for "Mistral AI").
+   */
   const website = (() => {
     for (const h of hits) {
       if (!h.host || NON_COMPANY.test(h.host)) continue;
       const hostCompact = h.host.replace(/\.[a-z.]+$/, '').replace(/[^a-z0-9]/g, '');
-      if (hostCompact.includes(compact)) return { host: h.host, why: `host matches full name (${h.host})` };
-      if (tokens.length >= 2 && hostCompact.includes(tokens.slice(0, 2).join(''))) {
-        return { host: h.host, why: `host matches "${tokens.slice(0, 2).join(' ')}" (${h.host})` };
+      const exact = hostCompact === compact;
+      const contained = compact.length >= 8 && hostCompact.includes(compact);
+      if (exact || contained) return { host: h.host, why: `host matches full name (${h.host})` };
+      if (tokens.length >= 2) {
+        const two = tokens.slice(0, 2).join('');
+        if (two.length >= 8 && hostCompact.includes(two)) {
+          return { host: h.host, why: `host matches "${tokens.slice(0, 2).join(' ')}" (${h.host})` };
+        }
       }
     }
     return null;

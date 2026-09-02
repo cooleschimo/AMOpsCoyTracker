@@ -45,6 +45,8 @@ export function candidateDomains(name: string): string[] {
 
 const UA = 'Mozilla/5.0 (compatible; AMOpsCoyTracker/1.0; +research)';
 
+const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
 export type SiteResult = {
   domain: string;
   title: string | null;
@@ -138,7 +140,32 @@ export async function tryDomain(domain: string, companyName: string): Promise<Si
   const compact = (x: string) => x.replace(/[^a-z0-9]/g, '');
   const contiguous = compact(hay).includes(compact(tokens.join('')));
 
-  const verified = allPresent || contiguous;
+  /*
+   * A ONE-TOKEN NAME CANNOT BE VERIFIED BY ITS NAME ALONE.
+   *
+   * "Aslan" appears on aslan.ai, a Thai finance site; "Electra" is the exact
+   * name of seven different companies in CB Insights. For a single-word name
+   * `allPresent` and `contiguous` are the same test — does this one word occur
+   * — and any page that happens to use the word passes it. That is a
+   * coincidence being recorded as an identity, and §8 is explicit that a wrong
+   * website is worse than none because it feeds a confident wrong assessment.
+   *
+   * So a single-token name needs corroboration beyond the name: the caller's
+   * `expectedIndustry` check in resolveWebsite. Multi-word names keep the
+   * original bar, where matching every token is genuinely distinctive.
+   */
+  /*
+   * A single-word name is only as good as the domain carrying it. When the
+   * domain's stem IS the name — agentrys.ai for Agentrys — the company owns
+   * that name on that domain and the match is as strong as any. When the name
+   * merely appears somewhere in the page text, it is a coincidence: "Aslan" is
+   * a Thai finance site, and "Electra" is the exact name of seven different
+   * companies. So the stem is what verifies a one-word name, not the prose.
+   */
+  const singleToken = tokens.length === 1;
+  const stem = domain.replace(/\.[a-z.]+$/, '').replace(/[^a-z0-9]/g, '');
+  const stemIsName = stem === tokens.join('');
+  const verified = singleToken ? stemIsName : (allPresent || contiguous);
 
   // A verified name match still leaves two cases the caller has to tell apart:
   //  - contentful : real company copy the assessment can judge
@@ -153,7 +180,9 @@ export async function tryDomain(domain: string, companyName: string): Promise<Si
     verifyReason: verified
       ? (contiguous ? `page contains the full name "${tokens.join(' ')}"${thin ? ' (THIN: placeholder page, little content)' : ''}`
                     : `page references all name tokens: ${hits.map((h) => `"${h}"`).join(', ')}${thin ? ' (THIN)' : ''}`)
-      : `partial match only (${hits.length}/${tokens.length}: ${hits.join(', ') || 'none'}) - rejected to avoid a wrong company`,
+      : singleToken
+        ? `single-word name "${tokens[0]}" but the domain stem is "${stem}" - a word appearing on a page is not identity`
+        : `partial match only (${hits.length}/${tokens.length}: ${hits.join(', ') || 'none'}) - rejected to avoid a wrong company`,
   };
 }
 
@@ -166,7 +195,52 @@ const INDUSTRY_WORDS: Record<string, RegExp> = {
   agency: /\b(agency|marketing|branding|advertis|creative studio|web design|seo|social media)\b/i,
   software: /\b(software|platform|api|saas|app|developer|cloud|data)\b/i,
   hardware: /\b(hardware|semiconductor|chip|device|sensor|robot|manufactur|materials)\b/i,
+  defence: /\b(defen[cs]e|military|intelligence|warfight|tactical|weapon|missile|aerospace|national security)\b/i,
+  ai: /\b(artificial intelligence|machine learning|\bllm\b|agentic|ai agents?|foundation model|inference|neural network|deep learning)\b/i,
+  energy: /\b(energy|battery|solar|grid|nuclear|fusion|power|renewable)\b/i,
+  space: /\b(space|satellite|orbit|launch|rocket|spacecraft)\b/i,
 };
+
+/**
+ * Whether a page's own copy corroborates the industry the company is known to
+ * be in. Used for the names that cannot verify themselves.
+ *
+ * The test is positive corroboration, never absence of a contradiction: a
+ * generic name always matches SOME company, so the page has to actively speak
+ * the right industry's language rather than merely fail to speak the wrong
+ * one's.
+ */
+export const SAME_NAME_SYSTEM = `You decide whether a website belongs to a specific company.
+
+Many companies share a name. You are given what is known about the company being looked for, and the actual content of a website whose address matches that name. Decide whether the site is that company's own site.
+
+Answer no when the site belongs to a different company that happens to share the name, when it is a publication, directory, or fan page about the name, or when the content is too thin to tell. "I cannot tell from this" is a no.
+
+Answer yes only when the site's own description of its business is consistent with what the company is known to do. A site in another language is fine if the business matches; the language is not the test.
+
+Being wrong costs more in one direction. A wrong site is recorded as fact and read by a later judgment as though it were checked, where no site simply leaves a gap that someone can fill. When it is close, say no.
+
+Return JSON only: {"same_company": true|false, "why": "<one short sentence>"}`;
+
+export function buildSameNamePrompt(
+  companyName: string, knownFor: string, site: { domain: string; title: string | null; text: string },
+): string {
+  return `Company being looked for: ${companyName}
+What is known about it: ${knownFor}
+
+Website found: ${site.domain}
+Page title: ${site.title ?? '(none)'}
+Page content:
+${site.text.slice(0, 1500)}`;
+}
+
+export function corroboratesIndustry(hay: string, expectedIndustry: string): boolean {
+  const want = expectedIndustry.toLowerCase();
+  const keys = Object.keys(INDUSTRY_WORDS).filter((k) => want.includes(k));
+  // Nothing recognisable to test against is not corroboration.
+  if (!keys.length) return false;
+  return keys.some((k) => INDUSTRY_WORDS[k]!.test(hay));
+}
 
 /**
  * Try candidates in order and return the first verified hit.
@@ -180,7 +254,21 @@ const INDUSTRY_WORDS: Record<string, RegExp> = {
 export async function resolveWebsite(companyName: string, expectedIndustry?: string | null): Promise<SiteResult | null> {
   for (const d of candidateDomains(companyName)) {
     const r = await tryDomain(d, companyName);
+
     if (r?.verified) {
+      /*
+       * A one-word name that verified on its stem still has to agree with what
+       * the company is known to do. aslan.ai is a Thai finance site and the
+       * company is defence AI; electra.com sells industrial kit and the company
+       * makes drugs. The stem proves someone owns the name — the industry is
+       * what says it is the RIGHT someone.
+       */
+      const oneWord = (r.verifyReason ?? '').startsWith('page contains the full name')
+        && !companyName.trim().includes(' ');
+      if (oneWord && expectedIndustry) {
+        const hay = `${r.title ?? ''} ${r.description ?? ''} ${r.text}`;
+        if (!corroboratesIndustry(hay, expectedIndustry)) { await sleep(120); continue; }
+      }
       if (expectedIndustry) {
         const hay = `${r.title ?? ''} ${r.description ?? ''} ${r.text}`;
         const expectBio = /biotech|health|pharma|medical|life science/i.test(expectedIndustry);
