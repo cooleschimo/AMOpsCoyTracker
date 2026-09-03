@@ -24,6 +24,7 @@ on:
         default: 'daily'
         type: choice
         options: [daily, weekly, discover, score, assess, formd, portfolios, acra]
+        # 'daily' is the pipeline; 'weekly' is the pipeline plus the digest.
 
 jobs:
   run:
@@ -80,15 +81,33 @@ jobs:
         name: Day of week (1=Monday)
         run: echo "day=$(date -u +%u)" >> "$GITHUB_OUTPUT"
 
-      # ---- the main pipeline -------------------------------------------------
-      # Monday gets the full run including the digest; other days stop before it.
-      - name: Weekly run (Monday, or on request)
+      # ---- Form D, before the pipeline reads it ------------------------------
+      #
+      # Form D CREATES companies, and weekly.ts scores whatever exists when it
+      # runs — so a filing found today has to be in the table before the
+      # pipeline starts, or it waits a full day to be noticed. Filings are
+      # published daily and a missed day is gone, so this is daily too.
+      #
+      # Every other news source — the wires, the trade press, Google News per
+      # company, the ATS boards — is inside weekly.ts already. Only Form D,
+      # the portfolio pages and ACRA sit outside it.
+      - name: Form D ingestion
+        if: ${{ github.event.inputs.mode == 'formd' || github.event_name == 'schedule' }}
+        run: npx tsx scripts/ingest-formd.ts --days 3
+
+      # ---- the pipeline ------------------------------------------------------
+      #
+      # Both steps run the same eleven stages — news, context, discovery, ATS,
+      # websites, people, location, filter, rescue, score, assess. The Monday
+      # one adds a twelfth, the digest, which is the only difference between
+      # them: find and score every day, publish once a week.
+      - name: Pipeline and weekly digest (Mondays)
         if: >-
           ${{ github.event.inputs.mode == 'weekly'
               || (github.event_name == 'schedule' && steps.dow.outputs.day == '1') }}
         run: npx tsx scripts/weekly.ts
 
-      - name: Daily run
+      - name: Pipeline, no digest
         if: >-
           ${{ github.event.inputs.mode == 'daily'
               || (github.event_name == 'schedule' && steps.dow.outputs.day != '1') }}
@@ -109,14 +128,16 @@ jobs:
         if: ${{ github.event.inputs.mode == 'assess' }}
         run: npx tsx scripts/assess-companies.ts
 
-      # ---- slower-moving sources ---------------------------------------------
-      # Form D is daily: filings are published daily and a missed day is gone.
-      - name: Form D ingestion
-        if: ${{ github.event.inputs.mode == 'formd' || github.event_name == 'schedule' }}
-        run: npx tsx scripts/ingest-formd.ts --days 3
-
-      # Portfolio and team pages change slowly, so these run weekly. Both are
-      # idempotent: re-running matches rather than duplicating.
+      # ---- graph building, after the pipeline --------------------------------
+      #
+      # These populate the graph rather than the digest: who invests in whom,
+      # who sits on which board, which companies hold a Singapore entity. None
+      # of it surfaces a company on its own — it is what §8's warm paths are
+      # built from once a company has already surfaced.
+      #
+      # So they run last, on the companies the pipeline just scored, and weekly
+      # rather than daily because portfolio and team pages change slowly. Both
+      # are idempotent: re-running matches rather than duplicating.
       - name: VC portfolio scraping
         if: >-
           ${{ github.event.inputs.mode == 'portfolios'
@@ -135,9 +156,3 @@ jobs:
           ${{ github.event.inputs.mode == 'acra'
               || (github.event_name == 'schedule' && steps.dow.outputs.day == '1') }}
         run: npx tsx scripts/ingest-acra.ts --limit 300
-
-      # Locations are read from a headline at discovery and upgraded here from
-      # the company's own news, which only exists after the news pull.
-      - name: Location enrichment
-        if: ${{ github.event_name == 'schedule' && steps.dow.outputs.day == '1' }}
-        run: npx tsx scripts/enrich-location.ts
