@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
+import { LocationEdit } from "./location-edit";
 import { cn, profileLabel } from "@/lib/utils";
 import type { DashboardCompany as Company } from "@/lib/ui-types";
 import {
@@ -30,7 +31,7 @@ export function CompanyHeading({ company, note }: { company: Company; note?: str
       </Link>
       {/* The sector is already tagged above the name; repeating it here spends
           a line on something the reader has just read. */}
-      <span className="text-xs text-muted-foreground">{company.hq}</span>
+      <LocationEdit companyId={Number(company.companyId)} hq={company.hq} source={company.hqSource} />
       {note && (
         <span className="font-mono text-2xs uppercase tracking-[0.12em] text-muted-foreground">
           {note}

@@ -15,16 +15,16 @@ import { cn } from '@/lib/utils';
  * Bay Area first, and then wants to know what else is out there without losing
  * their place in the list they were reading.
  *
- * Three buckets, in the order attention actually runs. The Bay Area is the core
- * of the target list; the rest of the US is in scope on the same terms; and
- * everywhere else is worth seeing but is a different conversation, so it is
+ * Three buckets, in the order attention actually runs. The West Coast is the
+ * core of the target list; the rest of the US is in scope on the same terms;
+ * and everywhere else is worth seeing but is a different conversation, so it is
  * last and never the default.
  *
  * A tab with nothing in it is shown with a zero rather than hidden — an empty
  * count is information, where a missing tab reads as a bug.
  */
 const TABS = [
-  { id: 'bay_area', label: 'Bay Area' },
+  { id: 'west_coast', label: 'West Coast' },
   { id: 'other_us', label: 'Rest of US' },
   { id: 'non_us', label: 'International' },
 ] as const;
@@ -41,7 +41,7 @@ export function GeographySection({
   empty: string;
 }) {
   const counts = {
-    bay_area: companies.filter((c) => c.geography === 'bay_area').length,
+    west_coast: companies.filter((c) => c.geography === 'west_coast').length,
     other_us: companies.filter((c) => c.geography === 'other_us').length,
     non_us: companies.filter((c) => c.geography === 'non_us').length,
   };
@@ -49,7 +49,7 @@ export function GeographySection({
   // Open on the first tab that has anything, so a week with no Bay Area
   // activity does not greet the reader with an empty list.
   const [active, setActive] = useState<TabId>(
-    counts.bay_area > 0 ? 'bay_area' : counts.other_us > 0 ? 'other_us' : 'non_us',
+    counts.west_coast > 0 ? 'west_coast' : counts.other_us > 0 ? 'other_us' : 'non_us',
   );
   const shown = companies.filter((c) => c.geography === active);
 

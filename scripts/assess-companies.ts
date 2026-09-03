@@ -22,7 +22,7 @@
  */
 import '../lib/loadenv';
 import { eq, sql, and, isNull, or } from 'drizzle-orm';
-import { getDb, getSql } from '../lib/db';
+import { getDb, getSql, withRetry } from '../lib/db';
 import { companies, companyAssessments, runs } from '../lib/schema';
 import { callJson } from '../lib/llm';
 import { Budget } from '../lib/budget';
@@ -38,6 +38,9 @@ const arg = (n: string, d?: string) => {
   return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : d;
 };
 const flag = (n: string) => process.argv.includes(`--${n}`);
+
+/** The states hq_region treats as West Coast, for ordering the queue. */
+const WEST_COAST_STATES = new Set(['CA', 'WA', 'OR', 'NV', 'AZ', 'CO', 'UT', 'ID', 'NM']);
 
 type Assessment = {
   name: string; sectors: string[];
@@ -106,8 +109,30 @@ type Assessment = {
                         and ca.rubric_version = ${COMPANY_RUBRIC_VERSION})`,
         ));
 
-  const targets = limit ? pending.slice(0, limit) : pending;
+  /**
+   * US companies first, West Coast before the rest.
+   *
+   * Discovery reads every source, so it finds Japanese, German and Chinese
+   * companies alongside American ones. Most of those will never be an EDB
+   * target, and assessment is the expensive step: the daily LLM allowance runs
+   * out partway through most runs, and whichever companies are at the end of
+   * the queue simply do not get judged that day.
+   *
+   * Ordering by geography decides who that is. A foreign company doing
+   * something in the US is still discovered, still scored, and still assessed —
+   * just after the companies more likely to matter.
+   */
+  const geoRank = (c: { hqState: string | null }) => {
+    const st = (c.hqState ?? '').trim();
+    if (!/^[A-Z]{2}$/.test(st)) return 2;
+    return WEST_COAST_STATES.has(st) ? 0 : 1;
+  };
+  const ordered = [...pending].sort((a, b) => geoRank(a) - geoRank(b));
+
+  const targets = limit ? ordered.slice(0, limit) : ordered;
+  const byGeo = targets.reduce((acc, c) => { acc[geoRank(c)]++; return acc; }, [0, 0, 0]);
   console.log(`${targets.length} companies pending assessment (batch size ${batchSize})`);
+  console.log(`  ${byGeo[0]} West Coast, ${byGeo[1]} rest of US, ${byGeo[2]} international\n`);
   if (!targets.length) return;
 
   const [run] = await db.insert(runs).values({ stage: 'assess' }).returning();
@@ -224,7 +249,10 @@ type Assessment = {
       if (inScope) counts.sector_assigned++; else counts.no_sector++;
 
       if (!dry) {
-        await db.insert(companyAssessments).values({
+        // Retried: Neon's HTTP endpoint drops a connection under load, and an
+        // unretried write ended a run at batch nine, losing every company after
+        // it. A dropped connection is not a reason to abandon the batch.
+        await withRetry(() => db.insert(companyAssessments).values({
           companyId: target.id, ...bands,
           rationale: a.rationale ?? null,
           priorityReason: a.priority_reason ?? null,
@@ -232,13 +260,13 @@ type Assessment = {
           contributionReason: a.contribution_reason ?? null,
           confidenceReason: a.confidence_reason ?? null,
           model: res.model, rubricVersion: COMPANY_RUBRIC_VERSION,
-        });
+        }));
         // Out of scope is recorded; in scope leaves scope_status alone, since
         // the sector itself is not this script's to write.
         if (!inScope) {
-          await db.update(companies)
+          await withRetry(() => db.update(companies)
             .set({ scopeStatus: 'out_of_scope', scopeReason: `assessment ${COMPANY_RUBRIC_VERSION}: not in scope` })
-            .where(eq(companies.id, target.id));
+            .where(eq(companies.id, target.id)));
         }
       }
     }

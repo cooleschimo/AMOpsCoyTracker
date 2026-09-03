@@ -632,6 +632,67 @@ export const CONTEXT_SOURCES: ContextSource[] = [
    * ("The 2026 Global Groundwork Index") rather than announcements, and scored
    * 0 of 10.
    */
+  /**
+   * More US-weighted sources, added to correct a skew rather than to widen
+   * coverage. The Asian and European feeds carry real signal but they carry a
+   * great deal of it — International ran to 21 of 40 companies in a week — and
+   * world news is mostly not American. These are US by construction.
+   *
+   * Judged on their headlines rather than a sample of one: Defense Daily names
+   * a company in nearly every line ("American Rheinmetall, GD Deliver Initial
+   * XM30 Prototypes"), and Solar Power World and EE Journal do the same for
+   * their sectors. Two obvious candidates were tried and left out — Global
+   * Trade Magazine and Site Selection's Insider both publish policy analysis
+   * with no company in the headline.
+   */
+  {
+    id: 'defense_daily',
+    name: 'Defense Daily',
+    url: 'https://www.defensedaily.com/feed/',
+    kind: 'trade',
+    sectors: ['defence_systems', 'defence'],
+    enabled: true,
+  },
+  {
+    id: 'geekwire',
+    name: 'GeekWire',
+    url: 'https://www.geekwire.com/feed/',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'solar_power_world',
+    name: 'Solar Power World',
+    url: 'https://www.solarpowerworldonline.com/feed/',
+    kind: 'trade',
+    sectors: ['materials_energy'],
+    enabled: true,
+  },
+  {
+    id: 'ee_journal',
+    name: 'EE Journal',
+    url: 'https://www.eejournal.com/feed/',
+    kind: 'trade',
+    sectors: ['semiconductors', 'compute'],
+    enabled: true,
+  },
+  {
+    id: 'datacenter_knowledge',
+    name: 'Datacenter Knowledge',
+    url: 'https://www.datacenterknowledge.com/rss.xml',
+    kind: 'trade',
+    sectors: ['ai_infrastructure'],
+    enabled: true,
+  },
+  {
+    id: 'aviation_week',
+    name: 'Aviation Week',
+    url: 'https://aviationweek.com/rss.xml',
+    kind: 'trade',
+    sectors: ['aerospace', 'space'],
+    enabled: true,
+  },
   {
     id: 'area_development',
     name: 'Area Development',

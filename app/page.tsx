@@ -9,12 +9,14 @@
  * Placement comes from lib/placement.ts, the same module the digest email uses,
  * so the two cannot disagree about which company sits where.
  */
+import Link from 'next/link';
 import { CompanyCase } from '@/components/company-case';
 import { GeographySection } from '@/components/geography-tabs';
 import { Building2, Radio, Sparkles } from 'lucide-react';
 import { Masonry } from '@/components/masonry';
 import { SectionHeading } from '@/components/primitives';
-import { getWeeklyDigest, type DashboardCompany } from '@/lib/dashboard-data';
+import { availableWeeks, getWeeklyDigest, type DashboardCompany } from '@/lib/dashboard-data';
+import { WeekPicker } from '@/components/week-picker';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,8 +58,23 @@ function Section({
   );
 }
 
-export default async function Dashboard() {
-  const d = await getWeeklyDigest();
+export default async function Dashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ place?: string; week?: string }>;
+}) {
+  const { place, week } = await searchParams;
+  const [d, weeks] = await Promise.all([getWeeklyDigest(undefined, week), availableWeeks()]);
+  const currentWeek = weeks.find((w) => w.label === d.weekLabel)?.weekOf ?? weeks[0]?.weekOf ?? '';
+  const isArchive = Boolean(week) && week !== weeks[0]?.weekOf;
+
+  /*
+   * A place filter narrows every section at once. Clicking "Boston, MA" on one
+   * card asks a question about the whole week, not about the section that card
+   * happened to be in.
+   */
+  const inPlace = (list: DashboardCompany[]) =>
+    place ? list.filter((c) => c.hq === place) : list;
 
   return (
     <main className="mx-auto max-w-[1400px] px-6 py-10 sm:px-12 sm:py-14 lg:px-16">
@@ -79,9 +96,26 @@ export default async function Dashboard() {
             <path d="M12 2.5v2.25M12 19.25v2.25M21.5 12h-2.25M4.75 12H2.5M18.72 5.28l-1.6 1.6M6.88 17.12l-1.6 1.6M18.72 18.72l-1.6-1.6M6.88 6.88l-1.6-1.6" />
           </svg>
         </h1>
-        <p className="text-sm text-muted-foreground">
-          Here&rsquo;s what happened last week, {d.weekLabel}.
+        <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+          <span>
+            {isArchive ? 'Looking back at ' : 'Here\u2019s what happened last week, '}
+            {d.weekLabel}.
+          </span>
+          <WeekPicker weeks={weeks} current={currentWeek} />
         </p>
+
+        {/* A filter has to announce itself. An emptier page with no explanation
+            reads as a quiet week rather than as a narrowed view. */}
+        {place && (
+          <p className="pt-1 text-sm">
+            <span className="text-muted-foreground">Showing only</span>{' '}
+            <span className="font-medium">{place}</span>
+            {' · '}
+            <Link href="/" className="text-muted-foreground link-underline hover:text-foreground">
+              show everywhere
+            </Link>
+          </p>
+        )}
 
         {/* The coverage numbers as a stat row rather than a sentence: three
             figures read faster as figures, and "monitored / processed" stays
@@ -110,22 +144,22 @@ export default async function Dashboard() {
       <div className="space-y-14">
         <GeographySection
           title="Worth a conversation"
-          companies={d.worthAConversation}
+          companies={inPlace(d.worthAConversation)}
           empty="Nothing cleared the bar this week."
         />
         <GeographySection
           title="New on the radar"
-          companies={d.newOnTheRadar}
+          companies={inPlace(d.newOnTheRadar)}
           empty="No new finds this week."
         />
         <Section
           title="EDB account activity"
-          companies={d.accountActivity}
+          companies={inPlace(d.accountActivity)}
           empty="No companies marked as accounts yet."
         />
         <Section
           title="Monitoring"
-          companies={d.monitoring}
+          companies={inPlace(d.monitoring)}
           empty="Nothing monitored yet."
         />
       </div>

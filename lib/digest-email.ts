@@ -328,6 +328,7 @@ export function renderDigestEmail(d: WeeklyDigest, appBaseUrl: string): string {
   const body =
     sectionBlock('Worth a conversation', d.worthAConversation, appBaseUrl)
     + sectionBlock('New on the radar', d.newOnTheRadar, appBaseUrl)
+    + sectionBlock('Early-stage finds', d.newOnTheRadar, appBaseUrl)
     + sectionBlock('EDB account activity', d.accountActivity, appBaseUrl)
     + sectionBlock('Monitoring', d.monitoring, appBaseUrl);
 
@@ -429,6 +430,7 @@ export function renderDigestText(d: WeeklyDigest, appBaseUrl: string): string {
 
   section('Worth a conversation', d.worthAConversation);
   section('New on the radar', d.newOnTheRadar);
+  section('Early-stage finds', d.newOnTheRadar);
   section('EDB account activity', d.accountActivity);
   section('Monitoring', d.monitoring);
 

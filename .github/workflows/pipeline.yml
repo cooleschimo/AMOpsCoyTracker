@@ -1,41 +1,50 @@
-# Pipeline scheduler. See BUILD_BRIEF §3a.
+# Pipeline scheduler. See BUILD_BRIEF §2a.
 #
 # Vercel Cron was rejected: Hobby is once-per-day (±59min) with a 300s function
 # cap. GitHub Actions gives 6h jobs and arbitrary schedules, and the web app on
 # Vercel does no pipeline work — the two halves share only the Neon database.
+#
+# Two cadences, matching scripts/weekly.ts. The daily run finds and scores;
+# the weekly run adds the digest. Discovery has to be daily because a feed holds
+# a story for a day or two and a weekly pull silently misses whatever fell off.
 #
 # NOTE: GitHub disables scheduled workflows after 60 days of repo inactivity.
 name: pipeline
 
 on:
   schedule:
-    # 06:15 UTC daily. GitHub's scheduler can lag 5-15 min under load.
+    # 06:15 UTC daily — early afternoon in Singapore. GitHub's scheduler can
+    # lag 5-15 min under load, which does not matter for a daily job.
     - cron: '15 6 * * *'
   workflow_dispatch:
     inputs:
-      stage:
-        description: 'Stage to run'
+      mode:
+        description: 'What to run'
         required: true
-        default: 'formd'
+        default: 'daily'
         type: choice
-        options: [formd, portfolios, people, acra, assess, seed, all]
-      days:
-        description: 'Form D lookback days'
-        required: false
-        default: '3'
+        options: [daily, weekly, discover, score, assess, formd, portfolios, acra]
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # The LLM stages are rate-limited rather than slow, so they spend most of
+    # their time backing off. Six hours is the ceiling a free runner allows.
+    timeout-minutes: 350
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      LLM_CHAIN: gemini,gemini2,groq,openrouter,groq2
+      # Every key, in failover order. lib/budget.ts marks one exhausted when its
+      # own daily cap reports, so a spent key is skipped rather than retried.
+      LLM_CHAIN: gemini,groq,gemini2,groq2,openrouter,gemini3,groq3,gemini4,groq4
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+      GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
+      GEMINI_API_KEY_4: ${{ secrets.GEMINI_API_KEY_4 }}
       GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.6-flash' }}
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+      GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
+      GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
       GROQ_MODEL_SCORING: ${{ vars.GROQ_MODEL_SCORING || 'openai/gpt-oss-120b' }}
       GROQ_MODEL_DRAFTING: ${{ vars.GROQ_MODEL_DRAFTING || 'openai/gpt-oss-120b' }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -44,6 +53,7 @@ jobs:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       DIGEST_TEST_RECIPIENT: ${{ secrets.DIGEST_TEST_RECIPIENT }}
       DIGEST_TEST_MODE: 'true'
+      APP_BASE_URL: ${{ vars.APP_BASE_URL || 'http://localhost:3111' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -51,35 +61,83 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+
+      # Fail loudly and immediately on a missing credential rather than a
+      # thousand lines into a stack trace. The workflow ran daily for a fortnight
+      # failing in twenty seconds because DATABASE_URL was never set.
+      - name: Check credentials
+        run: |
+          missing=""
+          [ -z "$DATABASE_URL" ] && missing="$missing DATABASE_URL"
+          [ -z "$GEMINI_API_KEY$GROQ_API_KEY$OPENROUTER_API_KEY" ] && missing="$missing (no LLM key)"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing"
+            echo "Set them with: gh secret set DATABASE_URL"
+            exit 1
+          fi
+
       - id: dow
         name: Day of week (1=Monday)
         run: echo "day=$(date -u +%u)" >> "$GITHUB_OUTPUT"
-      - name: Form D ingestion
-        if: ${{ github.event.inputs.stage == 'formd' || github.event.inputs.stage == 'all' || github.event_name == 'schedule' }}
-        run: npx tsx scripts/ingest-formd.ts --days ${{ github.event.inputs.days || 3 }}
 
-      # Portfolio and team pages change slowly, so these run weekly (Mondays)
-      # rather than daily. Both are idempotent: re-running matches rather than
-      # duplicating, so an extra run is harmless.
+      # ---- the main pipeline -------------------------------------------------
+      # Monday gets the full run including the digest; other days stop before it.
+      - name: Weekly run (Monday, or on request)
+        if: >-
+          ${{ github.event.inputs.mode == 'weekly'
+              || (github.event_name == 'schedule' && steps.dow.outputs.day == '1') }}
+        run: npx tsx scripts/weekly.ts
+
+      - name: Daily run
+        if: >-
+          ${{ github.event.inputs.mode == 'daily'
+              || (github.event_name == 'schedule' && steps.dow.outputs.day != '1') }}
+        run: npx tsx scripts/weekly.ts --daily
+
+      # ---- single stages, for a manual run -----------------------------------
+      - name: Discovery only
+        if: ${{ github.event.inputs.mode == 'discover' }}
+        run: |
+          npx tsx scripts/ingest-context.ts
+          npx tsx scripts/discover-news.ts
+
+      - name: Scoring only
+        if: ${{ github.event.inputs.mode == 'score' }}
+        run: npx tsx scripts/score-companies.ts
+
+      - name: Assessment only
+        if: ${{ github.event.inputs.mode == 'assess' }}
+        run: npx tsx scripts/assess-companies.ts
+
+      # ---- slower-moving sources ---------------------------------------------
+      # Form D is daily: filings are published daily and a missed day is gone.
+      - name: Form D ingestion
+        if: ${{ github.event.inputs.mode == 'formd' || github.event_name == 'schedule' }}
+        run: npx tsx scripts/ingest-formd.ts --days 3
+
+      # Portfolio and team pages change slowly, so these run weekly. Both are
+      # idempotent: re-running matches rather than duplicating.
       - name: VC portfolio scraping
-        if: ${{ github.event.inputs.stage == 'portfolios' || github.event.inputs.stage == 'all' || (github.event_name == 'schedule' && fromJSON(steps.dow.outputs.day || '1') == 1) }}
+        if: >-
+          ${{ github.event.inputs.mode == 'portfolios'
+              || (github.event_name == 'schedule' && steps.dow.outputs.day == '1') }}
         run: npx tsx scripts/ingest-portfolios.ts
 
       - name: Fund team pages -> people + affiliations
-        if: ${{ github.event.inputs.stage == 'people' || github.event.inputs.stage == 'all' || (github.event_name == 'schedule' && fromJSON(steps.dow.outputs.day || '1') == 1) }}
+        if: ${{ github.event_name == 'schedule' && steps.dow.outputs.day == '1' }}
         run: npx tsx scripts/ingest-people.ts --funds
 
-      - name: Company team pages -> people + roles
-        if: ${{ github.event.inputs.stage == 'people' || github.event.inputs.stage == 'all' }}
-        run: npx tsx scripts/ingest-people.ts --companies --limit 60
-
       # ACRA refreshes monthly, so a weekly pass is ample. It is a courtesy
-      # service with no key, so the run is deliberately capped rather than
-      # sweeping every portfolio company.
+      # service with no key, so the run is capped rather than sweeping every
+      # portfolio company.
       - name: ACRA resolution -> sg_links
-        if: ${{ github.event.inputs.stage == 'acra' || github.event.inputs.stage == 'all' || (github.event_name == 'schedule' && fromJSON(steps.dow.outputs.day || '1') == 1) }}
+        if: >-
+          ${{ github.event.inputs.mode == 'acra'
+              || (github.event_name == 'schedule' && steps.dow.outputs.day == '1') }}
         run: npx tsx scripts/ingest-acra.ts --limit 300
 
-      - name: Company-level assessment
-        if: ${{ github.event.inputs.stage == 'assess' || github.event.inputs.stage == 'all' }}
-        run: npx tsx scripts/assess-companies.ts
+      # Locations are read from a headline at discovery and upgraded here from
+      # the company's own news, which only exists after the news pull.
+      - name: Location enrichment
+        if: ${{ github.event_name == 'schedule' && steps.dow.outputs.day == '1' }}
+        run: npx tsx scripts/enrich-location.ts

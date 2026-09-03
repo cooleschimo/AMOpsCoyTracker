@@ -53,8 +53,10 @@ export type DashboardCompany = {
   sectors: string[];
   oneLiner: string;
   hq: string;
-  /** bay_area | other_us | non_us — the dashboard filters on this. */
-  geography: 'bay_area' | 'other_us' | 'non_us';
+  /** How the location was derived, so a filed address reads differently from a guess. */
+  hqSource: string | null;
+  /** west_coast | other_us | non_us — the dashboard filters on this. */
+  geography: 'west_coast' | 'other_us' | 'non_us';
   fundingTotal: string;
   headcount: string;
   founded: number | null;
@@ -269,14 +271,21 @@ function toCompany(
     sectors,
     oneLiner: String(r.description ?? ''),
     hq: [r.hq_city, r.hq_state].filter(Boolean).join(', ') || 'Unknown',
+  hqSource: (r.hq_source as string | null) ?? null,
   /**
-   * Three buckets, because that is how the geography is actually read: the Bay
-   * Area is the core, the rest of the US is in scope, and everything else is
-   * worth seeing but is a different conversation.
+   * Three buckets, because that is how the geography is actually read: the West
+   * Coast is the core of the target list, the rest of the US is in scope on the
+   * same terms, and everything else is worth seeing but is a different
+   * conversation.
+   *
+   * Five of the six hq_region values are West Coast — the Bay Area, SoCal,
+   * Seattle, San Diego and other_west — so the roll-up is everything except
+   * other_us. Splitting the Bay Area out on its own put Seattle and San Diego
+   * companies under "rest of US", which is not how anyone reads that list.
    */
-  geography: (r.hq_region === 'bay_area' ? 'bay_area'
+  geography: (typeof r.hq_region === 'string' && r.hq_region !== 'other_us' ? 'west_coast'
     : typeof r.hq_state === 'string' && /^[A-Z]{2}$/.test(r.hq_state) ? 'other_us'
-    : 'non_us') as 'bay_area' | 'other_us' | 'non_us',
+    : 'non_us') as 'west_coast' | 'other_us' | 'non_us',
     fundingTotal: money(r.total_raised),
     headcount: r.headcount_est ? String(r.headcount_est) : 'Unknown',
     founded: r.founded_year ? Number(r.founded_year) : null,
@@ -505,13 +514,13 @@ async function whyNowContext(
   return { siblings, sources, types };
 }
 
-async function signalRows(signalVersion: string): Promise<Row[]> {
+async function signalRows(signalVersion: string, weekOf?: string): Promise<Row[]> {
   const sql = getSql();
   const rows: any = await sql`
     select
       cs.company_id, c.name as company_name, c.familiarity, c.sectors,
       c.description, c.hq_city, c.hq_state, c.hq_region, c.total_raised, c.headcount_est,
-      c.founded_year, c.round_date, c.round_stage, c.round_amount_musd, c.valuation_est, c.valuation_source,
+      c.founded_year, c.hq_source, c.round_date, c.round_stage, c.round_amount_musd, c.valuation_est, c.valuation_source,
       cs.expansion, cs.momentum, cs.partnership, cs.signal_type,
       cs.expansion_language, cs.why, cs.why_item_ids, cs.week_of,
       i.id as item_id, i.title, i.url, i.source, i.source_type, i.published_at,
@@ -567,11 +576,13 @@ async function signalRows(signalVersion: string): Promise<Row[]> {
       order by a.assessed_at desc limit 1
     ) ca on true
     where cs.signal_version = ${signalVersion}
-      -- The latest week only. Signals accumulate week on week, and without this
-      -- the dashboard showed every week at once: a company scored a fortnight
-      -- ago sat beside one scored today, both reading as current.
-      and cs.week_of = (select max(week_of) from company_signals
-                        where signal_version = ${signalVersion})
+      -- One week, and by default the latest. Signals accumulate week on week,
+      -- and without this the dashboard showed every week at once: a company
+      -- scored a fortnight ago sat beside one scored today, both reading as
+      -- current. An explicit week is how the archive is read.
+      and cs.week_of = coalesce(
+        ${weekOf ?? null}::date,
+        (select max(week_of) from company_signals where signal_version = ${signalVersion}))
     order by cs.expansion desc, cs.momentum desc`;
   return rows as Row[];
 }
@@ -616,10 +627,39 @@ export type WeeklyDigest = {
 };
 
 /** This week's digest, placed by the same rules the email uses. */
+/**
+ * Every week the tool has scored, newest first.
+ *
+ * A digest is a record of what was known that week, and re-running the pipeline
+ * later cannot reconstruct it — the news window has moved on and the scoring
+ * rubric may have changed. So the weeks are kept and made reachable rather than
+ * only ever showing the latest.
+ */
+export async function availableWeeks(
+  signalVersion = COMPANY_SIGNAL_VERSION,
+): Promise<Array<{ weekOf: string; label: string; companies: number }>> {
+  const sql = getSql();
+  const rows: any = await sql`
+    select week_of, count(distinct company_id)::int as companies
+    from company_signals
+    where signal_version = ${signalVersion}
+    group by week_of
+    order by week_of desc`;
+  return rows.map((r: any) => ({
+    // The driver hands back a Date for a date column, whose toString is a
+    // human format — an ISO slice of it produces "Mon Aug 31" rather than a
+    // date the query can use.
+    weekOf: new Date(r.week_of).toISOString().slice(0, 10),
+    label: weekLabel(r.week_of),
+    companies: Number(r.companies),
+  }));
+}
+
 export async function getWeeklyDigest(
   signalVersion = COMPANY_SIGNAL_VERSION,
+  weekOf?: string,
 ): Promise<WeeklyDigest> {
-  const rows = await signalRows(signalVersion);
+  const rows = await signalRows(signalVersion, weekOf);
   const byCompany = new Map<number, Row>();
   for (const r of rows) byCompany.set(Number(r.company_id), r);
 
@@ -701,7 +741,7 @@ export async function getMonitoredCompanies(
   const rows: any = await sql`
     select c.id as company_id, c.name as company_name, c.familiarity, c.sectors,
            c.description, c.hq_city, c.hq_state, c.hq_region, c.total_raised, c.headcount_est,
-           c.founded_year, c.round_date, c.round_stage, c.round_amount_musd, c.valuation_est, c.valuation_source,
+           c.founded_year, c.hq_source, c.round_date, c.round_stage, c.round_amount_musd, c.valuation_est, c.valuation_source,
            m.added_at, m.note,
            cs.expansion, cs.momentum, cs.partnership, cs.signal_type, cs.why,
            cs.why_item_ids,
