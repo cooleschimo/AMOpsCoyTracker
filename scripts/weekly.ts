@@ -52,7 +52,15 @@ const STAGES: Stage[] = [
    * location after news, because it reads a company's accumulated headlines
    * rather than the single one that surfaced it.
    */
-  { name: 'websites', script: 'enrich-websites.ts', timeoutMin: 20,
+  /*
+   * 45 minutes and a per-run cap. Each company costs a few domain probes and,
+   * for a one-word name, a model call to confirm the site is not a different
+   * company of the same name — about nine seconds each, so the 272 companies
+   * currently without a website would run past any smaller budget. The cap
+   * keeps one run bounded as the backlog grows; the rest are picked up next
+   * run, strongest signal first.
+   */
+  { name: 'websites', script: 'enrich-websites.ts', args: ['--limit', '150'], timeoutMin: 45,
     why: 'a website is what the assessment reads, and what people scraping needs' },
   { name: 'people', script: 'ingest-people.ts', timeoutMin: 25,
     why: 'the named people §8 builds warm paths from' },

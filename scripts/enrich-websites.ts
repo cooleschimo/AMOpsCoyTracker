@@ -31,15 +31,26 @@ const arg = (n: string, d?: string) => {
   // Every watched company (lib/scope.ts). A website is the gate on people and
   // therefore on warm paths, so restricting this to one discovery route left
   // whole origins without either.
+  /*
+   * Strongest signal first, because a run is capped and the companies that
+   * matter are the ones reaching the digest — a website is what the assessment
+   * reads, so an unresolved company with a live trigger is judged on a name.
+   * Without an order a capped run picks alphabetically, which is arbitrary.
+   */
   const targets = await db.select({
       id: companies.id, name: companies.name, description: companies.description,
       sectors: companies.sectors, scopeReason: companies.scopeReason,
+      signal: sql<number>`coalesce((select max(greatest(cs.expansion, cs.partnership))
+                                     from company_signals cs where cs.company_id = ${companies.id}), 0)`,
     })
     .from(companies)
     .where(and(
       trackedCompanies(companies),
       isNull(companies.website),
-    ));
+    ))
+    .orderBy(sql`coalesce((select max(greatest(cs.expansion, cs.partnership))
+                            from company_signals cs where cs.company_id = ${companies.id}), 0) desc`,
+             companies.name);
   const list = limit ? targets.slice(0, limit) : targets;
   console.log(`${list.length} companies without a website`);
   if (!list.length) return;
