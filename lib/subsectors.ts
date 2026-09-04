@@ -95,6 +95,19 @@ export type SectorDef = {
   /** Named so a classifier and a reader draw the same line. */
   includes: string;
   excludes?: string;
+  /**
+   * What this subsector's news is written about when a company there does
+   * something an agency would want to know about. Read by lib/news-sources.ts
+   * to build the sector queries, so the words sit beside the definition they
+   * belong to rather than in a query string somewhere else.
+   *
+   * What counts as significant differs by subsector, and the terms follow
+   * `needs` rather than a single template. A semiconductor company's moment is
+   * a fab; an AI software company's is a regional office and a first enterprise
+   * customer; a fintech's is a licence. None of those look alike in a headline,
+   * and asking all three for "breaks ground" would find only the first.
+   */
+  searchTerms?: string[];
 };
 
 export const SECTOR_DEFS: SectorDef[] = [
@@ -107,6 +120,7 @@ export const SECTOR_DEFS: SectorDef[] = [
     needs: 'fab access, packaging capacity, IP protection, process engineers',
     includes: 'AI accelerators and inference ASICs, CPUs and processor IP, chiplets, analog and in-memory compute, RISC-V silicon',
     excludes: 'photonic interconnect, which is photonics',
+    searchTerms: ['"new fab"', '"chip plant"', '"advanced packaging"', '"wafer fab"'],
   },
   {
     id: 'photonics',
@@ -115,6 +129,7 @@ export const SECTOR_DEFS: SectorDef[] = [
     label: 'Photonics and optical interconnect',
     needs: 'advanced packaging, optics fabrication, precision assembly',
     includes: 'optical I/O and chiplets, silicon photonics, beam steering, optical networking components, DSPs for optical links',
+    searchTerms: ['"photonics fab"', '"optical interconnect"', '"silicon photonics" facility'],
   },
   {
     id: 'quantum',
@@ -123,6 +138,7 @@ export const SECTOR_DEFS: SectorDef[] = [
     label: 'Quantum computing and sensing',
     needs: 'research partners, national programme demand, specialist talent',
     includes: 'quantum computers of any modality, quantum sensing, post-quantum security where it is the main product',
+    searchTerms: ['"quantum computing" facility', 'quantum "national programme"', '"quantum research centre"'],
   },
   {
     id: 'ai_infrastructure',
@@ -132,6 +148,7 @@ export const SECTOR_DEFS: SectorDef[] = [
     needs: 'power, land, grid connection, data-centre siting, cooling',
     includes: 'GPU clouds, AI data centres, inference-serving platforms sold as capacity',
     excludes: 'chip designers, which are semiconductors',
+    searchTerms: ['"data centre" gigawatt', '"data center" "breaks ground"', '"AI campus"'],
   },
   {
     id: 'ai_models',
@@ -140,6 +157,10 @@ export const SECTOR_DEFS: SectorDef[] = [
     label: 'Foundation models and research labs',
     needs: 'compute, research talent, data agreements, government relationships',
     includes: 'frontier and open model labs, multimodal generation models, robot and protein foundation models',
+    searchTerms: [
+      '"foundation model" ("compute deal" OR "training cluster" OR "sovereign AI") -"market size"',
+      '"AI lab" ("government partnership" OR "national programme") Asia',
+    ],
   },
   {
     id: 'ai_software',
@@ -149,6 +170,10 @@ export const SECTOR_DEFS: SectorDef[] = [
     needs: 'office space, sales and support staff, enterprise reference customers',
     includes: 'vertical AI SaaS (legal, healthcare, support), coding assistants, enterprise search, agent orchestration, evaluation and observability, data platforms',
     excludes: 'anything whose product is compute or a model rather than software over one',
+    searchTerms: [
+      '("AI startup" OR "AI platform") ("opens office" OR "expands into" OR "first customer") -"market size"',
+      '"enterprise AI" deployment (Singapore OR Asia) -"market size" -forecast',
+    ],
   },
 
   // ---- robotics and physical systems ---------------------------------------
@@ -160,6 +185,7 @@ export const SECTOR_DEFS: SectorDef[] = [
     needs: 'manufacturing space, field trial sites, systems and controls engineers',
     includes: 'warehouse and logistics robots, humanoids, industrial arms, field robotics, self-driving vehicles, delivery robots and drones for civil use',
     excludes: 'surgical robots, which are medical devices; armed or ISR drones, which are defence',
+    searchTerms: ['robotics "production facility"', '"automated factory"', '"robot manufacturing"'],
   },
   {
     id: 'space',
@@ -168,6 +194,7 @@ export const SECTOR_DEFS: SectorDef[] = [
     label: 'Space systems',
     needs: 'launch access, ground stations, spectrum, export-control clearance',
     includes: 'satellites and buses, earth observation, in-space manufacturing, launch and reentry',
+    searchTerms: ['"satellite manufacturing"', '"launch facility"', 'space "production facility"'],
   },
   {
     id: 'advanced_manufacturing',
@@ -176,6 +203,7 @@ export const SECTOR_DEFS: SectorDef[] = [
     label: 'Advanced manufacturing and industrial technology',
     needs: 'industrial land, plant capacity, skilled production workforce',
     includes: 'automated factories and machining, additive manufacturing as a product, industrial process technology',
+    searchTerms: ['"advanced manufacturing" plant', '"additive manufacturing" facility'],
   },
   {
     id: 'materials_energy',
@@ -184,6 +212,7 @@ export const SECTOR_DEFS: SectorDef[] = [
     label: 'Advanced materials, batteries and energy',
     needs: 'pilot plant, industrial land, utilities, offtake agreements',
     includes: 'battery materials and cells, graphene and novel materials, energy storage, clean energy generation, climate and recycling technology',
+    searchTerms: ['gigafactory', '"cathode plant"', '"battery plant" investment', '"energy storage" facility'],
   },
 
   // ---- defence -------------------------------------------------------------
@@ -195,6 +224,7 @@ export const SECTOR_DEFS: SectorDef[] = [
     needs: 'export-control clearance, government customer, secure facilities',
     includes: 'weapons and munitions, military drones and counter-UAS, radar and electronic warfare, defence manufacturing',
     excludes: 'dual-use autonomy sold mainly to commercial buyers, which is robotics',
+    searchTerms: ['"defence manufacturing"', '"defense production facility"', '"munitions plant"'],
   },
   {
     id: 'defence_software',
@@ -203,6 +233,10 @@ export const SECTOR_DEFS: SectorDef[] = [
     label: 'Defence and national-security software',
     needs: 'security clearance, government relationships, secure hosting',
     includes: 'command and control, intelligence and ISR analysis, mission autonomy software, national-security data platforms',
+    searchTerms: [
+      '"defence software" ("contract award" OR "selected by") -"market size"',
+      '"mission autonomy" ("contract" OR "selected by")',
+    ],
   },
 
   // ---- life sciences -------------------------------------------------------
@@ -213,6 +247,7 @@ export const SECTOR_DEFS: SectorDef[] = [
     label: 'Therapeutics and drug development',
     needs: 'clinical trial sites, regulatory pathway, manufacturing capacity, research partners',
     includes: 'small molecules, biologics and antibodies, gene and cell therapy, gene editing, computational drug discovery where the product is the drug',
+    searchTerms: ['biomanufacturing', '"drug substance" facility', '"fill-finish"', '"biologics facility"'],
   },
   {
     id: 'biotech_platforms',
@@ -222,6 +257,7 @@ export const SECTOR_DEFS: SectorDef[] = [
     needs: 'lab space, research partners, instrument manufacturing',
     includes: 'research instruments and reagents, synthetic biology platforms, sequencing and omics tools, bioprocessing technology',
     excludes: 'companies developing their own drug, which are therapeutics',
+    searchTerms: ['"bioprocessing" facility', '"research campus" biotech'],
   },
   {
     id: 'medtech_devices',
@@ -230,6 +266,7 @@ export const SECTOR_DEFS: SectorDef[] = [
     label: 'Medical devices and diagnostics',
     needs: 'regulatory approval, clinical partners, device manufacturing',
     includes: 'surgical robots, diagnostics and screening, imaging, implants and neural interfaces, wearable therapeutics',
+    searchTerms: ['"medical device" manufacturing facility'],
   },
   {
     id: 'digital_health',
@@ -239,6 +276,9 @@ export const SECTOR_DEFS: SectorDef[] = [
     needs: 'health system partners, clinical data agreements, local operations',
     includes: 'care delivery services, clinical workflow software, health data platforms',
     excludes: 'AI agents sold as software to any industry, which are ai_software',
+    searchTerms: [
+      '"digital health" ("health system" OR "hospital partnership" OR "regulatory clearance") -"market size"',
+    ],
   },
 
   // ---- other ---------------------------------------------------------------
@@ -249,6 +289,10 @@ export const SECTOR_DEFS: SectorDef[] = [
     label: 'Financial technology',
     needs: 'regulatory licensing, banking partners, local entity',
     includes: 'payments, banking infrastructure, insurance and capital markets technology',
+    searchTerms: [
+      'fintech expansion (Singapore OR Asia) -"market size" -forecast',
+      'fintech ("payments licence" OR "banking partnership" OR "regulatory approval") -"market size"',
+    ],
   },
   {
     id: 'software_platforms',
@@ -258,6 +302,9 @@ export const SECTOR_DEFS: SectorDef[] = [
     needs: 'office space, engineering talent, sales and support staff',
     includes: 'non-AI SaaS, productivity and collaboration tools, design software, databases, data platforms, developer tools, community platforms',
     excludes: 'AI-first software, which is ai_software; security software, which is cybersecurity',
+    searchTerms: [
+      '("software company" OR SaaS) ("opens office" OR "regional headquarters") Asia -"market size"',
+    ],
   },
   {
     id: 'cybersecurity',
@@ -266,6 +313,9 @@ export const SECTOR_DEFS: SectorDef[] = [
     label: 'Cybersecurity and trust infrastructure',
     needs: 'security talent, enterprise reference customers, regulated-sector buyers',
     includes: 'identity and permissions infrastructure, attack-surface management, software supply-chain security, secure infrastructure tooling',
+    searchTerms: [
+      'cybersecurity company ("opens" OR "expands" OR "wins contract") -"market size" -report',
+    ],
   },
   {
     id: 'networking_connectivity',
@@ -274,6 +324,9 @@ export const SECTOR_DEFS: SectorDef[] = [
     label: 'Networking and connectivity',
     needs: 'datacentre and telco partners, enterprise buyers, systems engineers',
     includes: 'cloud networking, routing and switching software, spectrum-management software, telecom network infrastructure',
+    searchTerms: [
+      '("subsea cable" OR "network expansion" OR "points of presence") investment -"market size"',
+    ],
   },
   {
     id: 'commerce_marketplaces',
@@ -353,6 +406,52 @@ export const subsectorsForBroadSector = (id: BroadSectorId): SectorDef[] =>
 export const EXPORT_CONTROLLED: string[] = [
   'defence_systems', 'defence_software', 'space', 'quantum', 'semiconductors',
 ];
+
+/**
+ * Subsectors worth searching for more of.
+ *
+ * Not every subsector in the taxonomy is one EDB is looking for. Finance, real
+ * estate, healthcare services, commerce and logistics exist here to CLASSIFY
+ * what discovery drags in — a wire feed carries REITs and insurers alongside
+ * chipmakers, and a company needs a home even when the answer is "not for us".
+ * Searching for more of them would spend the daily allowance widening a part of
+ * the graph nobody reads.
+ *
+ * A subsector earns a query by being one an RD would want more of.
+ */
+export const SEARCHABLE_SUBSECTORS = SECTOR_DEFS.filter((s) => (s.searchTerms?.length ?? 0) > 0);
+
+/**
+ * Subsectors that classify but never surface.
+ *
+ * The same six, read the other way round. Not searching for funds and REITs
+ * kept us from seeking them; it did nothing about the ones discovery brought in
+ * anyway, and Andreessen Horowitz reached the dashboard as a company with an
+ * office opening. A venture fund is not an investment prospect for EDB — it is
+ * the other side of the table.
+ *
+ * Derived from the same `searchTerms` marker rather than listed again, so the
+ * two answers cannot drift: a subsector gains a query and leaves this set in
+ * one edit.
+ */
+export const UNSURFACED_SUBSECTORS: ReadonlySet<string> = new Set(
+  SECTOR_DEFS.filter((s) => !(s.searchTerms?.length ?? 0)).map((s) => s.id),
+);
+
+/**
+ * Whether a company belongs on the dashboard at all.
+ *
+ * A company with any surfaceable subsector stays: the tags are a list, and a
+ * chipmaker that also carries `investment_funds` for its venture arm is still a
+ * chipmaker. Only a company whose every tag is unsurfaceable drops out.
+ *
+ * An untagged company is kept. Missing tags mean the classifier has not run,
+ * which is not the same as a judgement that it does not belong.
+ */
+export function isSurfaceable(sectors: readonly string[] | null | undefined): boolean {
+  if (!sectors?.length) return true;
+  return sectors.some((s) => !UNSURFACED_SUBSECTORS.has(s));
+}
 
 /** Rendered into the classifier prompt so the model draws our lines, not its own. */
 export function sectorsForPrompt(): string {

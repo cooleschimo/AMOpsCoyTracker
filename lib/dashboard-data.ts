@@ -14,7 +14,7 @@ import { COMPANY_SIGNAL_VERSION } from './company-signal';
 import { planDigest, coverageLine, type PlacementInput, type Placed } from './placement';
 import { assembleWhyNow, type WhyNowInput } from './why-now';
 import { candidateProps } from './proposition';
-import { sectorBroadSector, isBroadSector } from './subsectors';
+import { sectorBroadSector, isBroadSector, isSurfaceable } from './subsectors';
 import type { Band } from './company-rubric';
 import type { Familiarity } from './familiarity';
 import { EXPORT_CONTROLLED } from './subsectors';
@@ -584,7 +584,16 @@ async function signalRows(signalVersion: string, weekOf?: string): Promise<Row[]
         ${weekOf ?? null}::date,
         (select max(week_of) from company_signals where signal_version = ${signalVersion}))
     order by cs.expansion desc, cs.momentum desc`;
-  return rows as Row[];
+  /*
+   * Funds, REITs, insurers and the rest are dropped here rather than in the
+   * query, so the rule lives once in lib/subsectors.ts beside the taxonomy that
+   * defines it. Repeating the six ids in SQL is how the search list and the
+   * surface list drift apart.
+   *
+   * They are still scored and still stored — a fund's news is what tells us a
+   * portfolio company raised. It is the dashboard they do not belong on.
+   */
+  return (rows as Row[]).filter((r) => isSurfaceable(r.sectors as string[] | null));
 }
 
 const toPlacementInput = (r: Row): PlacementInput => ({
@@ -622,7 +631,7 @@ export type WeeklyDigest = {
   worthAConversation: DashboardCompany[];
   /** A strong trigger the tool cannot yet argue for. */
   newOnTheRadar: DashboardCompany[];
-  accountActivity: DashboardCompany[];
+  familiarTerritory: DashboardCompany[];
   monitoring: DashboardCompany[];
 };
 
@@ -688,7 +697,7 @@ export async function getWeeklyDigest(
   const newOnTheRadar = pick(plan.sections.new_on_the_radar);
   // Account activity: companies EDB already holds or is talking to, where
   // something moved this week.
-  const accountActivity = pick(plan.sections.account_activity);
+  const familiarTerritory = pick(plan.sections.familiar_territory);
   const monitoring = await getMonitoredCompanies(signalVersion);
 
   return {
@@ -701,7 +710,7 @@ export async function getWeeklyDigest(
     },
     worthAConversation,
     newOnTheRadar,
-    accountActivity,
+    familiarTerritory,
     monitoring,
   };
 }
