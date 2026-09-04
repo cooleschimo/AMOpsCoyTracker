@@ -2,10 +2,10 @@
  * Step 8 — Google News RSS per company + press wire RSS into `items`.
  * Brief §5.5. The fetcher lives in lib/news-sources.ts; this script writes.
  *
- * Scope of the company-directed feed: Google News is queried per company for the
- * seed list plus the Form D discoveries that passed the company-level
- * assessment. It is a *why now* trigger, not a discovery route — the query is a
- * company name you must already have. Discovery comes from Form D, portfolio
+ * Scope of the company-directed feed: Google News is queried per company for
+ * every company still a candidate, whatever route found it. It is a *why now*
+ * trigger, not a discovery route — the query is a company name you must
+ * already have. Discovery comes from Form D, portfolio
  * pages, ACRA and ATS boards (brief §5.1-§5.4). The 2,595 portfolio companies
  * carry scope_status 'in_scope' as a default rather than as an assessment
  * verdict, so querying them would flood the step 9 drop counts with unassessed

@@ -49,7 +49,7 @@ export function normalizeDomain(raw?: string | null): string | null {
   return s || null;
 }
 
-/** Pipe-separated seed lists. Empty string yields [] — never ['']. */
+/** Pipe-separated lists from a CSV cell. Empty string yields [] — never ['']. */
 export function parsePipeList(raw?: string | null): string[] {
   if (!raw) return [];
   return raw.split('|').map((s) => s.trim()).filter(Boolean);

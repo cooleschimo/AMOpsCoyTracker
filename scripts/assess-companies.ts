@@ -17,8 +17,8 @@
  * without the second axis a large raise at an out-of-scope company outranks
  * silence at a strategically important one — the exact failure §7a exists to
  * prevent. The default targeting (Form D discoveries with no sectors) never
- * reaches the seed list, so before this flag 1 of 56 companies with a
- * live signal had an assessment.
+ * reaches the hand-imported companies, so before this flag 1 of 56 companies
+ * with a live signal had an assessment.
  */
 import '../lib/loadenv';
 import { eq, sql, and, isNull, or } from 'drizzle-orm';

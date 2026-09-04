@@ -4,7 +4,7 @@
  * Company-directed search can only find news about companies already on the
  * list: it asks Google for `"Etched"` and gets back Etched. That makes it a
  * monitor, not a discovery route, and it is why 69 of 71 companies scored in a
- * week came from the seed list.
+ * week came from the hand-imported list.
  *
  * Meanwhile the untargeted feeds — press wires and the sector trade press —
  * carry exactly the companies nobody has heard of yet:

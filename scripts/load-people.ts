@@ -3,8 +3,8 @@
  *
  * No free source gives named people for arbitrary private companies. Team-page
  * scraping reaches the companies that publish one and misses the rest, and the
- * seed list is mostly the rest — which leaves the warm paths §8 rates highest
- * with nothing to stand on.
+ * hand-imported companies are mostly the rest — which leaves the warm paths §8
+ * rates highest with nothing to stand on.
  *
  * DESIGN_RATIONALE §14 sets the boundary this sits on: a person with a valid
  * seat reads a licensed source and records the facts, and the pipeline loads
