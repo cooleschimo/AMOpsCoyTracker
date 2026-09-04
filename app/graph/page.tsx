@@ -26,7 +26,7 @@ export default async function GraphPage({
   const candidates = [
     ...digest.worthAConversation,
     ...digest.newOnTheRadar,
-    ...digest.accountActivity,
+    ...digest.familiarTerritory,
   ];
 
   const selectedId = company ?? candidates[0]?.id;

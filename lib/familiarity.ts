@@ -34,7 +34,7 @@ export const FAMILIARITY_HELP: Record<Familiarity, string> = {
 /**
  * The values that mean EDB already knows the company, so a trigger there is not
  * a discovery. Nothing is hidden on this alone: a real trigger at a known
- * company still surfaces, it just belongs under account activity rather than
+ * company still surfaces, it just belongs under familiar territory rather than
  * among companies EDB has yet to find.
  */
 export const ENGAGED: Familiarity[] = ['known', 'in_conversation'];

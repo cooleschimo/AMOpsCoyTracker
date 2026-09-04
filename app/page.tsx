@@ -153,9 +153,9 @@ export default async function Dashboard({
           empty="No new finds this week."
         />
         <Section
-          title="EDB account activity"
-          companies={inPlace(d.accountActivity)}
-          empty="No companies marked as accounts yet."
+          title="Familiar territory"
+          companies={inPlace(d.familiarTerritory)}
+          empty="No companies marked as known yet."
         />
         <Section
           title="Monitoring"

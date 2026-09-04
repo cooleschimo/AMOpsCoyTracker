@@ -8,8 +8,8 @@
  *
  *   Company discovery — company-centred. "Who don't we know that we should?"
  *     Ranks on the §7a company axis
- *     (target_priority, singapore_fit) and on account status: a company EDB
- *     already holds as an account does not belong in a discovery list.
+ *     (target_priority, singapore_fit) and on how well it is already known: a
+ *     company someone has marked known does not belong in a discovery list.
  *     'in_conversation' stays in, since active discussions still need
  *     surfacing, while 'known' and 'not_known' drop out.
  *
@@ -17,7 +17,7 @@
  *     Still a company, selected on its activity rather than its profile: ranks
  *     on `momentum` and how widely the story was carried. Account status is ignored here: a fast-moving
  *     company EDB already meets is exactly where a joint R&D project, testbed
- *     or commercial deployment becomes possible, so excluding existing accounts
+ *     or commercial deployment becomes possible, so excluding known companies
  *     would hide the best openings.
  *
  * The §7a matrix governs discovery, which is what stops a large raise at an
@@ -45,7 +45,7 @@ import { parseFundraise } from './fundraise';
  * trending rather than getting a block of its own.
  */
 export const SECTIONS = [
-  'worth_a_conversation', 'new_on_the_radar', 'account_activity',
+  'worth_a_conversation', 'new_on_the_radar', 'familiar_territory',
   'monitoring', 'exploration', 'to_watch', 'omitted',
 ] as const;
 export type Section = (typeof SECTIONS)[number];
@@ -99,7 +99,7 @@ export function detailFor(indexInSection: number): Detail {
 export const SECTION_CAPS: Partial<Record<Section, number>> = {
   worth_a_conversation: 25,
   new_on_the_radar: 25,
-  account_activity: 15,
+  familiar_territory: 15,
   exploration: 1,
 };
 
@@ -240,7 +240,7 @@ const daysOld = (d: Date) => Math.floor((Date.now() - d.getTime()) / 86400_000);
  * Familiarity values that disqualify a company from discovery.
  *
  * A company EDB already knows, or is already talking to, is not a find — it
- * belongs under account activity instead. 'not_known' is deliberately absent:
+ * belongs under familiar territory instead. 'not_known' is deliberately absent:
  * a company someone checked and does not know is precisely what discovery is
  * for, and 'no_status' means nobody has said, which is no reason to exclude it.
  */
@@ -301,11 +301,15 @@ export function isDiscovery(it: PlacementInput): boolean {
 }
 
 /**
- * Companies EDB already holds or is talking to. Ranked on momentum, because
- * what matters at a company already in hand is what just moved — a growth event
- * is where a joint project becomes possible.
+ * Familiar territory: companies someone has marked known or in conversation.
+ * Ranked on momentum, because what matters at a company already in hand is what
+ * just moved — a growth event is where a joint project becomes possible.
+ *
+ * These are excluded from discovery by NOT_DISCOVERABLE, so this is where they
+ * surface instead. Without it, marking a company known would hide it entirely,
+ * and the week it did something interesting would pass unseen.
  */
-export function isAccountActivity(it: PlacementInput): boolean {
+export function isFamiliarTerritory(it: PlacementInput): boolean {
   if (!it.familiarity) return false;
   if (!ENGAGED.includes(it.familiarity)) return false;
   return it.momentum >= 2 || Math.max(it.expansion, it.partnership) >= 2;
@@ -398,7 +402,7 @@ export type DigestPlan = {
     scored: number;
     placed: number;
     discovery_candidates: number;
-    account_activity_candidates: number;
+    familiar_territory_candidates: number;
     early_stage_candidates: number;
     /** Entries carrying a full argument, in either section. */
     worth_a_conversation: number;
@@ -416,7 +420,7 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
     scored: input.length,
     placed: 0,
     discovery_candidates: 0,
-    account_activity_candidates: 0,
+    familiar_territory_candidates: 0,
     early_stage_candidates: 0,
     worth_a_conversation: 0,
     excluded_existing_account: 0,
@@ -444,18 +448,18 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
   const discovery = dedupeByCompany(discoveryPool);
   counts.company_deduped += discovery.dropped.length;
 
-  // ---- Account activity: companies EDB already holds or is talking to ------
-  const inPlayPool = input.filter(isAccountActivity)
-    .map((it) => ({ ...it, section: 'account_activity' as Section, rank: trendingRank(it) }))
+  // ---- Familiar territory: companies already known or in conversation -----
+  const inPlayPool = input.filter(isFamiliarTerritory)
+    .map((it) => ({ ...it, section: 'familiar_territory' as Section, rank: trendingRank(it) }))
     .sort((a, b) => b.rank - a.rank);
-  counts.account_activity_candidates = inPlayPool.length;
+  counts.familiar_territory_candidates = inPlayPool.length;
   const inPlay = dedupeByCompany(inPlayPool);
   counts.company_deduped += inPlay.dropped.length;
 
   const buckets: Array<[Section, Placed[]]> = [
     ['worth_a_conversation', discovery.kept.filter((d) => d.section === 'worth_a_conversation')],
     ['new_on_the_radar', discovery.kept.filter((d) => d.section === 'new_on_the_radar')],
-    ['account_activity', inPlay.kept],
+    ['familiar_territory', inPlay.kept],
   ];
   for (const [name, list] of buckets) {
     const cap = SECTION_CAPS[name]!;
@@ -479,7 +483,7 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
    * placement, so these are held back rather than featured.
    */
   const placedIds = new Set(
-    [...sections.worth_a_conversation, ...sections.new_on_the_radar, ...sections.account_activity]
+    [...sections.worth_a_conversation, ...sections.new_on_the_radar, ...sections.familiar_territory]
       .map((i) => i.itemId),
   );
   for (const it of input) {
@@ -490,7 +494,7 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
   }
 
   const represented = new Set(
-    [...sections.worth_a_conversation, ...sections.new_on_the_radar, ...sections.account_activity]
+    [...sections.worth_a_conversation, ...sections.new_on_the_radar, ...sections.familiar_territory]
       .map((i) => i.signalType),
   );
   const cutPool = input.filter((i) => !placedIds.has(i.itemId));
@@ -500,7 +504,7 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
     : null;
 
   counts.placed = sections.worth_a_conversation.length + sections.new_on_the_radar.length
-    + sections.account_activity.length + (exploration ? 1 : 0);
+    + sections.familiar_territory.length + (exploration ? 1 : 0);
   return { sections, exploration, counts };
 }
 
