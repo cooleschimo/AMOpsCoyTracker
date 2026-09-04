@@ -70,6 +70,8 @@ type CallOpts = {
   budget?: Budget;
   /** JSON Schema. Groq requires every property listed in `required`. */
   schema?: Record<string, unknown>;
+  /** Ask the provider for JSON mode. Set by callJson; not for callers to pass. */
+  json?: boolean;
   maxRetries?: number;
   temperature?: number;
   /**
@@ -102,7 +104,17 @@ async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider)
     messages: [{ role: 'system', content: system }, { role: 'user', content: opts.user }],
     temperature: opts.temperature ?? 0.2,
   };
-  if (opts.schema) body.response_format = { type: 'json_object' };
+  /**
+   * JSON mode whenever the caller wants JSON back.
+   *
+   * This used to key off `opts.schema`, which is optional — so a caller that
+   * described its shape in the system prompt rather than passing a schema got
+   * free-form text and was left to `extractJson` guessing. That is what emptied
+   * an assessment run: 14 of 15 batches failed as "malformed JSON after
+   * stricter retry", 154 companies unassessed, and an exit code of 0 over the
+   * top of it. `json` is set by callJson for every call it makes.
+   */
+  if (opts.schema || opts.json) body.response_format = { type: 'json_object' };
   // Only the gpt-oss family accepts this parameter; sending it elsewhere 400s.
   if (opts.reasoningEffort && /gpt-oss/i.test(model)) body.reasoning_effort = opts.reasoningEffort;
 
@@ -160,6 +172,22 @@ async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider)
       }
       if (!res.ok) {
         const detail = await res.text().catch(() => '');
+        /**
+         * JSON mode refusing its own generation. Groq validates the response
+         * against `response_format` and 400s with `json_validate_failed` when
+         * the model produced something that did not conform, rather than
+         * returning the text for us to fix.
+         *
+         * That is a bad roll of the dice on one generation, not a bad request:
+         * the identical prompt succeeds on a retry. Falling through to the
+         * caller would spend a whole batch of companies on it.
+         */
+        if (res.status === 400 && /json_validate_failed/.test(detail)) {
+          const waitMs = Math.min(10_000, 2 ** attempt * 500);
+          console.warn(`[llm] ${provider.label ?? provider.name} rejected its own JSON (attempt ${attempt + 1}/${maxRetries + 1}); retrying in ${Math.round(waitMs / 1000)}s`);
+          await sleep(waitMs);
+          continue;
+        }
         return { error: `HTTP ${res.status}: ${detail.slice(0, 300)}` };
       }
 
@@ -240,6 +268,10 @@ export async function callJson<T = unknown>(opts: CallOpts): Promise<LlmResult<T
   if (budget?.halted) {
     return { ok: false, data: null, raw: null, error: `budget halted: ${budget.haltReason}`, tokensIn: 0, tokensOut: 0, model };
   }
+
+  // Every call through here parses the response as JSON, so ask the provider
+  // for JSON mode rather than leaving it to the system prompt to request.
+  opts = { ...opts, json: true };
 
   // Attempt 1
   let res = await callWithFailover(opts, false);
