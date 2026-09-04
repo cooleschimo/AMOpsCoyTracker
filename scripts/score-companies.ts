@@ -30,6 +30,7 @@ import { candidateProps } from '../lib/proposition';
 import { classifyExecHire } from '../lib/exec-hire';
 import { hiringIsTheNews } from '../lib/job-signal';
 import { volumeTriggerFires } from '../lib/ats';
+import { parseFundraise } from '../lib/fundraise';
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -85,7 +86,7 @@ type Out = {
   const [run] = await db.insert(runs).values({ stage: 'score_companies' }).returning();
   const budget = new Budget();
   const counts: Record<string, number> = {
-    companies: 0, scored: 0, failed: 0, no_representative: 0, hiring_lead_replaced: 0,
+    companies: 0, scored: 0, failed: 0, no_representative: 0, hiring_lead_replaced: 0, hiring_point_demoted: 0,
     context_items_seen: 0,
     expansion_3: 0, expansion_2: 0, expansion_1: 0, expansion_0: 0,
     momentum_3: 0, momentum_2: 0, momentum_1: 0, momentum_0: 0,
@@ -267,19 +268,35 @@ type Out = {
        * is applied here rather than requested there.
        */
       const byId = new Map(items.map((i) => [i.itemId, i]));
+      const news = items.filter((i) => i.sourceType !== 'ats');
+
+      /**
+       * Money outranks hiring even when the hiring qualifies as news.
+       *
+       * `hiringIsNews` asks whether the hiring is an event; it does not ask
+       * whether anything better happened. LangChain's first Singapore role made
+       * it news by that test, so the card opened on a job posting while
+       * "reaching $16M ARR at a $1.3B valuation" sat third as supporting
+       * evidence. A round, a valuation or a revenue figure is what a person
+       * would raise first, and it is checkable in a way an open role is not.
+       *
+       * Only a stated figure wins. `parseFundraise` returns null for a headline
+       * with no money in it, so an ordinary story does not displace real hiring
+       * news — a first Singapore hire still beats a product announcement.
+       */
+      const moneyStory = news.find((i) => parseFundraise(i.title, i.snippet ?? null));
+
       if (representativeItemId !== null
           && byId.get(representativeItemId)?.sourceType === 'ats'
-          && !hiringIsNews) {
-        const news = items.filter((i) => i.sourceType !== 'ats');
-        if (news.length) {
-          // The most corroborated, then the most recent: the same order the
-          // digest ranks by, so the lead is the story that actually travelled.
-          const best = [...news].sort((a, b) =>
-            (b.clusterSize - a.clusterSize)
-            || ((b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0)))[0];
-          representativeItemId = best.itemId;
-          counts.hiring_lead_replaced++;
-        }
+          && (!hiringIsNews || moneyStory)
+          && news.length) {
+        // The most corroborated, then the most recent: the same order the
+        // digest ranks by, so the lead is the story that actually travelled.
+        const best = moneyStory ?? [...news].sort((a, b) =>
+          (b.clusterSize - a.clusterSize)
+          || ((b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0)))[0];
+        representativeItemId = best.itemId;
+        counts.hiring_lead_replaced++;
       }
       if (representativeItemId === null) counts.no_representative++;
 
@@ -301,12 +318,35 @@ type Out = {
           }
           return { text: '', item: null as number | null };
         })
-        .filter((p) => p.text)
-        .slice(0, 4);
-      const why = points.map((p) => p.text).join(' · ');
+        .filter((p) => p.text);
+
+      /**
+       * Hiring never leads the evidence either, for the same reason it never
+       * leads the headline.
+       *
+       * Replacing the representative item fixed the opening line and left the
+       * bullets under it untouched, so a card could headline a funding round
+       * and then argue from job postings. Anthropic had 178 kept news items and
+       * still opened its why-now with three hiring points; Harvey had 181 and
+       * Sierra 207.
+       *
+       * A stable partition rather than a filter: hiring corroborates, so it
+       * keeps its place in the list and simply stops being first. Where hiring
+       * IS the event and no money story outranks it, the order is left exactly
+       * as scored — the same test the representative item uses, so the opening
+       * line and the evidence under it cannot disagree about what mattered.
+       */
+      const orderedPoints = (hiringIsNews && !moneyStory) ? points : [
+        ...points.filter((p) => p.item === null || byId.get(p.item)?.sourceType !== 'ats'),
+        ...points.filter((p) => p.item !== null && byId.get(p.item)?.sourceType === 'ats'),
+      ];
+      if (orderedPoints[0] !== points[0]) counts.hiring_point_demoted++;
+
+      const finalPoints = orderedPoints.slice(0, 4);
+      const why = finalPoints.map((p) => p.text).join(' · ');
       // Positionally aligned with `why`; the representative item stands in
       // wherever the model did not name one we offered.
-      const whyItemIds = points.map((p) => p.item ?? representativeItemId ?? 0);
+      const whyItemIds = finalPoints.map((p) => p.item ?? representativeItemId ?? 0);
 
       const hasHiring = items.some((i) => i.sourceType === 'ats');
       const hasOther = items.some((i) => i.sourceType !== 'ats');
