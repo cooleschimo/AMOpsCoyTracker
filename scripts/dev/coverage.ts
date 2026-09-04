@@ -9,7 +9,7 @@ import { getSql } from '../../lib/db';
   console.table(await q`
     select count(distinct c.id)::int as seed_companies_with_investor_edge
     from companies c join investments i on i.company_id=c.id
-    where c.discovered_via='seed'`);
+    where c.discovered_via='manual'`);
 
   console.log('\n=== how many funds back each company (multi-fund = better evidence) ===');
   console.table(await q`

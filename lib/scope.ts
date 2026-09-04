@@ -38,14 +38,6 @@ export const ROUND_STAGES = [
 ] as const;
 export type RoundStage = (typeof ROUND_STAGES)[number];
 
-/** Seed flags. Brief §2. memory_filled and verify_* gate what the UI may assert. */
-export const SEED_FLAGS = [
-  'verify_hq', 'verify_round', 'verify_independence', 'verify_other',
-  'memory_filled', 'round_dated', 'manual_digest', 'late_stage',
-  'prime', 'sg_warm_path',
-] as const;
-export type SeedFlag = (typeof SEED_FLAGS)[number];
-
 /**
  * Exclusion reasons for the discovery guard table. Brief §4 listed five;
  * non_west_coast_hq added 2026-08-21 to match seed data (True Anomaly).
@@ -63,7 +55,6 @@ export type SgApacRole = (typeof SG_APAC_ROLES)[number];
 export const isSector = (v: string): v is Sector => (SECTORS as readonly string[]).includes(v);
 export const isHqRegion = (v: string): v is HqRegion => (HQ_REGIONS as readonly string[]).includes(v);
 export const isRoundStage = (v: string): v is RoundStage => (ROUND_STAGES as readonly string[]).includes(v);
-export const isSeedFlag = (v: string): v is SeedFlag => (SEED_FLAGS as readonly string[]).includes(v);
 export const isExclusionReason = (v: string): v is ExclusionReason =>
   (EXCLUSION_REASONS as readonly string[]).includes(v);
 export const isSgApacRole = (v: string): v is SgApacRole =>
@@ -88,8 +79,6 @@ export const isSgApacRole = (v: string): v is SgApacRole =>
  * A company the assessment marked out of scope drops out, which is what stops
  * the set growing without limit. 'unknown' is not a judgment and stays in.
  */
-export const TRACKED_ORIGINS = ['seed', 'form_d', 'news'] as const;
-
 /**
  * Drizzle form. Takes the `companies` table so lib/scope.ts stays free of a
  * schema import — scope is vocabulary, and importing the schema here would make

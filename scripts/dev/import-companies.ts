@@ -1,5 +1,11 @@
 /**
- * Seed script. Brief §2 + §4.
+ * Import companies from a hand-maintained CSV. Brief §2.
+ *
+ * A manual bootstrap, not pipeline infrastructure: nothing schedules this, and
+ * the pipeline treats what it creates exactly like anything else it finds.
+ * `discovered_via` records that a person put the company there rather than a
+ * feed, which is provenance and nothing more — no query gives these companies
+ * different treatment, and none should.
  *
  * WHAT THIS DOES (and deliberately does not do):
  * - Parses fixed-format fields ONLY. The `notes` column is for humans and is
@@ -8,29 +14,33 @@
  *   sg_links row. A '?' role suffix (investor?:GIC) means reported-but-unverified
  *   -> match_status='probable'; otherwise 'confirmed'. Both are still pending
  *   review either way.
- * - Carries `flags` into companies.seed_flags, which gate what the UI may assert.
- * - Loads excluded_companies.csv into the discovery guard table.
  * - familiarity stays 'no_status' (tri-state): whether EDB holds the account is
  *   internal knowledge this tool cannot verify. No boolean, no silent FALSE.
  *
+ * The discovery guard lives in scripts/load-exclusions.ts, which runs on its
+ * own: a permanent exclusion should not need an occasional import to take
+ * effect.
+ *
  * Idempotent: re-running updates rather than duplicating.
+ *
+ * Usage: npx tsx scripts/dev/import-companies.ts [--dry]
  */
-import '../lib/loadenv';
+import '../../lib/loadenv';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { eq, sql } from 'drizzle-orm';
-import { getDb } from '../lib/db';
+import { getDb } from '../../lib/db';
 import {
-  companies, organizations, sgLinks, excludedCompanies, investments, runs,
-} from '../lib/schema';
-import { parseCsv } from '../lib/csv';
+  companies, organizations, sgLinks, investments, runs,
+} from '../../lib/schema';
+import { parseCsv } from '../../lib/csv';
 import {
   normalizeCompanyName, normalizeOrgName, normalizeDomain, parsePipeList,
   parseMusd, validRoundDate,
-} from '../lib/normalize';
+} from '../../lib/normalize';
 import {
-  isSector, isHqRegion, isRoundStage, isSeedFlag, isExclusionReason, isSgApacRole,
-} from '../lib/scope';
+  isSector, isHqRegion, isRoundStage, isSgApacRole,
+} from '../../lib/scope';
 
 type Issue = { row: number; company: string; field: string; value: string; note: string };
 
@@ -42,10 +52,10 @@ async function main() {
     companies_read: 0, companies_inserted: 0, companies_updated: 0,
     sg_tokens_parsed: 0, organizations_created: 0, sg_links_created: 0,
     sg_links_confirmed: 0, sg_links_probable: 0, investments_created: 0,
-    excluded_read: 0, excluded_inserted: 0, rows_failed: 0,
+    rows_failed: 0,
   };
 
-  const [run] = await db.insert(runs).values({ stage: 'seed' }).returning();
+  const [run] = await db.insert(runs).values({ stage: 'import_companies' }).returning();
 
   // ── companies.csv ────────────────────────────────────────────────────────
   const csvPath = join(process.cwd(), 'data', 'companies.csv');
@@ -86,11 +96,6 @@ async function main() {
         issues.push({ row: rowNum, company: name, field: 'round_stage', value: r.round_stage, note: 'not in ROUND_STAGES enum - nulled' });
       }
 
-      const flagsRaw = parsePipeList(r.flags);
-      const seedFlags = flagsRaw.filter(isSeedFlag);
-      for (const bad of flagsRaw.filter((f) => !isSeedFlag(f))) {
-        issues.push({ row: rowNum, company: name, field: 'flags', value: bad, note: 'not in SEED_FLAGS enum - dropped' });
-      }
 
       // familiarity: how well EDB knows the company. The seed CSV has no
       // business asserting this, so anything other than the default is flagged
@@ -116,12 +121,11 @@ async function main() {
         roundAmountMusd: parseMusd(r.round_amount_musd),
         roundValMusd: parseMusd(r.round_val_musd),
         roundDate: validRoundDate(r.round_date),
-        seedFlags,
         familiarity,
-        familiaritySource: 'seed',
+        familiaritySource: 'manual',
         atsType: r.ats_type || null,
         atsSlug: r.ats_slug || null,
-        discoveredVia: 'seed',
+        discoveredVia: 'manual',
         normalizedName: normalizeCompanyName(name),
         // notes: NEVER parsed from CSV. Reserved for EDB-internal history.
       };
@@ -193,7 +197,7 @@ async function main() {
             // explicitly rather than leaving null: brief §4 says an unsourced
             // edge is worse than no edge, so it must at least say where it
             // came from and that it is unverified.
-            sourceUrl: 'seed:data/companies.csv#sg_apac (research-verified Aug 2026, no per-token URL)',
+            sourceUrl: 'manual:data/companies.csv#sg_apac (research-verified Aug 2026, no per-token URL)',
           });
           counts.sg_links_created++;
           if (matchStatus === 'confirmed') counts.sg_links_confirmed++; else counts.sg_links_probable++;
@@ -201,7 +205,12 @@ async function main() {
 
         // investor/investor_lead also implies an investment edge.
         if (role === 'investor' || role === 'investor_lead') {
-          const roundLabel = `seed:${r.round_stage || 'unknown'}`;
+          /*
+           * The stage as written, with no prefix. It used to be stored as
+           * "seed:series_c", which the org page's `round ~* 'seed|angel'`
+           * bucket then read as a seed round whatever the real stage was.
+           */
+          const roundLabel = r.round_stage || 'unknown';
           const dupeInv = await db.select({ id: investments.id }).from(investments)
             .where(sql`${investments.orgId} = ${orgId} AND ${investments.companyId} = ${companyId} AND ${investments.round} = ${roundLabel}`)
             .limit(1);
@@ -209,8 +218,8 @@ async function main() {
             await db.insert(investments).values({
               orgId, companyId, round: roundLabel,
               isLead: role === 'investor_lead',
-              source: 'seed',
-              sourceUrl: 'seed:data/companies.csv#sg_apac (research-verified Aug 2026, no per-token URL)',
+              source: 'manual',
+              sourceUrl: 'manual:data/companies.csv#sg_apac (research-verified Aug 2026, no per-token URL)',
             });
             counts.investments_created++;
           }
@@ -222,30 +231,6 @@ async function main() {
     }
   }
 
-  // ── excluded_companies.csv -> discovery guard table ──────────────────────
-  const exRows = parseCsv(readFileSync(join(process.cwd(), 'data', 'excluded_companies.csv'), 'utf8'));
-  counts.excluded_read = exRows.length;
-  for (const [idx, r] of exRows.entries()) {
-    const rowNum = idx + 2;
-    const name = r.name?.trim();
-    if (!name) { counts.rows_failed++; continue; }
-    const reason = r.reason?.trim();
-    if (!reason || !isExclusionReason(reason)) {
-      issues.push({ row: rowNum, company: name, field: 'reason', value: reason ?? '', note: 'not in EXCLUSION_REASONS enum' });
-    }
-    const norm = normalizeCompanyName(name);
-    const existing = await db.select({ id: excludedCompanies.id }).from(excludedCompanies)
-      .where(eq(excludedCompanies.normalizedName, norm)).limit(1);
-    const vals = {
-      name, normalizedName: norm,
-      aliases: parsePipeList(r.aliases),
-      reason: reason || 'independence_uncertain',
-      asOf: r.as_of ? (r.as_of.length === 4 ? `${r.as_of}-01-01` : `${r.as_of}-01`) : null,
-      detail: r.detail || null,
-    };
-    if (existing.length) await db.update(excludedCompanies).set(vals).where(eq(excludedCompanies.id, existing[0].id));
-    else { await db.insert(excludedCompanies).values(vals); counts.excluded_inserted++; }
-  }
 
   await db.update(runs)
     .set({ finishedAt: new Date(), counts: { ...counts, issues: issues.length } })

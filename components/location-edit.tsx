@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
  * the list wants the place; only someone who doubts it needs the provenance.
  */
 const SOURCE_NOTE: Record<string, string> = {
-  seed: 'From the seed research.',
+  researched: 'Hand-researched.',
   form_d: 'From the company’s own SEC filing.',
   news: 'Read from the headline that surfaced this company — a guess, not a filed address.',
   news_search: 'Read from the news written about this company.',

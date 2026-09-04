@@ -145,7 +145,7 @@ async function main() {
         cik: f.cik,
         foundedYear: f.yearOfInc ? Number(f.yearOfInc) || null : null,
         familiarity: 'no_status',        // tri-state; nothing asserted yet
-        familiaritySource: 'seed',
+        familiaritySource: 'form_d',
         discoveredVia: 'form_d',
         description: f.industryGroup ? `Form D industry group: ${f.industryGroup}` : null,
       }).returning({ id: companies.id });

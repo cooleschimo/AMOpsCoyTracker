@@ -18,6 +18,7 @@
 import '../lib/loadenv';
 import { eq, and, sql, isNotNull } from 'drizzle-orm';
 import { getDb, withRetry } from '../lib/db';
+import { trackedCompanies } from '../lib/scope';
 import { companies, organizations, sgLinks, runs, sourceHealth } from '../lib/schema';
 import { lookupCompany, isLiveStatus } from '../lib/acra';
 
@@ -32,12 +33,13 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
   const dry = flag('dry');
   const limit = Number(arg('limit', '0'));
 
-  // Default to companies worth resolving: seeded, Form D discoveries, or those
-  // already carrying an sg signal. --all covers every portfolio company too,
-  // which is thousands of calls against a courtesy service.
+  // Every company still a candidate, on the same rule the rest of the pipeline
+  // uses — how one arrived says nothing about whether it holds a Singapore
+  // entity. --all covers portfolio companies too, which is thousands of calls
+  // against a courtesy service; the default is capped instead.
   const targets = await withRetry(() => db.select({ id: companies.id, name: companies.name })
     .from(companies)
-    .where(flag('all') ? sql`true` : sql`${companies.discoveredVia} in ('seed','form_d')`)
+    .where(flag('all') ? sql`true` : trackedCompanies(companies))
     .limit(limit || 250));
 
   console.log(`${targets.length} companies to resolve against ACRA`);

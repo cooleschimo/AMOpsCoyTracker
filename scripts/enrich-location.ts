@@ -67,7 +67,7 @@ type Out = { results?: Array<{ id?: number; hq?: string | null; evidence?: strin
               order by coalesce(i.published_at, i.fetched_at) desc
               limit 25) x) as titles
     from companies c
-    where coalesce(c.hq_source, '') not in ('manual', 'seed', 'form_d')
+    where coalesce(c.hq_source, '') not in ('manual', 'researched', 'form_d')
       and (${all} or c.hq_city is null or c.hq_source = 'news')
       and (select count(*) from items i where i.company_id = c.id) >= 3
     order by c.name`;

@@ -28,7 +28,7 @@ export const companies = pgTable('companies', {
   hqRegion: text('hq_region'),
   /**
    * Where the location came from, so a reader can tell a filed address from a
-   * guess. 'seed' and 'form_d' are researched or filed; 'news' is the model's
+   * guess. 'researched' and 'form_d' are hand-checked or filed; 'news' is the model's
    * reading of a headline — often right, never checked, and the reason
    * Implantica arrived as San Diego. 'manual' is a person's correction and
    * outranks every automatic source.
@@ -84,7 +84,7 @@ export const companies = pgTable('companies', {
    *   in_scope     — a sector match, or pending the company-level assessment
    *   out_of_scope — confidently outside the four sectors; the row is kept so
    *                  "is the filter wrong?" stays answerable (RATIONALE §15.4)
-   *   unknown      — seeded companies, which are in scope by construction
+   *   unknown      — nothing has judged it either way, which is not a verdict
    * Tri-state, because 'pending assessment' is a real third state.
    */
   scopeStatus: text('scope_status').default('unknown'),
@@ -200,8 +200,10 @@ export const investments = pgTable('investments', {
 /**
  * Discovery guard list. Discovery checks candidates against this table (name +
  * aliases) and tags them rather than adding them. Stale references keep exited
- * companies circulating — around 15% of the seed research was stale — so
- * without the check they get re-imported from Form D and news.
+ * companies circulating — around 15% of the hand-researched list was stale —
+ * so without the check they get re-imported from Form D and news.
+ *
+ * Loaded by scripts/load-exclusions.ts.
  */
 export const excludedCompanies = pgTable('excluded_companies', {
   id: serial('id').primaryKey(),

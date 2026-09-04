@@ -38,7 +38,7 @@ const arg = (n: string, d: string) => {
                      and cs.week_of > current_date - 60) as live
     from companies
     where ${all}
-       or discovered_via in ('seed', 'form_d')
+       or discovered_via in ('manual', 'form_d')
        or array_length(sectors, 1) > 0
        or (description is not null and description <> ''
            and description not ilike 'Website:%')

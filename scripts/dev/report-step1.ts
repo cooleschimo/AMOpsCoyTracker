@@ -13,7 +13,7 @@ const hr = (t: string) => console.log(`\n${'='.repeat(78)}\n${t}\n${'='.repeat(7
 
   hr('1. SEED LOAD — row counts');
   const counts = await sql`
-    select 'companies (seed)' as t, count(*)::int as n from companies where discovered_via='seed'
+    select 'companies (manual)' as t, count(*)::int as n from companies where discovered_via='manual'
     union all select 'companies (form_d)', count(*)::int from companies where discovered_via='form_d'
     union all select 'excluded_companies', count(*)::int from excluded_companies
     union all select 'organizations', count(*)::int from organizations

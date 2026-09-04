@@ -9,7 +9,7 @@
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
-    "seed": "tsx scripts/seed.ts",
+    "load-exclusions": "tsx scripts/load-exclusions.ts",
     "formd": "tsx scripts/ingest-formd.ts"
   },
   "dependencies": {

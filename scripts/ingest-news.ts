@@ -21,13 +21,14 @@
  * Usage: npx tsx scripts/ingest-news.ts [--limit N] [--dry] [--wires-only] [--companies-only]
  */
 import '../lib/loadenv';
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { getDb, withRetry } from '../lib/db';
 import { companies, items, runs, sourceHealth } from '../lib/schema';
 import {
   WIRE_SOURCES, googleNewsUrl, fetchFeed, type FeedItem,
 } from '../lib/news-sources';
 import { canonicalizeUrl, splitGoogleTitle } from '../lib/news-ingest';
+import { trackedCompanies } from '../lib/scope';
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -146,34 +147,32 @@ async function insertItems(db: ReturnType<typeof getDb>, rows: PendingItem[]): P
     // ---- Company-directed Google News -------------------------------------
     if (!wiresOnly) {
       /**
-       * Everything the pipeline is actually watching.
+       * Everything the pipeline is actually watching, on one rule for every
+       * company regardless of how it arrived.
        *
-       * The seed list and assessed Form D filings, and — the addition that
-       * matters — companies news discovery found. Those arrived with exactly
-       * one item, the headline that surfaced them, and were never searched
-       * again: they could not accumulate a second. That starves the scoring,
-       * which reads a company's whole window to judge momentum and to build a
-       * why-now, so a genuine find was being scored on a single sentence.
+       * How a company entered the database says nothing about whether this
+       * week's news about it is worth having. Targeting used to branch on
+       * origin — hand-imported companies were searched unconditionally, Form D
+       * ones only once assessed in scope — which meant identical uncertainty
+       * was treated differently by provenance: 64 Form D companies went
+       * unsearched at 'unknown' while imported ones at 'unknown' were searched,
+       * and one imported company kept being searched after the assessment had
+       * ruled it out of scope.
        *
-       * A discovered company is searched once it is in scope, or while nothing
-       * has judged it either way. One the assessment marked out of scope is
-       * dropped, which is what stops the target list growing without limit.
+       * The question a target list answers is whether the company is still a
+       * candidate, so scope is the only thing it asks. An out-of-scope company
+       * is dropped, which is what stops the list growing without limit, and a
+       * portfolio company is not a target in its own right — it is a holding of
+       * a fund the graph tracks.
        */
       const targets = await db.select({
         id: companies.id, name: companies.name, aliases: companies.aliases,
       }).from(companies)
-        .where(or(
-          eq(companies.discoveredVia, 'seed'),
-          and(eq(companies.discoveredVia, 'form_d'), eq(companies.scopeStatus, 'in_scope')),
-          and(
-            eq(companies.discoveredVia, 'news'),
-            sql`coalesce(${companies.scopeStatus}, 'unknown') <> 'out_of_scope'`,
-          ),
-        ))
+        .where(trackedCompanies(companies))
         .orderBy(companies.id);
 
       const list = limit ? targets.slice(0, limit) : targets;
-      console.log(`Google News: ${list.length} companies (seed, assessed Form D, discovered)`);
+      console.log(`Google News: ${list.length} companies in scope`);
 
       for (const [idx, c] of list.entries()) {
         const url = googleNewsUrl(c.name);

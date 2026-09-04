@@ -17,7 +17,7 @@ import { optional } from '../../lib/env';
       (select count(*) from roles r where r.company_id=c.id)::int people,
       (select count(*) from investments v where v.company_id=c.id)::int inv,
       (select count(*) from sg_links g where g.subject_type='company' and g.subject_id=c.id)::int sg
-    from companies c where c.discovered_via='seed'
+    from companies c where c.discovered_via='manual'
     order by (select count(*) from investments v where v.company_id=c.id) desc,
              (select count(*) from roles r where r.company_id=c.id) desc limit 5`;
   console.log('\nCOMPANY PAGES (connection view):');
