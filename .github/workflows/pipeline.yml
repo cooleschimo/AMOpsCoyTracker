@@ -34,9 +34,14 @@ jobs:
     timeout-minutes: 350
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      # Every key, in failover order. lib/budget.ts marks one exhausted when its
-      # own daily cap reports, so a spent key is skipped rather than retried.
-      LLM_CHAIN: gemini,groq,gemini2,groq2,openrouter,gemini3,groq3,gemini4,groq4
+      # Every key, in failover order, alternating provider so no one of them
+      # carries a whole stage. Groq allows 180k tokens and 1,000 requests a day
+      # per key; gemini-3.6-flash's free tier is TWENTY requests a day, so the
+      # Gemini keys drop out early and the Groq ones carry the tail. Starting on
+      # Groq means the first request does not spend itself finding that out.
+      # lib/budget.ts marks a key exhausted when its own cap reports, so a spent
+      # one is skipped rather than retried.
+      LLM_CHAIN: groq,gemini,groq2,gemini2,groq3,gemini3,groq4,gemini4,openrouter
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
       GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}

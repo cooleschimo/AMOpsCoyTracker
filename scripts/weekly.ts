@@ -37,12 +37,21 @@ type Stage = {
 };
 
 const STAGES: Stage[] = [
-  { name: 'news', script: 'ingest-news.ts', timeoutMin: 25,
-    why: 'Google News per company plus the press wires' },
+  /*
+   * Context and discovery come before the per-company news search, because the
+   * search only asks about companies already in the table.
+   *
+   * Running news first meant a company discovered on Tuesday had no news of its
+   * own until Wednesday: it arrived with the single headline that surfaced it,
+   * and scoring judged it on that one sentence. Discovering first closes that
+   * gap — the same run that finds a company also pulls its news.
+   */
   { name: 'context', script: 'ingest-context.ts', timeoutMin: 15,
-    why: 'policy and sector moves that shift a company without it acting' },
+    why: 'the untargeted feeds: policy, sector moves, and the trade press discovery reads' },
   { name: 'discover', script: 'discover-news.ts', timeoutMin: 10,
     why: 'companies named in untargeted news that we do not track yet' },
+  { name: 'news', script: 'ingest-news.ts', timeoutMin: 30,
+    why: 'Google News per company, including the ones just discovered' },
   /*
    * Enrichment, in dependency order and placed after discovery so a company
    * found this run is filled in on the same run rather than waiting a week.
@@ -159,5 +168,33 @@ function run(stage: Stage, dry: boolean): Promise<{ ok: boolean; ms: number; not
     console.log(`\n${failed.length} stage${failed.length === 1 ? '' : 's'} failed: ${failed.map((f) => f.stage).join(', ')}`);
     console.log(`Rerun from the first failure: npx tsx scripts/weekly.ts --from ${failed[0].stage}`);
   }
-  process.exit(failed.length ? 1 : 0);
+
+  /*
+   * A stage that ran and produced nothing is not a success.
+   *
+   * Every stage exits 0 when the LLM allowance is spent, because being out of
+   * quota is not a crash — so a run where scoring and assessment both did
+   * nothing reported green. That is the worst outcome to report: worse than
+   * failing, because nobody looks at a green run.
+   *
+   * The counts already say it. A scoring stage that scored nothing, or an
+   * assessment where every batch failed, is called out here and the run exits
+   * non-zero so the schedule shows red.
+   */
+  const barren = results.filter((r) => {
+    if (!r.ok) return false;
+    const m = r.note.match(/"(scored|assessed|classified)":\s*0\b/);
+    const allBatchesFailed = /"batches":\s*([1-9]\d*)/.test(r.note)
+      && /"(batches_failed|failed_batches)":\s*([1-9]\d*)/.test(r.note)
+      && r.note.match(/"batches":\s*(\d+)/)?.[1]
+        === r.note.match(/"(?:batches_failed|failed_batches)":\s*(\d+)/)?.[1];
+    return Boolean(m) || allBatchesFailed;
+  });
+  if (barren.length) {
+    console.log(`\n${barren.length} stage${barren.length === 1 ? '' : 's'} ran but produced nothing: `
+      + `${barren.map((b) => b.stage).join(', ')}`);
+    console.log('Usually the daily LLM allowance: every provider spent before the run started.');
+  }
+
+  process.exit(failed.length || barren.length ? 1 : 0);
 })();

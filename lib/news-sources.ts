@@ -11,6 +11,8 @@
  *                         BLOCKERS.md, marked down in source health
  */
 
+import { SEARCHABLE_SUBSECTORS } from './subsectors';
+
 export type NewsSource = {
   id: string;
   name: string;
@@ -222,6 +224,11 @@ export type ContextSource = {
   note?: string;
 };
 
+/*
+ * Sector movement is generated from the taxonomy rather than listed here: one
+ * query per subsector that actually sites things, built from that subsector's
+ * own search terms. See SEARCHABLE_SUBSECTORS.
+ */
 export const CONTEXT_SOURCES: ContextSource[] = [
   {
     id: 'fedreg_bis',
@@ -317,23 +324,67 @@ export const CONTEXT_SOURCES: ContextSource[] = [
     sectors: ['deeptech', 'defence_tech', 'ai'],
     enabled: true,
   },
-  {
-    id: 'sector_waves',
-    name: 'Sector-wide movement',
-    url: googleNewsTopicUrl('(semiconductor OR biotech OR robotics OR "AI infrastructure") AND ("record funding" OR "capacity expansion" OR consolidation OR "industry shift")'),
-    kind: 'sector',
-    sectors: [],
+  ...SEARCHABLE_SUBSECTORS.map((sub) => ({
+    id: `sector_${sub.id}`,
+    name: `${sub.short} — sector movement`,
+    /*
+     * The query is the subsector's own search terms, OR-ed. They live on the
+     * taxonomy in lib/subsectors.ts rather than here, so adding a subsector
+     * brings its sector query with it and the words a headline uses sit beside
+     * the definition of what the subsector is.
+     */
+    url: googleNewsTopicUrl(sub.searchTerms!.join(' OR ')),
+    kind: 'sector' as const,
+    /*
+     * Tagged with the subsector and its family, so a company only sees movement
+     * in its own field: score-companies matches this against the company's own
+     * tags. A fab announcement is context for a chip company and noise for a
+     * legal-AI one.
+     */
+    sectors: [sub.id, sub.broad],
     enabled: true,
-  },
+  })),
+
+  /**
+   * Competing investment promotion agencies. One agency per query: stacking
+   * five with OR returned nothing but Malaysia, the same degradation the
+   * Singapore agency queries showed before they were split.
+   *
+   * A company these agencies win is a company that chose somewhere else, which
+   * is the point of watching them.
+   */
   {
-    id: 'competitor_ipa',
-    name: 'Competing investment promotion agencies',
-    url: googleNewsTopicUrl('("IDA Ireland" OR "Invest India" OR MIDA Malaysia OR "Abu Dhabi" OR "Saudi Arabia") AND (semiconductor OR biotech OR "data centre" OR "R&D centre") investment'),
+    id: 'ipa_mida',
+    name: 'MIDA Malaysia',
+    url: googleNewsTopicUrl('"MIDA" Malaysia investment'),
     kind: 'competitor_ipa',
     sectors: [],
     enabled: true,
   },
-
+  {
+    id: 'ipa_ida_ireland',
+    name: 'IDA Ireland',
+    url: googleNewsTopicUrl('"IDA Ireland" investment'),
+    kind: 'competitor_ipa',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'ipa_invest_india',
+    name: 'Invest India',
+    url: googleNewsTopicUrl('"Invest India" investment'),
+    kind: 'competitor_ipa',
+    sectors: [],
+    enabled: true,
+  },
+  {
+    id: 'ipa_gulf',
+    name: 'Gulf states — semiconductor and data centre investment',
+    url: googleNewsTopicUrl('Saudi Arabia ("semiconductor" OR "data centre") investment'),
+    kind: 'competitor_ipa',
+    sectors: [],
+    enabled: true,
+  },
   /**
    * Publications read in the region, taken from their own feeds rather than
    * through a Google News query. A search returns what matched the words; a
