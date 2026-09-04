@@ -131,6 +131,23 @@ export const actions = {
       emit();
     });
   },
+
+  restoreToMonitoring(companyId: string) {
+    const previous = state.droppedFromMonitoring[companyId];
+    const next = { ...state.droppedFromMonitoring };
+    delete next[companyId];
+    state = { ...state, droppedFromMonitoring: next };
+    emit();
+
+    void server.restoreToMonitoring(numericId(companyId)).then((res) => {
+      if (res.ok || !previous) return;
+      state = {
+        ...state,
+        droppedFromMonitoring: { ...state.droppedFromMonitoring, [companyId]: previous },
+      };
+      emit();
+    });
+  },
 };
 
 const serverSnapshot = state;

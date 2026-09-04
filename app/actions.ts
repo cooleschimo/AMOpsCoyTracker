@@ -135,6 +135,30 @@ export async function dropFromMonitoring(companyId: number): Promise<ActionResul
 }
 
 /**
+ * Put a company back under monitoring after it was dropped.
+ *
+ * Clearing `removed_at` resumes the original watch rather than starting a new
+ * one, so the period the company has been monitored stays continuous — an undo
+ * that opened a second row would read as two shorter watches with a gap.
+ */
+export async function restoreToMonitoring(companyId: number): Promise<ActionResult> {
+  const key = await voterKey();
+  try {
+    await withRetry(async () => {
+      const sql = getSql();
+      await sql`update monitoring set removed_at = null
+                where company_id = ${companyId} and voter_key = ${key}
+                  and removed_at is not null`;
+    });
+    revalidatePath('/monitoring');
+    revalidatePath('/');
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/**
  * Account status is a separate axis from disposition: it answers "do we already
  * know this company", and the placement logic reads it directly (§10).
  */

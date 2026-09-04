@@ -7,6 +7,7 @@
  */
 import Link from 'next/link';
 import { CompanyCase } from '@/components/company-case';
+import { MonitoringDrop } from '@/components/monitoring-drop';
 import { Masonry } from '@/components/masonry';
 import { SectionHeading } from '@/components/primitives';
 // From lib, not primitives: primitives is a client module, and a server
@@ -71,7 +72,13 @@ export default async function MonitoringPage() {
                 />
                 <Masonry className="dense-cards">
                   {inSector.map((c) => (
-                    <CompanyCase key={c.id} company={c} />
+                    // The control sits under the card rather than inside it:
+                    // stopping a watch belongs to this page, and CompanyCase is
+                    // shared with the dashboard where the action has no meaning.
+                    <div key={c.id}>
+                      <CompanyCase company={c} />
+                      <MonitoringDrop companyId={c.id} />
+                    </div>
                   ))}
                 </Masonry>
               </section>
