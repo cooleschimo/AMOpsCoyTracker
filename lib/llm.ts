@@ -216,9 +216,30 @@ async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider)
  * recorded rather than hidden: scores from different models are not strictly
  * comparable, and the column is what makes that visible.
  */
+/**
+ * Where the next call starts in the chain.
+ *
+ * Walking from the top every time spends the first provider's whole allowance
+ * before the second is touched, which wastes the chain in two ways: the early
+ * keys hit their cap while the later ones idle, and every call pays the cost of
+ * re-checking providers that are already spent. One OpenRouter key sitting last
+ * still out-produced any single Groq key, because it only ever saw the
+ * overflow.
+ *
+ * Starting each call one place further along spreads the load evenly. The order
+ * itself is unchanged, so failover still walks the whole chain from wherever it
+ * begins, and an exhausted provider is still skipped rather than retried — the
+ * rotation decides where to START, never whether to try.
+ */
+let rotation = 0;
+
 async function callWithFailover(opts: CallOpts, stricter: boolean): Promise<RawOk | RawErr> {
-  const providers = llmProviders();
-  if (!providers.length) return { error: 'no LLM provider configured (set GROQ_API_KEY or another provider key)' };
+  const chain = llmProviders();
+  if (!chain.length) return { error: 'no LLM provider configured (set GROQ_API_KEY or another provider key)' };
+
+  // Rotate the starting point, then walk the whole chain from there.
+  const start = rotation++ % chain.length;
+  const providers = [...chain.slice(start), ...chain.slice(0, start)];
 
   const names = providers.map((p) => p.label ?? p.name);
   let last: RawErr = { error: 'no provider attempted' };
