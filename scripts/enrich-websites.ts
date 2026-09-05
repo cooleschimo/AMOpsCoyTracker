@@ -16,12 +16,42 @@ import { trackedCompanies } from '../lib/scope';
 import { resolveWebsite, tryDomain, SAME_NAME_SYSTEM, buildSameNamePrompt } from '../lib/enrich';
 import { callJson } from '../lib/llm';
 import { Budget } from '../lib/budget';
-import { researchCompany } from '../lib/websearch';
+import { researchCompany, findCompanyWebsiteWithContext } from '../lib/websearch';
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
   return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : d;
 };
+
+/**
+ * Is this site the company we are looking for, or a different one of the same
+ * name? A failed call is not a yes: without an answer the match is unconfirmed,
+ * and an unconfirmed site is the thing this whole path exists to avoid.
+ */
+async function isSameCompany(
+  name: string,
+  knownIndustry: string | null,
+  site: { domain: string; title: string | null; text: string },
+  budget: Budget,
+  counts: Record<string, number>,
+): Promise<{ ok: boolean }> {
+  const verdict = await callJson<{ same_company: boolean; why: string }>({
+    system: SAME_NAME_SYSTEM,
+    user: buildSameNamePrompt(name, knownIndustry || '(nothing recorded)', site),
+    budget,
+    schema: {
+      type: 'object',
+      properties: { same_company: { type: 'boolean' }, why: { type: 'string' } },
+      required: ['same_company', 'why'],
+      additionalProperties: false,
+    },
+    reasoningEffort: 'low',
+  });
+  if (verdict.ok && verdict.data?.same_company) return { ok: true };
+  counts.same_name_rejected++;
+  console.log(`  ✗ ${name} -> ${site.domain} rejected: ${verdict.data?.why ?? verdict.error ?? 'unconfirmed'}`);
+  return { ok: false };
+}
 
 (async () => {
   const db = getDb();
@@ -57,7 +87,7 @@ const arg = (n: string, d?: string) => {
 
   const [run] = await db.insert(runs).values({ stage: 'enrich_web' }).returning();
   const budget = new Budget();
-  const counts = { attempted: 0, resolved: 0, unresolved: 0, via_domain_guess: 0, via_search: 0, search_ambiguous: 0, search_rejected: 0, same_name_rejected: 0 };
+  const counts = { attempted: 0, resolved: 0, unresolved: 0, via_domain_guess: 0, via_search: 0, search_ambiguous: 0, search_rejected: 0, same_name_rejected: 0, via_context_search: 0 };
 
   for (const c of list) {
     counts.attempted++;
@@ -122,26 +152,44 @@ const arg = (n: string, d?: string) => {
      * needing a website have one-word names, so this is the common case rather
      * than the edge.
      */
-    if (r && !c.name.trim().includes(' ')) {
-      const known = knownIndustry ?? '';
-      const verdict = await callJson<{ same_company: boolean; why: string }>({
-        system: SAME_NAME_SYSTEM,
-        user: buildSameNamePrompt(c.name, known || '(nothing recorded)', { domain: r.domain, title: r.title, text: r.text }),
-        budget,
-        schema: {
-          type: 'object',
-          properties: { same_company: { type: 'boolean' }, why: { type: 'string' } },
-          required: ['same_company', 'why'],
-          additionalProperties: false,
-        },
-        reasoningEffort: 'low',
-      });
-      // A failed call is not a yes. Without an answer the match is unconfirmed,
-      // and an unconfirmed site is the thing this whole path exists to avoid.
-      if (!verdict.ok || !verdict.data?.same_company) {
-        counts.same_name_rejected++;
-        console.log(`  ✗ ${c.name} -> ${r.domain} rejected: ${verdict.data?.why ?? verdict.error ?? 'unconfirmed'}`);
-        r = null;
+    /*
+     * A one-word name needs more than a domain that spells it.
+     *
+     * Domain guessing is right often enough to try first and free to run, but
+     * for a one-word name it only proves somebody owns the word: aslan.ai is a
+     * Thai finance site, kepler.org an African education charity. So the guess
+     * is treated as ONE candidate rather than the answer, and the sector — which
+     * is already known here — buys a second opinion from search before any model
+     * call is made. "Aslan defence software ai software" ranks
+     * aslanintelligence.com; the bare name never would, which is why the plain
+     * search in step 2 is no help for these.
+     *
+     * Sectors only, not the whole of `knownIndustry`. A search query is not a
+     * prompt: adding the discovering headline returned zero results, because a
+     * keyword index scores on every term and no page matches a sentence of prose.
+     *
+     * Candidates are then checked in order and the first that survives both the
+     * page check and the same-name check wins. Multi-word names skip all of
+     * this — matching every token of "Celera Semiconductor" is already
+     * distinctive.
+     */
+    const oneWord = !c.name.trim().includes(' ');
+    const searchContext = (c.sectors ?? []).join(' ');
+    if (oneWord && searchContext) {
+      const candidates: Array<{ host: string; why: string }> = [];
+      if (r) candidates.push({ host: r.domain, why: 'domain guess' });
+      for (const cand of await findCompanyWebsiteWithContext(c.name, searchContext)) {
+        if (!candidates.some((x) => x.host === cand.host)) candidates.push(cand);
+      }
+
+      r = null;
+      for (const cand of candidates) {
+        const checked = await tryDomain(cand.host, c.name);
+        if (!checked?.verified) continue;
+        if (!(await isSameCompany(c.name, knownIndustry, checked, budget, counts)).ok) continue;
+        if (cand.why !== 'domain guess') counts.via_context_search++;
+        r = { ...checked, verifyReason: `${cand.why}; ${checked.verifyReason}` };
+        break;
       }
     }
 

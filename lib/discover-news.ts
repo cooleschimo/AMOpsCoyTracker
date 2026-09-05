@@ -45,8 +45,17 @@ export type NewsCandidate = {
  * Words that end a company name. A headline is "X raises $40M to do Y", so the
  * name is what precedes the verb — but only when the verb is the company's.
  */
+/**
+ * The verb that ends the subject. Everything before it is the company.
+ *
+ * Going public is here alongside raising: a listing is a financing event the
+ * round vocabulary has no word for, and the headline puts the company in the
+ * same place — "Perplexity Files to Go Public", "Freenome Goes Public in $310M
+ * SPAC Deal". Without it, lib/fundraise.ts recognised the event and this
+ * returned null for the name, so nothing was created either way.
+ */
 const RAISE_VERB =
-  /\s+\b(raises?|raised|raising|secures?|secured|closes?|closed|lands?|landed|nets?|netted|banks?|announces?|announced|completes?|completed|emerges?|emerged|launches?|launched)\b/i;
+  /\s+\b(raises?|raised|raising|secures?|secured|closes?|closed|lands?|landed|nets?|netted|banks?|announces?|announced|completes?|completed|emerges?|emerged|launches?|launched|(?:to\s+)?(?:goes?|go) public|going public|files?|filed|prices?|priced|(?:to\s+)?debuts?|debuted|(?:to\s+)?lists?|listed|begins? trading)\b/i;
 
 /**
  * Openers that mean the subject is not the company: a publication crediting
@@ -62,7 +71,7 @@ const NOT_THE_COMPANY =
  * outlet telling its readers who this is.
  */
 const LEAD_IN =
-  /^(?:[\w.-]+-backed\s+)?(?:\w+\s+){0,3}?\b(startup|start-up|company|firm|maker|developer|platform|scaleup|scale-up|unicorn|venture)\s+/i;
+  /^(?:[\w.-]+-backed\s+)?(?:[\w-]+\s+){0,5}?\b(startup|start-up|company|firm|maker|manufacturer|developer|platform|scaleup|scale-up|unicorn|venture|lab|group)\s+/i;
 
 /**
  * A name that is only a category — "Defense startup", "Austin startup", "SG
@@ -78,14 +87,14 @@ const LEAD_IN =
  * is a description of one.
  */
 const CATEGORY_WORD =
-  /^(startup|start-up|company|firm|maker|developer|scaleup|scale-up|unicorn|venture|ventures|business)s?$/i;
+  /^(startup|start-up|company|firm|maker|manufacturer|developer|scaleup|scale-up|unicorn|venture|ventures|business)s?$/i;
 
 /**
  * Words that describe a company without identifying it — the modifiers an
  * outlet puts in front of "startup" when it has not named the company.
  */
 const DESCRIPTOR =
-  /^(a|an|the|new|young|early|late|local|foreign|domestic|global|regional|leading|emerging|stealth|sg|us|uk|eu|ai|defen[cs]e|fintech|biotech|healthtech|edtech|insurtech|proptech|agritech|cleantech|deeptech|space|quantum|robotics|travel|fashion|energy|mobility|logistics|austin|boston|seattle|london|berlin|paris|singapore|indian|chinese|japanese|korean|german|french|british|american|european|asian)$/i;
+  /^(a|an|the|new|young|early|late|first|second|largest|biggest|top|local|foreign|domestic|global|regional|leading|emerging|stealth|sg|us|uk|eu|ai|defen[cs]e|fintech|biotech|healthtech|edtech|insurtech|proptech|agritech|cleantech|deeptech|space|quantum|robot|robotics|humanoid|drone|chip|semiconductor|travel|fashion|energy|mobility|logistics|austin|boston|seattle|london|berlin|paris|singapore|indian|chinese|japanese|korean|german|french|british|american|european|asian)$/i;
 
 /**
  * Whether a name is a category rather than a company, for callers that get a
@@ -165,7 +174,7 @@ export function companyFromHeadline(title: string): string | null {
   name = name.split(/[,:;–—]/)[0].trim();
   name = name.replace(/^[^\p{L}\p{N}]+/u, '').replace(/[^\p{L}\p{N}.'’&-]+$/u, '');
   // A trailing auxiliary or preposition belongs to the sentence, not the name.
-  name = name.replace(/\s+\b(has|have|had|is|are|was|were|will|just|now|also|reportedly|said|says)$/i, '').trim();
+  name = name.replace(/\s+\b(has|have|had|is|are|was|were|will|just|now|also|reportedly|said|says|to|set|plans?|prepares?)$/i, '').trim();
 
   if (!name) return null;
   if (NOT_A_COMPANY.test(name)) return null;

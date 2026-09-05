@@ -34,6 +34,9 @@ export const ROUND_STAGES = [
   'series_e', 'series_f', 'series_g', 'series_h',
   'series_a_ext', 'series_b_ext', 'series_c_ext', 'series_d_ext',
   'series_e_ext', 'series_f_ext', 'series_g_ext', 'series_h_ext',
+  // A listing is a financing event with no lettered round. lib/placement.ts
+  // already counts it as late-stage; it belongs in the vocabulary too.
+  'ipo',
   'strategic', 'multiple', 'unknown',
 ] as const;
 export type RoundStage = (typeof ROUND_STAGES)[number];

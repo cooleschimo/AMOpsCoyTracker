@@ -31,6 +31,37 @@ export type Fundraise = {
   valuationUsd: number | null;
 };
 
+/**
+ * A company going public, which is a financing event the round vocabulary has
+ * no word for.
+ *
+ * Kept narrow on purpose. Four hundred headlines mentioning "IPO" in a four
+ * month window contain twelve where a company is actually listing; the rest are
+ * market commentary, share prices and "ahead of its IPO" — and treating those
+ * as events would hand discovery a stream of stock tickers.
+ *
+ * So the company has to be the SUBJECT of the listing: it files, prices,
+ * completes, begins trading, or goes public. A headline merely mentioning an
+ * IPO is not one.
+ */
+const GOING_PUBLIC =
+  /\b(to go public|goes public|going public|files? to go public|files? for (an? )?ipo|filed for (an? )?ipo|prices? (its )?ipo|completes? (its )?ipo|launches? (its )?ipo|begins? trading|to list on|lists? on|debuts? on (the )?(nasdaq|nyse|stock)|via (an? )?spac|spac (deal|merger)|direct listing)\b/i;
+
+/**
+ * Headlines that name an IPO without being about one happening: a share price,
+ * a market wrap, a piece written before a listing. These outnumber the real
+ * events by about thirty to one.
+ */
+const IPO_COMMENTARY =
+  /\b(ahead of|await|awaits|investors await|what investors|stock (hits|falls|rises|jumps|gains|drops)|52-week|futures|shares? (fall|rise|jump|slide|gain|drop)|lackluster|inducement grant|listing rule|post-ipo|since (its )?ipo|ipo market|ipo window|ipo pipeline|could ipo|may ipo|might ipo|eyes? (an? )?ipo|weighs? (an? )?ipo|considers? (an? )?ipo)\b/i;
+
+/** Whether a headline is a company actually going public. */
+export function isGoingPublic(title: string, snippet?: string | null): boolean {
+  const text = `${title} ${snippet ?? ''}`;
+  if (IPO_COMMENTARY.test(text)) return false;
+  return GOING_PUBLIC.test(text);
+}
+
 const MULTIPLIER: Record<string, number> = {
   k: 1e3, m: 1e6, b: 1e9, bn: 1e9, t: 1e12,
   thousand: 1e3, million: 1e6, billion: 1e9, trillion: 1e12,
@@ -79,14 +110,19 @@ export function parseFundraise(title: string, snippet?: string | null): Fundrais
   if (/\braise[sd]?\s+(concerns?|questions?|doubts?|awareness|the\s+alarm|eyebrows)/i.test(text)) return null;
   if (/\bfundraiser\b/i.test(text) && !/\bseries\s+[a-j]\b/i.test(text)) return null;
 
+  const goingPublic = isGoingPublic(title, snippet);
+
   const isRaise =
     /\b(raise[sd]?|raising|secure[sd]?|closes?|closed|lands?|nets?|banks?)\b[^.]{0,40}\$/i.test(text)
     || /\bseries\s+[a-j]\b/i.test(text)
     || /\b(funding|investment)\s+round\b/i.test(text)
-    || /\bvaluation\b/i.test(text);
+    || /\bvaluation\b/i.test(text)
+    || goingPublic;
   if (!isRaise) return null;
 
-  const round = parseRound(text);
+  // 'ipo' rather than a letter: a listing is not a lettered round, and calling
+  // it one would put it in the early-stage bucket that lib/placement.ts reads.
+  const round = goingPublic ? 'ipo' : parseRound(text);
 
   /**
    * Valuation and amount are both dollar figures, so which is which comes from

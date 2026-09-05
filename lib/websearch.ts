@@ -26,6 +26,8 @@
  *   3. this                                                (1 request)
  */
 
+import { search } from './search-providers';
+
 const BASE = 'https://puri.li';
 const UA = 'AMOpsCoyTracker/1.0 (research; contact via repo)';
 
@@ -153,6 +155,50 @@ const NEWS_HINT = /(news|techcrunch|venturebeat|axios|forbes|businesswire|prnews
  * Effects tutorials. When nothing references the company, looksAmbiguous is true
  * and the context is not about this company.
  */
+/**
+ * Search again, with what the company is known to do in the query.
+ *
+ * The bare-name search is right for a distinctive name and wrong for a common
+ * one: "Aslan" returns a Thai finance site and "Kepler" an African education
+ * charity, because the name alone is what half the web is about. Adding the
+ * sector puts the company's own field in the query, and Google ranks on it —
+ * the same two names return aslanintelligence.com and kepler.space.
+ *
+ * This is the second attempt, not the first. It costs a search either way, but
+ * the extra terms hurt a rare name (fewer, rarer terms is what keyword search
+ * rewards), so it is reserved for the case where the plain search already
+ * produced something the same-name check threw out.
+ *
+ * Returns candidate hosts in rank order rather than one answer. Every one still
+ * has to pass the page check and the same-name check; this only decides what is
+ * worth checking.
+ */
+export async function findCompanyWebsiteWithContext(
+  companyName: string, knownFor: string, limit = 5,
+): Promise<Array<{ host: string; why: string }>> {
+  const bare = companyName
+    .replace(/,?\s+(inc|incorporated|llc|l\.l\.c|ltd|limited|corp|corporation|co|pbc|plc|lp|llp)\.?$/i, '')
+    .trim();
+  // Sector ids are snake_case in the database and prose in a search index.
+  const context = knownFor.replace(/[_-]+/g, ' ').split(/\s+/).slice(0, 12).join(' ').trim();
+  if (!context) return [];
+
+  // The provider chain (Serper = Google), not webSearch's own endpoint: this
+  // query leans on ranking quality, and the plain-name search that already
+  // failed is the one webSearch serves.
+  const hits = await search(`${bare} ${context} company official website`, { maxResults: 8 });
+  const out: Array<{ host: string; why: string }> = [];
+  const seen = new Set<string>();
+  for (const h of hits) {
+    if (!h.host || NON_COMPANY.test(h.host)) continue;
+    if (seen.has(h.host)) continue;
+    seen.add(h.host);
+    out.push({ host: h.host, why: `context search "${context}" ranked ${h.host}` });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
 export async function researchCompany(companyName: string): Promise<CompanyResearch> {
   const bare = companyName
     .replace(/,?\s+(inc|incorporated|llc|l\.l\.c|ltd|limited|corp|corporation|co|pbc|plc|lp|llp)\.?$/i, '')
