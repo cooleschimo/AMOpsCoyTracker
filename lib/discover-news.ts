@@ -64,9 +64,57 @@ const NOT_THE_COMPANY =
 const LEAD_IN =
   /^(?:[\w.-]+-backed\s+)?(?:\w+\s+){0,3}?\b(startup|start-up|company|firm|maker|developer|platform|scaleup|scale-up|unicorn|venture)\s+/i;
 
+/**
+ * A name that is only a category — "Defense startup", "Austin startup", "SG
+ * travel startup". LEAD_IN cannot catch these: it requires something after the
+ * category word to strip down to, and here there is nothing after it.
+ *
+ * This is what let "Defense startup" become a company row that then collected
+ * 88 stories about a dozen different firms — Aitan, Ursa Major, Quantum
+ * Systems — and read as one company with remarkable momentum.
+ *
+ * Anchored at the end, so a real name CONTAINING one of these words survives:
+ * ARCH Venture Partners and Martin & Company are companies, "Defense startup"
+ * is a description of one.
+ */
+const CATEGORY_WORD =
+  /^(startup|start-up|company|firm|maker|developer|scaleup|scale-up|unicorn|venture|ventures|business)s?$/i;
+
+/**
+ * Words that describe a company without identifying it — the modifiers an
+ * outlet puts in front of "startup" when it has not named the company.
+ */
+const DESCRIPTOR =
+  /^(a|an|the|new|young|early|late|local|foreign|domestic|global|regional|leading|emerging|stealth|sg|us|uk|eu|ai|defen[cs]e|fintech|biotech|healthtech|edtech|insurtech|proptech|agritech|cleantech|deeptech|space|quantum|robotics|travel|fashion|energy|mobility|logistics|austin|boston|seattle|london|berlin|paris|singapore|indian|chinese|japanese|korean|german|french|british|american|european|asian)$/i;
+
+/**
+ * Whether a name is a category rather than a company, for callers that get a
+ * name from somewhere other than the headline parser — the model's extraction
+ * returns a string, and telling it not to return a category is not the same as
+ * enforcing it.
+ */
+export function isCategoryName(name: string): boolean {
+  const words = name.trim().split(/\s+/);
+  // The last word has to be the category itself — "Defense startup", not
+  // "Anduril".
+  if (!words.length || !CATEGORY_WORD.test(words[words.length - 1])) return false;
+  // And every word before it has to be a descriptor rather than a name. This is
+  // what separates "Defense startup" and "SG travel startup" from "Uplift
+  // Ventures" and "Martin & Company", which are the names companies actually
+  // registered.
+  return words.slice(0, -1).every((w) => DESCRIPTOR.test(w));
+}
+
 /** A name that is really a country, a sector or a publication. */
 const NOT_A_COMPANY =
   /^(the|a|an|this|these|those|new|top|best|why|how|what|when|where|india|china|singapore|us|uk|eu|europe|asia|apac|africa|startup|startups|vc|vcs|investors?|founders?|report|study|survey|market|markets|sector|industry)\b/i;
+
+/**
+ * A remnant that is only a corporate suffix, and so cannot be the whole name.
+ * "Partners", "Technologies", "Labs" — each is the tail of a name, never one.
+ */
+const BARE_SUFFIX =
+  /^(partners?|technologies|technology|systems|labs?|holdings?|group|ventures?|capital|industries|solutions|networks|sciences?)$/i;
 
 /** Corporate suffixes worth keeping attached, so "Acme Inc" is not cut to "Acme". */
 const KEEP_SUFFIX = /\b(inc|corp|corporation|llc|ltd|limited|plc|ag|sa|bv|gmbh|labs?|technologies|technology|systems|robotics|bio|biosciences|therapeutics|semiconductor|semiconductors|networks|health|medical|space|ai)\b\.?$/i;
@@ -85,9 +133,29 @@ export function companyFromHeadline(title: string): string | null {
   if (!m || m.index === undefined) return null;
   let name = t.slice(0, m.index).trim();
 
-  // Strip a descriptive lead-in, but only when a plausible name survives it.
-  const stripped = name.replace(LEAD_IN, '').trim();
-  if (stripped && /^[A-Z]/.test(stripped)) name = stripped;
+  /*
+   * Strip a descriptive lead-in — "Fashion startup Atorie" is Atorie.
+   *
+   * When NOTHING survives the strip, the headline named a category rather than
+   * a company: "Defense startup raises $61 million" has no name in it at all.
+   * Keeping the unstripped text was how "Defense startup" became a company row
+   * that then collected 88 stories about a dozen different firms — Aitan, Ursa
+   * Major, Quantum Systems — each of which looked like momentum at one company.
+   *
+   * A lead-in that leaves a lowercase remnant is also a miss rather than a
+   * name, so both cases return null instead of falling back.
+   *
+   * The strip is declined when the remnant is a bare corporate suffix: "ARCH
+   * Venture Partners" would otherwise be cut to "Partners", because 'venture'
+   * is a lead-in word in one company's description and part of another's actual
+   * name. Keeping the whole thing is right whenever the tail alone is not a
+   * name someone would recognise.
+   */
+  if (LEAD_IN.test(name)) {
+    const stripped = name.replace(LEAD_IN, '').trim();
+    if (!stripped || !/^[A-Z]/.test(stripped)) return null;
+    if (!BARE_SUFFIX.test(stripped)) name = stripped;
+  }
 
   // A possessive means the subject is a unit of something else — "Xpeng's
   // robotics unit" is not a company we can resolve, so it is left alone.
@@ -101,6 +169,7 @@ export function companyFromHeadline(title: string): string | null {
 
   if (!name) return null;
   if (NOT_A_COMPANY.test(name)) return null;
+  if (isCategoryName(name)) return null;
   // A real name is short. Anything long is a sentence fragment.
   const words = name.split(/\s+/);
   if (words.length > 5) return null;
@@ -172,6 +241,8 @@ Return null when the subject is:
 If two companies are named — a partnership or an acquisition — return the one the headline is ABOUT: the one doing the acquiring, opening, or launching. If that is genuinely ambiguous, return null.
 
 Give the company's own name as it would write it, not the headline's description of it: "Antler-backed Indian space startup InspeCity" is InspeCity.
+
+When the headline never names the company — "Defense startup raises $61 million", "Austin startup raises $10.3M" — return null. A category is not a name, and one row called "Defense startup" ends up collecting stories about dozens of unrelated companies.
 
 Also give the company's headquarters when the headline, the outlet or your own knowledge of the company supports it. Give "city, ST" for a US company and "City, Country" otherwise. Return null for hq when you do not know — a guessed location is worse than an absent one, because it decides whether the company is in scope at all.
 

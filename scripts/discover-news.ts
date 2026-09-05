@@ -28,7 +28,7 @@ import { writeFileSync } from 'node:fs';
 import { getDb, getSql, withRetry } from '../lib/db';
 import { companies, items, runs } from '../lib/schema';
 import {
-  EXTRACT_SYSTEM, buildExtractPrompt, candidatesFrom, eventCandidates,
+  EXTRACT_SYSTEM, buildExtractPrompt, candidatesFrom, eventCandidates, isCategoryName,
   type NewsCandidate,
 } from '../lib/discover-news';
 import { normalizeCompanyName } from '../lib/normalize';
@@ -121,7 +121,7 @@ function parseHq(hq: string | null | undefined) {
   const counts = {
     items_read: rows.length, candidates: found.length,
     event_headlines: 0, event_batches: 0, event_named: 0, event_rejected: 0,
-    fundraise_rejected: 0,
+    fundraise_rejected: 0, category_rejected: 0,
     created: 0, below_floor: 0, on_guard_list: 0, already_exists: 0,
   };
 
@@ -154,6 +154,9 @@ function parseHq(hq: string | null | undefined) {
         if (!c) continue;
         const name = (r.company ?? '').trim();
         if (!name || name.toLowerCase() === 'null') { counts.fundraise_rejected++; continue; }
+        // The prompt asks for a name rather than a category; this is what makes
+        // it so. "Defense startup" collected 88 stories about a dozen firms.
+        if (isCategoryName(name)) { counts.category_rejected++; continue; }
         confirmed.push({ ...c, name, hq: (r.hq ?? '').trim() || null });
       }
     }
@@ -188,6 +191,7 @@ function parseHq(hq: string | null | undefined) {
         if (!it) continue;
         const name = (r.company ?? '').trim();
         if (!name || name.toLowerCase() === 'null') { counts.event_rejected++; continue; }
+        if (isCategoryName(name)) { counts.category_rejected++; continue; }
         if (knownSet.has(normalizeCompanyName(name))) continue;
         counts.event_named++;
         found.push({
