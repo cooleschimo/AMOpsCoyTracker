@@ -26,7 +26,18 @@ import { getDb, getSql } from '../lib/db';
 import { runs } from '../lib/schema';
 import { Budget } from '../lib/budget';
 import { callJson } from '../lib/llm';
-import { isBroadSector, isSector, sectorBroadSector, sectorsForPrompt } from '../lib/subsectors';
+import {
+  isBroadSector, isSector, sectorBroadSector, sectorsForPrompt, SECTOR_DEFS,
+} from '../lib/subsectors';
+
+/**
+ * The subsector ids, which are what classification has to produce. A broad
+ * family is not enough: 'ai' is a valid tag in this taxonomy AND was one in the
+ * taxonomy before it, so accepting it would pass over every company that only
+ * ever had the broad tag. 'other' is the classifier's own way of saying it
+ * could not tell, so it does not count as classified either.
+ */
+const SUBSECTOR_IDS = SECTOR_DEFS.map((d) => d.id).filter((id) => id !== 'other');
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -90,6 +101,19 @@ ${batch.map((c) => `id ${c.id}: ${c.name}
    * Graves County" says manufacturing, "Epson launches AX6 cobot" says robotics.
    * So it stands in, and the prompt is told it may be reading one.
    */
+  /**
+   * A company needs classifying when it carries no SUBSECTOR. This used to
+   * skip anything tagged 'ai', 'deeptech', 'biotech' or 'defence_tech' — the
+   * tags of the taxonomy this one REPLACED — so an old broad tag read as proof
+   * of being current and the companies most in need of retagging were the exact
+   * ones passed over. Every hand-imported company still carried only the old
+   * vocabulary a fortnight after the retag.
+   *
+   * Derived from lib/subsectors.ts rather than listed, so a new subsector does
+   * not need remembering here. The flag is read as a plain boolean rather than
+   * spliced in as SQL: a nested tagged fragment carrying an array parameter
+   * does not compose on the Neon HTTP driver.
+   */
   const rows: any = await sqlc`
     select c.id, c.name, c.website,
            coalesce(nullif(c.description, ''), c.scope_reason) as description
@@ -98,9 +122,8 @@ ${batch.map((c) => `id ${c.id}: ${c.name}
         (c.description is not null and c.description <> '' and c.description not ilike 'Website:%')
         or (c.discovered_via = 'news' and c.scope_reason is not null)
       )
-      ${all ? sqlc`` : sqlc`and (c.sectors is null or array_length(c.sectors, 1) is null
-                               or not exists (select 1 from unnest(c.sectors) s
-                                              where s in ('ai','deeptech','biotech','defence_tech')))`}
+      and (${all} or not exists (select 1 from unnest(c.sectors) s
+                                 where s = any(${SUBSECTOR_IDS})))
     order by
       exists (select 1 from company_signals cs
               where cs.company_id = c.id and cs.week_of > current_date - 60) desc,
