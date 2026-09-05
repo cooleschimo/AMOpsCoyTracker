@@ -23,7 +23,7 @@ on:
         required: true
         default: 'daily'
         type: choice
-        options: [daily, weekly, discover, score, assess, formd, portfolios, acra]
+        options: [daily, weekly, discover, score, assess, review, formd, portfolios, acra]
         # 'daily' is the pipeline; 'weekly' is the pipeline plus the digest.
 
 jobs:
@@ -102,8 +102,8 @@ jobs:
 
       # ---- the pipeline ------------------------------------------------------
       #
-      # Both steps run the same eleven stages — news, context, discovery, ATS,
-      # websites, people, location, filter, rescue, score, assess. The Monday
+      # Both steps run the same twelve stages — news, context, discovery, ATS,
+      # websites, people, location, filter, rescue, score, assess, review. The Monday
       # one adds a twelfth, the digest, which is the only difference between
       # them: find and score every day, publish once a week.
       - name: Pipeline and weekly digest (Mondays)
@@ -132,6 +132,10 @@ jobs:
       - name: Assessment only
         if: ${{ github.event.inputs.mode == 'assess' }}
         run: npx tsx scripts/assess-companies.ts
+
+      - name: Dashboard review only
+        if: ${{ github.event.inputs.mode == 'review' }}
+        run: npx tsx scripts/review-dashboard.ts
 
       # ---- graph building, after the pipeline --------------------------------
       #

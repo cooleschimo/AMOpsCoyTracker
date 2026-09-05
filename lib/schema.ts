@@ -664,3 +664,50 @@ export const jobPostings = pgTable('job_postings', {
   uniqueIndex('job_postings_company_external_key').on(t.companyId, t.atsType, t.externalId),
   index('job_postings_company_idx').on(t.companyId),
 ]);
+
+/**
+ * The dashboard's own quality check. Brief §7b.
+ *
+ * Everything upstream judges a company on its own: the extractor names it from
+ * one headline, the scorer reads its window, the assessor rates it. Nothing
+ * looks at the finished set and asks whether these are really thirty-four
+ * distinct companies with defensible evidence.
+ *
+ * That is where the failures actually show. Lambda reached the dashboard three
+ * times — as itself, as "Nvidia-backed Lambda" and as "Neocloud Lambda" — and
+ * no per-company check could have caught it, because each row was individually
+ * fine. "Defense startup" collected 88 stories about a dozen different
+ * companies and looked, in isolation, like a company with strong momentum.
+ *
+ * So the review runs last, over the placed set, and is cheap for the same
+ * reason: thirty-odd companies rather than three thousand.
+ *
+ * A verdict never edits a company. `duplicate_of` proposes a merge and `drop`
+ * proposes a removal; both wait for a person, because an automatic merge on a
+ * model's say-so would silently destroy the row it was wrong about.
+ */
+export const companyReviews = pgTable('company_reviews', {
+  id: serial('id').primaryKey(),
+  companyId: integer('company_id').references(() => companies.id).notNull(),
+  /** Monday of the week reviewed, matching company_signals.week_of. */
+  weekOf: date('week_of').notNull(),
+  /** ok | malformed_name | duplicate | weak_evidence | not_a_company */
+  verdict: text('verdict').notNull(),
+  /** Where the model would merge this row, when the verdict is 'duplicate'. */
+  duplicateOfId: integer('duplicate_of_id').references(() => companies.id),
+  /** A cleaner name, when the one on the row is a headline fragment. */
+  suggestedName: text('suggested_name'),
+  /** One sentence a person can act on without re-reading the evidence. */
+  reason: text('reason'),
+  /** Whether the dashboard should hold this company back pending review. */
+  hideFromDashboard: boolean('hide_from_dashboard').default(false),
+  /** Set when a person has acted on it, so a verdict is raised once. */
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  resolution: text('resolution'),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }).defaultNow(),
+  rubricVersion: text('rubric_version').notNull(),
+  model: text('model'),
+}, (t) => [
+  uniqueIndex('company_reviews_company_week_key').on(t.companyId, t.weekOf, t.rubricVersion),
+  index('company_reviews_week_idx').on(t.weekOf),
+]);

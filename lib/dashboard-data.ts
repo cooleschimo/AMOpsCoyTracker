@@ -593,7 +593,21 @@ async function signalRows(signalVersion: string, weekOf?: string): Promise<Row[]
    * They are still scored and still stored — a fund's news is what tells us a
    * portfolio company raised. It is the dashboard they do not belong on.
    */
-  return (rows as Row[]).filter((r) => isSurfaceable(r.sectors as string[] | null));
+  const surfaceable = (rows as Row[]).filter((r) => isSurfaceable(r.sectors as string[] | null));
+
+  /*
+   * Anything §7b's review found to be no company at all — a headline fragment
+   * taken for a name, or one row collecting stories about a dozen different
+   * companies. A proposed duplicate is NOT hidden: the merge target may be
+   * wrong, and hiding a real company on a guess is worse than showing it twice
+   * until someone confirms.
+   */
+  const hidden: any = await sql`
+    select company_id from company_reviews
+    where hide_from_dashboard = true and resolved_at is null`;
+  if (!hidden.length) return surfaceable;
+  const hide = new Set(hidden.map((h: any) => Number(h.company_id)));
+  return surfaceable.filter((r) => !hide.has(Number(r.company_id)));
 }
 
 const toPlacementInput = (r: Row): PlacementInput => ({

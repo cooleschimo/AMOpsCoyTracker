@@ -15,7 +15,7 @@
  * Two cadences, one script.
  *
  * --daily runs everything that finds and scores: ingest, discover, filter,
- * rescue, score, assess. Discovery has to be daily because a feed holds a story
+ * rescue, score, assess, review. Discovery has to be daily because a feed holds a story
  * for a day or two and a weekly pull silently misses whatever fell off — and a
  * company found on Tuesday should be scored by the time the digest is written.
  *
@@ -88,6 +88,8 @@ const STAGES: Stage[] = [
     why: 'the three axes per company for this week' },
   { name: 'assess', script: 'assess-companies.ts', timeoutMin: 45,
     why: 'accumulative judgment: prior assessment plus what arrived since' },
+  { name: 'review', script: 'review-dashboard.ts', timeoutMin: 10,
+    why: 'the set is only checkable once placement has decided what is in it' },
   { name: 'digest', script: 'render-digest.ts', args: ['--save'], timeoutMin: 10,
     why: 'placement matrix and the rendered digest' },
 ];
