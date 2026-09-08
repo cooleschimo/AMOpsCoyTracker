@@ -167,6 +167,9 @@ async function insertItems(db: ReturnType<typeof getDb>, rows: PendingItem[]): P
        */
       const targets = await db.select({
         id: companies.id, name: companies.name, aliases: companies.aliases,
+        // Read by lib/ambiguous.ts to narrow the query for a name that is also
+        // an ordinary word.
+        website: companies.website, hqCity: companies.hqCity, sectors: companies.sectors,
       }).from(companies)
         .where(trackedCompanies(companies))
         .orderBy(companies.id);
@@ -175,7 +178,7 @@ async function insertItems(db: ReturnType<typeof getDb>, rows: PendingItem[]): P
       console.log(`Google News: ${list.length} companies in scope`);
 
       for (const [idx, c] of list.entries()) {
-        const url = googleNewsUrl(c.name);
+        const url = googleNewsUrl(c);
         const { items: feed, error } = await fetchFeed(url);
         counts.companies_queried++;
 

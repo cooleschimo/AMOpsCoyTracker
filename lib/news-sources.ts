@@ -11,6 +11,7 @@
  *                         BLOCKERS.md, marked down in source health
  */
 
+import { disambiguatedQuery, type CompanyContext } from './ambiguous';
 import { SEARCHABLE_SUBSECTORS } from './subsectors';
 
 export type NewsSource = {
@@ -24,9 +25,20 @@ export type NewsSource = {
   note?: string;
 };
 
-/** Google News RSS per company. Brief §5.5 gives this exact format. */
-export function googleNewsUrl(companyName: string): string {
-  const q = encodeURIComponent(`"${companyName}"`);
+/**
+ * Google News RSS per company. Brief §5.5 gives this exact format.
+ *
+ * The query is the name in quotes, except where the name is also an ordinary
+ * word: `"AIR"` returns weather forecasts, `"Temple"` returns Hindu temples.
+ * lib/ambiguous.ts narrows those with the company's own sector and domain, so
+ * the wrong items are never fetched rather than filtered out afterwards.
+ *
+ * Takes the whole company rather than its name so the caller cannot forget to
+ * pass the context the narrowing needs.
+ */
+export function googleNewsUrl(company: string | CompanyContext): string {
+  const c: CompanyContext = typeof company === 'string' ? { name: company } : company;
+  const q = encodeURIComponent(disambiguatedQuery(c));
   return `https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`;
 }
 
