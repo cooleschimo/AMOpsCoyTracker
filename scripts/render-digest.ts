@@ -29,6 +29,22 @@ const arg = (n: string, d?: string) => {
 };
 const flag = (n: string) => process.argv.includes(`--${n}`);
 
+/**
+ * The week this digest covers: the one that just finished.
+ *
+ * The digest reports on a completed week, where the dashboard is a live view of
+ * the current one — the same signals read at a different moment. A digest sent
+ * on Monday about the week starting that Monday would cover a few hours, so it
+ * looks back one. `--week` overrides, which is how an earlier week is
+ * re-rendered.
+ */
+function lastWeekMonday(): string {
+  const now = new Date();
+  const day = (now.getUTCDay() + 6) % 7;
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day) - 7 * 86400_000)
+    .toISOString().slice(0, 10);
+}
+
 /** Monday of the current week, so a mid-week re-run updates one digest row. */
 function weekOfMonday(): string {
   const now = new Date();
@@ -42,6 +58,7 @@ function weekOfMonday(): string {
   const sqlc = getSql();
   const signalVersion = arg('signals', COMPANY_SIGNAL_VERSION)!;
   const save = flag('save');
+  const weekOf = arg('week', lastWeekMonday())!;
 
   // Latest assessment per company, at whatever version is current — a lateral
   // join rather than a plain one, so an unassessed company still yields a row.
@@ -76,6 +93,10 @@ function weekOfMonday(): string {
       order by a.assessed_at desc limit 1
     ) ca on true
     where cs.signal_version = ${signalVersion}
+      -- One week only. Signals accumulate week on week, so without this the
+      -- digest read every week at once and then labelled the result with a
+      -- single week's date.
+      and cs.week_of = ${weekOf}::date
     order by cs.expansion desc, cs.momentum desc`;
 
   if (!rows.length) {
@@ -214,7 +235,6 @@ function weekOfMonday(): string {
       and coalesce(c.scope_status, 'unknown') <> 'out_of_scope'`;
   const proc: any = await sqlc`select count(*)::int n from items`;
   const coverage = coverageLine(mon[0].n, proc[0].n, plan.counts.placed);
-  const weekOf = weekOfMonday();
 
   const renderInput = { weekOf, coverage, plan, rows: renderRows, appBaseUrl: env.appBaseUrl() };
   const html = renderHtml(renderInput);

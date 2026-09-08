@@ -624,6 +624,37 @@ export function SignalTypeSet({ points }: { points: EvidencePoint[] }) {
   );
 }
 
+/**
+ * This point's item arrived in today's run.
+ *
+ * The pipeline runs daily but a company holds its place for the whole week, so
+ * by midweek the dashboard is mostly names the reader has already seen. The
+ * mark sits on the POINT rather than the card because that is what actually
+ * changed: a company surfaced on Monday can pick up a new item on Thursday, and
+ * that item is the reason to look again.
+ *
+ * A dot and a word rather than a filled pill — every card carries several
+ * points, and a saturated badge repeated down a column would outweigh the text
+ * it is annotating.
+ */
+export function NewTodayTag() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-fresh/40 bg-fresh-soft/60 px-1.5 py-0.5 font-mono text-2xs font-medium uppercase tracking-[0.08em] text-fresh">
+      <span className="size-1.5 rounded-full bg-fresh" aria-hidden />
+      New
+    </span>
+  );
+}
+
+function NewToday() {
+  return (
+    <span className="ml-2 inline-flex items-center gap-1 whitespace-nowrap align-baseline text-2xs font-medium text-fresh">
+      <span className="size-1.5 rounded-full bg-fresh" aria-hidden />
+      new today
+    </span>
+  );
+}
+
 export function WhyNow({ points }: { points: EvidencePoint[] }) {
   return (
     <ul className="measure space-y-2">
@@ -638,6 +669,7 @@ export function WhyNow({ points }: { points: EvidencePoint[] }) {
           />
           <span>
             {p.text}
+            {p.isNew ? <NewToday /> : null}
             <span className="ml-2 whitespace-nowrap text-2xs text-muted-foreground">
               {signalTypeLabel[p.signalType]}
               {p.origin === "headline_signal" ? " · headline signal" : " · supporting"}

@@ -11,6 +11,7 @@ import {
   CheckFirst,
   FactGrid,
   Label,
+  NewTodayTag,
   SectorTag,
   SignalBadge,
   SignalTypeSet,
@@ -80,6 +81,11 @@ export function CompanyCase({
         <div className="flex items-start justify-between gap-x-3">
           <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1">
             <SectorTag sector={company.sector} />
+            {/* A company keeps its place all week, so the card alone cannot say
+                whether anything moved. This repeats at the top what the why-now
+                list marks per point, because that is the question a reader has
+                when scanning rather than reading. */}
+            {company.whyNow.some((p) => p.isNew) ? <NewTodayTag /> : null}
             <SignalTypeSet points={company.whyNow} />
             <span className="num font-mono text-2xs text-muted-foreground">
               {company.trigger.source.date}

@@ -43,6 +43,8 @@
   /* meaning-bearing colours */
   --color-caution: var(--caution);
   --color-caution-soft: var(--caution-soft);
+  --color-fresh: var(--fresh);
+  --color-fresh-soft: var(--fresh-soft);
   --color-confirmed: var(--confirmed);
   --color-plausible: var(--plausible);
   --color-weak: var(--weak);
@@ -107,6 +109,12 @@
 
   --caution: oklch(0.5 0.11 68);
   --caution-soft: oklch(0.94 0.035 80);
+  /* Arrived today. The one mark on a card that reports a fact rather than a
+     judgment: the pipeline saw this item since the last time anyone looked.
+     Held away from --confirmed's 165 so a fresh mark and a confirmed path do
+     not read as the same green. */
+  --fresh: oklch(0.55 0.13 145);
+  --fresh-soft: oklch(0.94 0.04 145);
   --confirmed: oklch(0.44 0.09 165);
   --plausible: oklch(0.52 0.1 72);
   --weak: oklch(0.5 0.006 95);
@@ -147,6 +155,8 @@
 
   --caution: oklch(0.76 0.1 72);
   --caution-soft: oklch(0.32 0.045 70);
+  --fresh: oklch(0.8 0.12 145);
+  --fresh-soft: oklch(0.3 0.045 145);
   --confirmed: oklch(0.72 0.09 165);
   --plausible: oklch(0.76 0.1 75);
   --weak: oklch(0.6 0.006 95);

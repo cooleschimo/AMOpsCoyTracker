@@ -27,6 +27,21 @@ export type EvidencePoint = {
   signalType: string;
   origin: 'headline_signal' | 'supporting';
   source: Source;
+  /**
+   * The item behind this point was first fetched today.
+   *
+   * The pipeline runs daily and a company stays on the dashboard for as long as
+   * its week's signal holds, so "is this company new" stops being a useful
+   * question by Tuesday — the same names sit there all week. What changes daily
+   * is the evidence: a company surfaced on Monday can pick up a fresh item on
+   * Thursday, and that item is the reason to look again. Marking the POINT
+   * rather than the company is what makes that visible.
+   *
+   * Fetched, not published: this says the pipeline saw it today, which is the
+   * claim the dashboard can actually support. A story published last week and
+   * found today is new to the reader.
+   */
+  isNew: boolean;
 };
 
 export type Assessment = {
@@ -162,6 +177,7 @@ function whyPoints(
   siblings: WhyNowInput[],
   sourcesByItem: Map<number, Source>,
   typesByItem: Map<number, string>,
+  fetchedToday: Set<number>,
   signalType: string,
   fallback: Source,
 ): EvidencePoint[] {
@@ -184,6 +200,7 @@ function whyPoints(
         signalType: sourceType === 'ats' ? 'hiring' : signalType,
         origin: itemId === featured.itemId ? ('headline_signal' as const) : ('supporting' as const),
         source: src,
+        isNew: fetchedToday.has(itemId),
       };
     });
   }
@@ -205,6 +222,7 @@ function whyPoints(
     signalType: p.sourceType === 'ats' ? 'hiring' : signalType,
     origin: p.primary ? ('headline_signal' as const) : ('supporting' as const),
     source: sourcesByItem.get(p.itemId) ?? fallback,
+    isNew: fetchedToday.has(p.itemId),
   }));
 }
 
@@ -252,6 +270,7 @@ function toCompany(
     siblings: Map<number, WhyNowInput[]>;
     sources: Map<number, Source>;
     types: Map<number, string>;
+    fetchedToday: Set<number>;
   },
 ): DashboardCompany {
   const source: Source = {
@@ -351,6 +370,7 @@ function toCompany(
       ctx?.siblings.get(Number(r.company_id)) ?? [],
       ctx?.sources ?? new Map(),
       ctx?.types ?? new Map(),
+      ctx?.fetchedToday ?? new Set(),
       String(r.signal_type ?? 'other'),
       source,
     ),
@@ -434,12 +454,14 @@ async function whyNowContext(
   siblings: Map<number, WhyNowInput[]>;
   sources: Map<number, Source>;
   types: Map<number, string>;
+  fetchedToday: Set<number>;
 }> {
   const siblings = new Map<number, WhyNowInput[]>();
   const sources = new Map<number, Source>();
   const types = new Map<number, string>();
+  const fetchedToday = new Set<number>();
   const companyIds = rows.map((r) => Number(r.company_id)).filter(Number.isFinite);
-  if (!companyIds.length) return { siblings, sources, types };
+  if (!companyIds.length) return { siblings, sources, types, fetchedToday };
 
   const sql = getSql();
 
@@ -457,9 +479,11 @@ async function whyNowContext(
 
   if (citedIds.length) {
     const cited: any = await sql`
-      select id as item_id, source, url, source_type, published_at
+      select id as item_id, source, url, source_type, published_at,
+             (fetched_at >= date_trunc('day', now())) as fetched_today
       from items where id = any(${citedIds})`;
     for (const row of cited as Row[]) {
+      if (row.fetched_today) fetchedToday.add(Number(row.item_id));
       sources.set(Number(row.item_id), {
         name: String(row.source ?? 'Source'),
         url: String(row.url ?? ''),
@@ -471,7 +495,8 @@ async function whyNowContext(
 
   const others: any = await sql`
     select cs.company_id, cs.why, i.id as item_id, i.source, i.url,
-           i.source_type, i.published_at
+           i.source_type, i.published_at,
+           (i.fetched_at >= date_trunc('day', now())) as fetched_today
     from company_signals cs
     join items i on i.id = cs.representative_item_id
     where cs.signal_version = ${signalVersion}
@@ -482,7 +507,8 @@ async function whyNowContext(
   // becomes visible (§7).
   const scored: any = await sql`
     select ic.company_id, s.why, i.id as item_id, i.source, i.url,
-           i.source_type, i.published_at
+           i.source_type, i.published_at,
+           (i.fetched_at >= date_trunc('day', now())) as fetched_today
     from scores s
     join items i on i.id = s.item_id
     join item_companies ic on ic.item_id = i.id
@@ -511,7 +537,13 @@ async function whyNowContext(
     }
     siblings.set(cid, arr);
   }
-  return { siblings, sources, types };
+  // Every route that produced an item also records whether it arrived today,
+  // so a supporting point is markable as well as a headline one.
+  for (const row of [...(others as Row[]), ...(scored as Row[])]) {
+    if (row.fetched_today) fetchedToday.add(Number(row.item_id));
+  }
+
+  return { siblings, sources, types, fetchedToday };
 }
 
 async function signalRows(signalVersion: string, weekOf?: string): Promise<Row[]> {
@@ -741,12 +773,17 @@ function weekLabel(weekOf?: string | Date | null): string {
   // The week the SIGNALS are from, not the week it happens to be read in. A
   // label computed from today drifts away from the data it sits above the
   // moment a run lands on a different day than the reader opens the page.
+  //
+  // The fallback is THIS week, because that is what score-companies stamps: it
+  // writes the current Monday, so a dashboard with no row to read from should
+  // name the week it is being read in rather than the one before it. The digest
+  // is the place that looks back a week; see scripts/render-digest.ts.
   const mon = weekOf
     ? new Date(weekOf)
     : (() => {
         const now = new Date();
         const day = (now.getUTCDay() + 6) % 7;
-        return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day) - 7 * 86400_000);
+        return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day));
       })();
   const sun = new Date(mon.getTime() + 6 * 86400_000);
   const fmt = (d: Date, opts: Intl.DateTimeFormatOptions) =>
