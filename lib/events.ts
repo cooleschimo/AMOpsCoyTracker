@@ -35,6 +35,7 @@
 import { callJson } from './llm';
 import type { Budget } from './budget';
 import { looksLikePersonName } from './people-scrape';
+import { normalizeCompanyName } from './normalize';
 
 const UA = 'Mozilla/5.0 (compatible; AMOpsCoyTracker/1.0; +research)';
 
@@ -215,6 +216,98 @@ export function directoryLines(html: string): string[] {
     out.push(line);
   }
   return out;
+}
+
+/**
+ * The lines that name a company we already track.
+ *
+ * A directory is mostly names we have no reason to hold. SEMICON West lists
+ * three thousand exhibitors, ATxSG four hundred and twenty, and of those four
+ * hundred and twenty exactly nine were companies this pipeline monitors — the
+ * rest are equipment suppliers, distributors and integrators that no part of
+ * the tool would ever ask about. Sending the whole directory to a model spends
+ * its budget reading names to throw away.
+ *
+ * So the index decides what the model sees. A known name found in a line makes
+ * that line worth reading; everything else is dropped without a call. The model
+ * still does the job only it can do — telling an exhibitor from a media partner,
+ * and pulling a person and their title out of a session title — but on the
+ * lines that can matter rather than all of them.
+ *
+ * Matching is by token window, not by whole line, because a directory entry
+ * carries a name plus its furniture: "Applied Materials · Booth 1423", "Motive
+ * | Hall 3". Every run of one to four adjacent words is normalised and looked
+ * up, which is also what lets "Motive Technologies" match a company held as
+ * "Motive" — `normalizeCompanyName` strips the suffix from both.
+ *
+ * The cost of the prefilter is a name written so differently from how we hold
+ * it that no window matches. That company is missed, which is the same outcome
+ * the unmatched-drop produced anyway: a name that fails to resolve was never
+ * going to become a row.
+ */
+/**
+ * Company names that are also ordinary words.
+ *
+ * The table holds companies called Archive, Create, Edge, Electric and Neo, and
+ * a directory is full of prose using those words for their ordinary meaning —
+ * "Edge Computing Pavilion", "Create your itinerary". Matched on a one-word
+ * window they select lines that name no company at all.
+ *
+ * This is the collision problem `lib/acra.ts` solves by counting registry
+ * entities that share an identity, but a directory offers nothing to count
+ * against. So the test is the word itself: a single common word is not enough
+ * to select a line, while the same company matches freely on a longer window
+ * ("Edge Impulse") or wherever a two-word name is written out.
+ *
+ * Missing a one-word company whose name never appears with anything attached is
+ * the cost, and it is the cheaper error — a line selected on "Create" reaches
+ * the model as an entry it then has to reject.
+ */
+const ORDINARY_WORDS = new Set([
+  // Directory furniture: the words a listing uses about itself.
+  'summit', 'connect', 'discover', 'explore', 'partner', 'sponsor', 'exhibitor',
+  'speaker', 'session', 'stage', 'hall', 'booth', 'stand', 'pavilion', 'expo',
+  'programme', 'program', 'agenda', 'register', 'attend', 'visit', 'download',
+  // Words that describe rather than name, and appear in every other line.
+  'archive', 'create', 'edge', 'electric', 'neo', 'thrive', 'science', 'world',
+  'network', 'digital', 'future', 'global', 'international', 'technology',
+  'innovation', 'solutions', 'systems', 'group', 'media', 'asia', 'singapore',
+]);
+
+export function linesNamingKnownCompanies(
+  lines: string[],
+  index: Map<string, { id: number; name: string }>,
+  opts: { maxWindow?: number } = {},
+): { lines: string[]; hits: Array<{ id: number; name: string }> } {
+  const maxWindow = opts.maxWindow ?? 4;
+  const keep: string[] = [];
+  const hits = new Map<number, { id: number; name: string }>();
+
+  for (const line of lines) {
+    // Punctuation is where a directory separates a name from its booth number,
+    // so it bounds the windows rather than being swept into them.
+    const words = line.split(/[^A-Za-z0-9&'’.-]+/).filter(Boolean);
+    let matched: { id: number; name: string } | null = null;
+
+    for (let w = Math.min(maxWindow, words.length); w >= 1 && !matched; w--) {
+      for (let i = 0; i + w <= words.length; i++) {
+        const norm = normalizeCompanyName(words.slice(i, i + w).join(' '));
+        // A one-character or digit-only key matches far too much to be evidence.
+        if (norm.length < 3) continue;
+        // Nor is a single ordinary word, whatever the table holds under it.
+        if (!norm.includes(' ') && ORDINARY_WORDS.has(norm)) continue;
+        const hit = index.get(norm);
+        if (hit) { matched = hit; break; }
+      }
+    }
+
+    if (matched) {
+      keep.push(line);
+      if (!hits.has(matched.id)) hits.set(matched.id, matched);
+    }
+  }
+
+  return { lines: keep, hits: [...hits.values()] };
 }
 
 export type FetchedDirectory = {

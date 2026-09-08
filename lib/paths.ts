@@ -195,10 +195,27 @@ export async function findWarmPaths(companyId: number): Promise<WarmPath[]> {
     left join people p on p.id = ep.person_id
     where ep.company_id = ${companyId} and (e.starts_on is null or e.starts_on >= current_date)`;
 
+  /*
+   * The driver hands back a Date for a date column, and its toString is a
+   * runtime-zone timestamp — "Wed May 26 2027 00:00:00 GMT-0700 (Pacific
+   * Daylight Time)" in the middle of a sentence an RD reads. A show has a day,
+   * not an instant, so it is formatted from the UTC parts rather than rendered
+   * through a local timezone that could shift it a day either way.
+   */
+  const showDate = (v: unknown): string | null => {
+    if (!v) return null;
+    const d = v instanceof Date ? v : new Date(String(v));
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString('en-GB', {
+      day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+    });
+  };
+
   for (const r of eventRows) {
+    const on = showDate(r.starts_on);
     paths.push({
       kind: 'event',
-      description: `${r.person_name ?? `Someone from ${subject}`} is ${r.participation} at ${r.event_name}${r.city ? ` in ${r.city}` : ''}${r.starts_on ? ` on ${r.starts_on}` : ''} — a chance to meet ${subject} in person.`,
+      description: `${r.person_name ?? `Someone from ${subject}`} is ${r.participation} at ${r.event_name}${r.city ? ` in ${r.city}` : ''}${on ? ` on ${on}` : ''} — a chance to meet ${subject} in person.`,
       viaPersonId: r.person_id ? Number(r.person_id) : null,
       viaPersonName: (r.person_name as string) ?? null,
       viaOrgId: null, viaOrgName: null,

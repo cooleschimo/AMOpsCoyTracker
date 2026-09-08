@@ -13,13 +13,14 @@
  * reviews it: a company having a stand at a show EDB also attends is an
  * opportunity to introduce ourselves, not an introduction.
  *
- * Matching is deliberately one-directional. A name on an exhibitor list is
- * matched against companies already tracked and dropped when it misses. Three
- * thousand exhibitors at SEMICON West are mostly equipment suppliers and
- * distributors with no bearing on FDI, so creating a company from a stand would
- * flood the table with names nothing else in the pipeline has any reason to
- * look at. A person is created, because a person only ever arrives attached to
- * a company already matched.
+ * Matching is deliberately one-directional, and it happens BEFORE the model
+ * rather than after. A directory is mostly names with no bearing on FDI — three
+ * thousand exhibitors at SEMICON West are largely equipment suppliers and
+ * distributors — so the company index picks out the lines naming a company we
+ * monitor, and only those are read. A stand is not a reason to create a
+ * company: it says the company exists, which we knew, and nothing about whether
+ * it is in scope. A person is created, because a person only ever arrives
+ * attached to a company already matched.
  *
  * Usage:
  *   npx tsx scripts/ingest-events.ts [--limit N] [--only <event name>] [--dry]
@@ -33,6 +34,7 @@ import { Budget } from '../lib/budget';
 import { normalizeCompanyName, normalizePersonName } from '../lib/normalize';
 import {
   CONFERENCES, fetchDirectory, robotsAllows, editionDates, extractParticipants, yearFromUrl,
+  linesNamingKnownCompanies,
   withinPlanningWindow, type Conference, type ExtractedParticipant,
 } from '../lib/events';
 
@@ -43,16 +45,28 @@ const arg = (n: string, d?: string) => {
 const flag = (n: string) => process.argv.includes(`--${n}`);
 
 /**
- * Every tracked company by normalised name.
+ * The companies worth looking for, by normalised name.
  *
- * Loaded once. An exhibitor list is thousands of names against a few thousand
- * companies, and a query per name would be the whole cost of the stage.
+ * This is the same population the dashboard counts as monitored — everything
+ * except bulk portfolio-scraped names and out-of-scope. Portfolio scraping
+ * fills the graph with thousands of companies that are never fetched for news
+ * or scored, and an event row against one of those would surface a path for a
+ * company nothing else in the tool has an opinion about.
+ *
+ * Wider than the companies scored this week, deliberately. Scoring moves with
+ * the news and a company quiet this week may lead the digest next; an exhibitor
+ * list read six weeks out would otherwise miss it for the sake of a gap that
+ * closes on its own.
+ *
+ * Loaded once and used as a filter over the directory, so the cost is one query
+ * rather than one per name.
  */
 async function companyIndex(): Promise<Map<string, { id: number; name: string }>> {
   const rows: any = await getSql()`
     select id, name, normalized_name, aliases
     from companies
-    where coalesce(scope_status, 'unknown') <> 'out_of_scope'`;
+    where coalesce(discovered_via, '') <> 'portfolio'
+      and coalesce(scope_status, 'unknown') <> 'out_of_scope'`;
   const index = new Map<string, { id: number; name: string }>();
   for (const r of rows) {
     const entry = { id: Number(r.id), name: String(r.name) };
@@ -143,7 +157,8 @@ async function recordHealth(source: string, count: number, note: string) {
   const budget = new Budget();
   const counts = {
     conferences: list.length, fetched: 0, blocked_by_robots: 0, fetch_failed: 0,
-    dated: 0, outside_window: 0, chunks: 0, failed_chunks: 0, truncated_lists: 0,
+    dated: 0, outside_window: 0, lines_read: 0, lines_sent: 0,
+    chunks: 0, failed_chunks: 0, truncated_lists: 0,
     extracted: 0, matched: 0, unmatched: 0,
     events_created: 0, participants_created: 0, people_created: 0,
   };
@@ -178,18 +193,42 @@ async function recordHealth(source: string, count: number, note: string) {
         continue;
       }
 
+      /*
+       * The model only reads the lines that name a company we monitor.
+       *
+       * Reading the whole directory spent its budget on names nothing in the
+       * tool would ever ask about: ATxSG returned four hundred and twenty
+       * companies of which nine were tracked, and the other four hundred and
+       * eleven were extracted, matched, missed and discarded. The index knows
+       * which lines can matter before a call is made.
+       */
+      const candidates = linesNamingKnownCompanies(page.lines, index);
+      counts.lines_read += page.lines.length;
+      counts.lines_sent += candidates.lines.length;
+      if (!candidates.lines.length) {
+        console.log(`  – ${conf.name}: ${page.lines.length} lines, none naming a monitored company`);
+        if (!dry) await recordHealth(`event:${conf.name}`, 0,
+          `${page.lines.length} lines, no monitored company named`);
+        continue;
+      }
+
       const { participants, chunks, failedChunks, truncated } = await extractParticipants(
-        page.lines, { name: conf.name, kind: conf.kind }, { budget },
+        candidates.lines, { name: conf.name, kind: conf.kind }, { budget },
       );
       counts.chunks += chunks;
       counts.failed_chunks += failedChunks;
       counts.extracted += participants.length;
       if (truncated) {
         counts.truncated_lists++;
-        console.log(`    (read ${chunks * 120} of ${page.lines.length} lines; the rest wait for the next run)`);
+        console.log(`    (read ${chunks * 120} of ${candidates.lines.length} candidate lines; the rest wait for the next run)`);
       }
 
-      // Only the ones we already track. The rest are the show's own long tail.
+      /*
+       * The prefilter chose the lines; this decides whose row it is. They can
+       * disagree — a line selected because it names a tracked company may also
+       * name its parent or a co-exhibitor, and the model says which one the
+       * entry is actually about. The name it returns is what gets resolved.
+       */
       const matched = participants
         .map((p) => ({ p, hit: index.get(normalizeCompanyName(p.company)) }))
         .filter((x): x is { p: ExtractedParticipant; hit: { id: number; name: string } } => !!x.hit);
@@ -197,13 +236,14 @@ async function recordHealth(source: string, count: number, note: string) {
       counts.unmatched += participants.length - matched.length;
 
       console.log(`  ✓ ${conf.name}${dates ? ` (${dates.startsOn})` : ''}: `
-        + `${participants.length} listed, ${matched.length} tracked`);
+        + `${page.lines.length} lines, ${candidates.lines.length} naming a monitored company, `
+        + `${matched.length} confirmed`);
       for (const { p, hit } of matched) {
         console.log(`      ${hit.name}${p.person ? ` — ${p.person}` : ''} (${p.participation})`);
       }
 
       if (!dry) await recordHealth(`event:${conf.name}`, matched.length,
-        `${participants.length} listed at ${page.url}`);
+        `${candidates.lines.length} of ${page.lines.length} lines named a monitored company, at ${page.url}`);
       if (dry || !matched.length) continue;
 
       const { id: eventId, created } = await upsertEvent(conf, dates);

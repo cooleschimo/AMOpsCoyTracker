@@ -10,7 +10,8 @@
  *
  * Run: npx tsx tests/events-parse.test.ts
  */
-import { parseDateRange, editionDates, plausibleParticipant, directoryLines, withinPlanningWindow, yearFromUrl } from '../lib/events';
+import { parseDateRange, editionDates, plausibleParticipant, directoryLines, withinPlanningWindow, yearFromUrl, linesNamingKnownCompanies } from '../lib/events';
+import { normalizeCompanyName } from '../lib/normalize';
 
 let pass = 0, fail = 0;
 const check = (name: string, got: unknown, want: unknown) => {
@@ -114,6 +115,45 @@ check('names read out of a logo grid',
 check('one entry per line, chrome dropped',
   directoryLines('<div>Home</div><div>Applied Materials<br>Booth 1423</div><div>Applied Materials<br>Booth 1423</div>'),
   ['Applied Materials', 'Booth 1423']);
+
+// ── The prefilter: which lines a model ever sees ─────────────────────────────
+// A directory entry is a name plus its furniture, so the match has to find a
+// known name inside a line rather than compare whole lines.
+//
+// The index is keyed by the SAME normaliser the lookup uses. Writing the keys
+// out by hand is how this test first failed: "Twelve Labs" normalises to
+// "twelve" because `labs` is a stripped suffix, so a hand-written 'twelve labs'
+// key is one no window can ever produce. The script builds its index through
+// normalizeCompanyName for this reason, and so does this.
+const index = new Map<string, { id: number; name: string }>(
+  [{ id: 1, name: 'Applied Materials' }, { id: 2, name: 'Motive' }, { id: 3, name: 'Twelve Labs' }]
+    .map((c) => [normalizeCompanyName(c.name), c]),
+);
+const filtered = linesNamingKnownCompanies([
+  'Applied Materials · Booth 1423',
+  'Acme Fastener Supply · Booth 1424',
+  'Motive | Hall 3',
+  'Panel: Scaling Advanced Packaging — Dr. Ana Cheng, VP Operations, Twelve Labs',
+  'Cookie preferences',
+], index);
+check('only the lines naming a monitored company go to the model',
+  filtered.lines,
+  ['Applied Materials · Booth 1423', 'Motive | Hall 3',
+   'Panel: Scaling Advanced Packaging — Dr. Ana Cheng, VP Operations, Twelve Labs']);
+check('and the companies they named come back',
+  filtered.hits.map((h) => h.name).sort(),
+  ['Applied Materials', 'Motive', 'Twelve Labs']);
+
+// normalizeCompanyName strips legal and descriptive suffixes from both sides,
+// which is what lets a directory's fuller name reach a company held shorter.
+check('a suffixed name still matches the company held without one',
+  linesNamingKnownCompanies(['Motive Technologies Inc. · Booth 12'], index).lines.length, 1);
+check('a directory of nothing we track sends nothing',
+  linesNamingKnownCompanies(['Acme Fastener Supply', 'Booth 1424', 'Opt-In'], index).lines.length, 0);
+// A two-letter or digit-only window would match half a directory.
+check('a short token is not evidence',
+  linesNamingKnownCompanies(['AM · Booth 3', '2026'],
+    new Map([[normalizeCompanyName('AM'), { id: 9, name: 'AM' }]])).lines.length, 0);
 
 console.log(`\n${pass}/${pass + fail} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
