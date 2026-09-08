@@ -163,7 +163,7 @@ export function llmProviders(): LlmProvider[] {
       baseUrl: optional('MISTRAL_BASE_URL', 'https://api.mistral.ai/v1'),
       model: optional('MISTRAL_MODEL', 'mistral-small-latest'),
     },
-    // Deliberately absent, all verified 2026-08-24 (see HANDOVER §5):
+    // Deliberately absent, all verified (see PROGRESS §5):
     //   Cerebras      — HTTP 402 on inference for every model; key authenticates
     //                   but the account has no entitlement
     //   Together AI   — no longer free; $5 prepaid minimum for new signups
