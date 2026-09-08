@@ -38,7 +38,9 @@ jobs:
       # whole stage and no account is leaned on twice in a row. Each provider's
       # free tier is per ACCOUNT — Gemini per project, OpenRouter fifty model
       # requests a day — so a second key is a second allowance, not a retry.
-      # The tail is uneven because the accounts are: there is no gemini5.
+      # The tail is uneven because the accounts are: gemini5's project answers
+      # 403 PERMISSION_DENIED, so it is left out rather than given a slot that
+      # fails every time the chain reaches it.
       # lib/budget.ts marks a key exhausted when its own cap reports, so a spent
       # one is skipped rather than retried.
       LLM_CHAIN: gemini,groq,openrouter,gemini2,groq2,openrouter2,gemini3,groq3,openrouter3,gemini4,groq4,openrouter4,groq5,openrouter5
@@ -46,6 +48,7 @@ jobs:
       GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
       GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
       GEMINI_API_KEY_4: ${{ secrets.GEMINI_API_KEY_4 }}
+      GEMINI_API_KEY_5: ${{ secrets.GEMINI_API_KEY_5 }}
       GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.6-flash' }}
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
