@@ -25,7 +25,8 @@ Brief §12 build order, actual status:
 | 11 | Digest render + placement | ✅ render done (`out/digest-*.html` + `.txt`); approval and send NOT built |
 | 11 (UI) | `/item/[id]` review page + dispositions | ✅ done |
 | — | `/admin/accounts` — account status by hand | ✅ done |
-| 12–20 | dashboard, labelling, admin stats, drafts, edges, events, sector sources, cron, DEBUGGING.md | ❌ not started |
+| 17 | Conference exhibitor and speaker parsing → events | ✅ done — `lib/events.ts`, `scripts/ingest-events.ts`; 12 shows configured, participants matched against tracked companies only |
+| 12–20 | dashboard, labelling, admin stats, drafts, edges, sector sources, cron, DEBUGGING.md | ❌ not started |
 
 **A second agent is working on the dashboard, monitoring and disposition
 actions.** `design/LOVABLE_PROMPT.md` is theirs. Coordinate before editing

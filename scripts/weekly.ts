@@ -14,15 +14,18 @@
  *
  * Two cadences, one script.
  *
- * --daily runs everything that finds and scores: ingest, discover, filter,
- * rescue, score, assess, review, grouped into four phases — gather, enrich,
- * judge, publish — and marked with what each one spends. Eight draw on the
- * shared LLM allowance and four only fetch, which is the distinction that
- * matters when a run fails: every llm stage fails together when the allowance
- * is gone or a key stops authenticating, and no fetch stage is touched by
- * either. Discovery has to be daily because a feed holds a story
+ * --daily runs everything that finds and scores, grouped into four phases —
+ * gather, enrich, judge, publish — and marked with what each one spends. Most
+ * draw on the shared LLM allowance and the rest only fetch, which is the
+ * distinction that matters when a run fails: every llm stage fails together
+ * when the allowance is gone or a key stops authenticating, and no fetch stage
+ * is touched by either. Discovery has to be daily because a feed holds a story
  * for a day or two and a weekly pull silently misses whatever fell off — and a
  * company found on Tuesday should be scored by the time the digest is written.
+ *
+ * The stages marked `weeklyOnly` sit out of the daily run, because what they
+ * read does not change overnight: an exhibitor list is republished over months,
+ * and the digest goes out once.
  *
  * The default is the full run, digest included, for the day the digest goes out.
  *
@@ -65,6 +68,8 @@ type Stage = {
   timeoutMin: number;
   phase: Phase;
   cost: Cost;
+  /** Skipped by --daily: what it reads does not change overnight. */
+  weeklyOnly?: boolean;
   why: string;
 };
 
@@ -107,6 +112,18 @@ const STAGES: Stage[] = [
     why: 'the named people §8 builds warm paths from' },
   { name: 'location', script: 'enrich-location.ts', timeoutMin: 15, phase: 'enrich', cost: 'llm',
     why: 'a discovered hq is one headline\'s guess until the rest are read' },
+  /*
+   * After people, because an exhibitor list names a person who may already be
+   * in the graph from a team page, and matching one is better than creating a
+   * second row for the same person.
+   *
+   * Weekly rather than daily. A conference exhibitor list is republished over
+   * months, not overnight, and each read costs a model call per chunk of a
+   * directory that runs to hundreds of lines.
+   */
+  { name: 'events', script: 'ingest-events.ts', timeoutMin: 20, phase: 'enrich', cost: 'llm',
+    weeklyOnly: true,
+    why: 'who from the list will be at which show, and when — the one forward-looking path' },
   // After discovery and websites: a board is found from the company's site, and
   // hiring feeds the momentum axis, so a company discovered this run would
   // otherwise be scored with no hiring evidence at all.
@@ -123,6 +140,7 @@ const STAGES: Stage[] = [
   { name: 'review', script: 'review-dashboard.ts', timeoutMin: 10, phase: 'publish', cost: 'llm',
     why: 'the set is only checkable once placement has decided what is in it' },
   { name: 'digest', script: 'render-digest.ts', args: ['--save'], timeoutMin: 10, phase: 'publish', cost: 'llm',
+    weeklyOnly: true,
     why: 'placement matrix and the rendered digest' },
 ];
 
@@ -170,7 +188,6 @@ function run(stage: Stage, dry: boolean): Promise<{ ok: boolean; ms: number; not
   const only = argOf('only')?.split(',').map((s) => s.trim());
   const skip = argOf('skip')?.split(',').map((s) => s.trim()) ?? [];
   const from = argOf('from');
-  // The digest is the only weekly-only stage; everything before it is daily.
   const daily = flag('daily');
 
   let stages = STAGES;
@@ -180,7 +197,7 @@ function run(stage: Stage, dry: boolean): Promise<{ ok: boolean; ms: number; not
     stages = stages.slice(i);
   }
   if (only) stages = stages.filter((s) => only.includes(s.name));
-  if (daily) stages = stages.filter((s) => s.name !== 'digest');
+  if (daily) stages = stages.filter((s) => !s.weeklyOnly);
   stages = stages.filter((s) => !skip.includes(s.name));
 
   const nLlm = stages.filter((s) => s.cost === 'llm').length;

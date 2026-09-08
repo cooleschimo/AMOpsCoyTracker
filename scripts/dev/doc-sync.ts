@@ -39,7 +39,7 @@ for (const f of readdirSync('lib')) {
   // Plumbing needs no mention; these are the files that hold judgment.
   if (!['rubric.ts', 'company-rubric.ts', 'valueprops.ts', 'placement.ts',
         'proposition.ts', 'cluster.ts', 'ats.ts', 'job-signal.ts',
-        'accounts.ts', 'blocklist.ts'].includes(f)) continue;
+        'accounts.ts', 'blocklist.ts', 'events.ts'].includes(f)) continue;
   check(`lib/${f}`, docs.includes(f));
 }
 
