@@ -114,6 +114,15 @@ function geminiKeys(): KeySlot[] {
   return numberedKeys('GEMINI_API_KEY', 'gemini');
 }
 
+/**
+ * Every configured OpenRouter key, in order: OPENROUTER_API_KEY, _2, ...
+ * The free tier is fifty model requests a day per ACCOUNT, so a second account
+ * is a second allowance in exactly the way a second Gemini project is.
+ */
+function openrouterKeys(): KeySlot[] {
+  return numberedKeys('OPENROUTER_API_KEY', 'openrouter');
+}
+
 export function llmProviders(): LlmProvider[] {
   const all: LlmProvider[] = [
     ...groqKeys().map(({ apiKey, label }) => ({
@@ -138,15 +147,16 @@ export function llmProviders(): LlmProvider[] {
       // string containing it is silently truncated.
       label,
     })),
-    {
-      name: 'openrouter',
-      apiKey: optional('OPENROUTER_API_KEY'),
+    ...openrouterKeys().map(({ apiKey, label }) => ({
+      name: 'openrouter' as const,
+      apiKey,
       baseUrl: optional('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
       // ':free' variants cost nothing. Which models carry that suffix changes
       // without notice, so treat this as a value to update rather than a fixed
       // choice — the OpenAI-compatible shape means only the string changes.
       model: optional('OPENROUTER_MODEL', 'openrouter/free'),
-    },
+      label,
+    })),
     {
       name: 'mistral',
       apiKey: optional('MISTRAL_API_KEY'),

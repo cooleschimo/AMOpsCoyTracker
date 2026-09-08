@@ -34,14 +34,14 @@ jobs:
     timeout-minutes: 350
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      # Every key, in failover order, alternating provider so no one of them
-      # carries a whole stage. Groq allows 180k tokens and 1,000 requests a day
-      # per key; gemini-3.6-flash's free tier is TWENTY requests a day, so the
-      # Gemini keys drop out early and the Groq ones carry the tail. Starting on
-      # Groq means the first request does not spend itself finding that out.
+      # Every key, cycling gemini -> groq -> openrouter so no provider carries a
+      # whole stage and no account is leaned on twice in a row. Each provider's
+      # free tier is per ACCOUNT — Gemini per project, OpenRouter fifty model
+      # requests a day — so a second key is a second allowance, not a retry.
+      # The tail is uneven because the accounts are: there is no gemini5.
       # lib/budget.ts marks a key exhausted when its own cap reports, so a spent
       # one is skipped rather than retried.
-      LLM_CHAIN: groq,gemini,groq2,gemini2,groq3,gemini3,groq4,gemini4,openrouter
+      LLM_CHAIN: gemini,groq,openrouter,gemini2,groq2,openrouter2,gemini3,groq3,openrouter3,gemini4,groq4,openrouter4,groq5,openrouter5
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
       GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
@@ -51,9 +51,14 @@ jobs:
       GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
       GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
       GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
+      GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
       GROQ_MODEL_SCORING: ${{ vars.GROQ_MODEL_SCORING || 'openai/gpt-oss-120b' }}
       GROQ_MODEL_DRAFTING: ${{ vars.GROQ_MODEL_DRAFTING || 'openai/gpt-oss-120b' }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      OPENROUTER_API_KEY_2: ${{ secrets.OPENROUTER_API_KEY_2 }}
+      OPENROUTER_API_KEY_3: ${{ secrets.OPENROUTER_API_KEY_3 }}
+      OPENROUTER_API_KEY_4: ${{ secrets.OPENROUTER_API_KEY_4 }}
+      OPENROUTER_API_KEY_5: ${{ secrets.OPENROUTER_API_KEY_5 }}
       OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'openrouter/free' }}
       SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
