@@ -15,7 +15,12 @@
  * Two cadences, one script.
  *
  * --daily runs everything that finds and scores: ingest, discover, filter,
- * rescue, score, assess, review. Discovery has to be daily because a feed holds a story
+ * rescue, score, assess, review, grouped into four phases — gather, enrich,
+ * judge, publish — and marked with what each one spends. Eight draw on the
+ * shared LLM allowance and four only fetch, which is the distinction that
+ * matters when a run fails: every llm stage fails together when the allowance
+ * is gone or a key stops authenticating, and no fetch stage is touched by
+ * either. Discovery has to be daily because a feed holds a story
  * for a day or two and a weekly pull silently misses whatever fell off — and a
  * company found on Tuesday should be scored by the time the digest is written.
  *
@@ -27,12 +32,39 @@
 import '../lib/loadenv';
 import { spawn } from 'node:child_process';
 
+/**
+ * What a stage spends.
+ *
+ * 'llm' stages draw on the shared daily allowance in lib/budget.ts; 'fetch'
+ * stages only cost network time. The distinction is the one that matters when a
+ * run goes wrong, because every llm stage fails the same way for the same
+ * reason — the allowance is gone, or a key stopped authenticating — and no
+ * fetch stage is affected by either. A flat list of twelve names cannot say
+ * that, so the summary groups on it.
+ */
+type Cost = 'llm' | 'fetch';
+
+/**
+ * The phases a run moves through. Named rather than numbered so a failure reads
+ * as "nothing was judged this run" instead of "stage 9 of 12 failed".
+ */
+type Phase = 'gather' | 'enrich' | 'judge' | 'publish';
+
+const PHASE_WHAT: Record<Phase, string> = {
+  gather: 'find companies and the news about them',
+  enrich: 'fill in what the judgment will read',
+  judge: 'decide what matters and why',
+  publish: 'check the finished set and render it',
+};
+
 type Stage = {
   name: string;
   script: string;
   args?: string[];
   /** Minutes after which the stage is abandoned and the run moves on. */
   timeoutMin: number;
+  phase: Phase;
+  cost: Cost;
   why: string;
 };
 
@@ -46,11 +78,11 @@ const STAGES: Stage[] = [
    * and scoring judged it on that one sentence. Discovering first closes that
    * gap — the same run that finds a company also pulls its news.
    */
-  { name: 'context', script: 'ingest-context.ts', timeoutMin: 15,
+  { name: 'context', script: 'ingest-context.ts', timeoutMin: 15, phase: 'gather', cost: 'fetch',
     why: 'the untargeted feeds: policy, sector moves, and the trade press discovery reads' },
-  { name: 'discover', script: 'discover-news.ts', timeoutMin: 10,
+  { name: 'discover', script: 'discover-news.ts', timeoutMin: 10, phase: 'gather', cost: 'llm',
     why: 'companies named in untargeted news that we do not track yet' },
-  { name: 'news', script: 'ingest-news.ts', timeoutMin: 30,
+  { name: 'news', script: 'ingest-news.ts', timeoutMin: 30, phase: 'gather', cost: 'fetch',
     why: 'Google News per company, including the ones just discovered' },
   /*
    * Enrichment, in dependency order and placed after discovery so a company
@@ -69,28 +101,28 @@ const STAGES: Stage[] = [
    * keeps one run bounded as the backlog grows; the rest are picked up next
    * run, strongest signal first.
    */
-  { name: 'websites', script: 'enrich-websites.ts', args: ['--limit', '150'], timeoutMin: 45,
+  { name: 'websites', script: 'enrich-websites.ts', args: ['--limit', '150'], timeoutMin: 45, phase: 'enrich', cost: 'llm',
     why: 'a website is what the assessment reads, and what people scraping needs' },
-  { name: 'people', script: 'ingest-people.ts', timeoutMin: 25,
+  { name: 'people', script: 'ingest-people.ts', timeoutMin: 25, phase: 'enrich', cost: 'fetch',
     why: 'the named people §8 builds warm paths from' },
-  { name: 'location', script: 'enrich-location.ts', timeoutMin: 15,
+  { name: 'location', script: 'enrich-location.ts', timeoutMin: 15, phase: 'enrich', cost: 'llm',
     why: 'a discovered hq is one headline\'s guess until the rest are read' },
   // After discovery and websites: a board is found from the company's site, and
   // hiring feeds the momentum axis, so a company discovered this run would
   // otherwise be scored with no hiring evidence at all.
-  { name: 'ats', script: 'ingest-ats.ts', timeoutMin: 30,
+  { name: 'ats', script: 'ingest-ats.ts', timeoutMin: 30, phase: 'enrich', cost: 'fetch',
     why: 'job boards; the hiring snapshot score-companies reads' },
-  { name: 'filter', script: 'filter-score.ts', timeoutMin: 45,
+  { name: 'filter', script: 'filter-score.ts', timeoutMin: 45, phase: 'judge', cost: 'llm',
     why: 'canonicalise, drop, cluster, score the items' },
-  { name: 'rescue', script: 'rescue-mismatch.ts', timeoutMin: 20,
+  { name: 'rescue', script: 'rescue-mismatch.ts', timeoutMin: 20, phase: 'judge', cost: 'llm',
     why: 'items the name filter dropped that are about the company after all' },
-  { name: 'score', script: 'score-companies.ts', timeoutMin: 45,
+  { name: 'score', script: 'score-companies.ts', timeoutMin: 45, phase: 'judge', cost: 'llm',
     why: 'the three axes per company for this week' },
-  { name: 'assess', script: 'assess-companies.ts', timeoutMin: 45,
+  { name: 'assess', script: 'assess-companies.ts', timeoutMin: 45, phase: 'judge', cost: 'llm',
     why: 'accumulative judgment: prior assessment plus what arrived since' },
-  { name: 'review', script: 'review-dashboard.ts', timeoutMin: 10,
+  { name: 'review', script: 'review-dashboard.ts', timeoutMin: 10, phase: 'publish', cost: 'llm',
     why: 'the set is only checkable once placement has decided what is in it' },
-  { name: 'digest', script: 'render-digest.ts', args: ['--save'], timeoutMin: 10,
+  { name: 'digest', script: 'render-digest.ts', args: ['--save'], timeoutMin: 10, phase: 'publish', cost: 'llm',
     why: 'placement matrix and the rendered digest' },
 ];
 
@@ -151,19 +183,72 @@ function run(stage: Stage, dry: boolean): Promise<{ ok: boolean; ms: number; not
   if (daily) stages = stages.filter((s) => s.name !== 'digest');
   stages = stages.filter((s) => !skip.includes(s.name));
 
-  console.log(`${daily ? 'daily' : 'weekly'} run — ${stages.length} stages${dry ? ' (DRY)' : ''}\n`);
+  const nLlm = stages.filter((s) => s.cost === 'llm').length;
+  console.log(`${daily ? 'daily' : 'weekly'} run — ${stages.length} stages `
+    + `(${nLlm} spend LLM budget, ${stages.length - nLlm} only fetch)${dry ? ' (DRY)' : ''}\n`);
+
+  /*
+   * GitHub Actions folds ::group:: into a collapsible section, so a phase reads
+   * as one chunk in the log rather than twelve undifferentiated stages. Locally
+   * the markers are just lines, which is why the phase header is printed either
+   * way.
+   */
+  const inCi = Boolean(process.env.GITHUB_ACTIONS);
+  let openPhase: Phase | null = null;
+  const enterPhase = (ph: Phase) => {
+    if (openPhase === ph) return;
+    if (openPhase && inCi) console.log('::endgroup::');
+    openPhase = ph;
+    const title = `${ph.toUpperCase()} — ${PHASE_WHAT[ph]}`;
+    console.log(inCi ? `::group::${title}` : `\n${'#'.repeat(70)}\n${title}\n${'#'.repeat(70)}`);
+  };
   const results: Array<{ stage: string; ok: boolean; ms: number; note: string }> = [];
 
   for (const stage of stages) {
-    console.log(`\n${'='.repeat(70)}\n${stage.name} — ${stage.why}\n${'='.repeat(70)}`);
+    enterPhase(stage.phase);
+    console.log(`\n${'='.repeat(70)}\n${stage.name} [${stage.cost}] — ${stage.why}\n${'='.repeat(70)}`);
     const r = await run(stage, dry);
     results.push({ stage: stage.name, ...r });
     console.log(`\n[${r.ok ? 'ok' : 'FAILED'}] ${stage.name} in ${(r.ms / 60_000).toFixed(1)}m ${r.note}`);
   }
 
+  if (openPhase && inCi) console.log('::endgroup::');
   console.log(`\n\n${'='.repeat(70)}\nSUMMARY\n${'='.repeat(70)}`);
+  /*
+   * Grouped by phase, and marked with what each stage spends.
+   *
+   * A flat list of twelve names cannot answer the question actually asked of a
+   * failed run — was this the model or the network — and the answer decides
+   * what to do about it. Every llm stage fails together when the allowance is
+   * gone or a key stops authenticating, and no fetch stage is touched by
+   * either: Monday's run had eight llm stages fail on 428 rejected calls while
+   * every fetch stage reported fine.
+   */
+  const byPhase = new Map<Phase, typeof results>();
   for (const r of results) {
-    console.log(`  ${r.ok ? 'ok  ' : 'FAIL'} ${r.stage.padEnd(9)} ${(r.ms / 60_000).toFixed(1).padStart(5)}m  ${r.note}`);
+    const st = STAGES.find((s) => s.name === r.stage);
+    const ph = st?.phase ?? 'judge';
+    byPhase.set(ph, [...(byPhase.get(ph) ?? []), r]);
+  }
+  for (const ph of ['gather', 'enrich', 'judge', 'publish'] as Phase[]) {
+    const rows = byPhase.get(ph);
+    if (!rows?.length) continue;
+    console.log(`\n  ${ph.toUpperCase()} — ${PHASE_WHAT[ph]}`);
+    for (const r of rows) {
+      const cost = STAGES.find((s) => s.name === r.stage)?.cost === 'llm' ? 'llm  ' : 'fetch';
+      console.log(`    ${r.ok ? 'ok  ' : 'FAIL'} ${cost} ${r.stage.padEnd(9)} ${(r.ms / 60_000).toFixed(1).padStart(5)}m  ${r.note}`);
+    }
+  }
+
+  /*
+   * When every failure is an llm stage, the cause is upstream of any of them —
+   * the allowance, or a key — and naming stages one by one buries that.
+   */
+  const llmNames = new Set(STAGES.filter((s) => s.cost === 'llm').map((s) => s.name));
+  const failedStages = results.filter((r) => !r.ok);
+  if (failedStages.length && failedStages.every((f) => llmNames.has(f.stage))) {
+    console.log(`\n  Every failed stage was an LLM stage. Check the allowance and the keys `
+      + `before re-running: one spent or rejected key fails all of them the same way.`);
   }
   const failed = results.filter((r) => !r.ok);
   if (failed.length) {
