@@ -153,15 +153,39 @@ type ScoreOut = {
      */
     const fold = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
-    const termsById = new Map<number, string[]>();
+    const termsById = new Map<number, RegExp[]>();
+    /*
+     * Whole words, not substrings.
+     *
+     * `hay.includes('sierra')` is true of "Sierra Club", "Sierra Nevada" and
+     * "Sierra Leone", so Sierra the AI company owned a ski consignment sale, a
+     * seaweed story and a weather forecast; Harvey owned an arrest in Ohio.
+     * 271 kept items in a thirty-day window belonged to a company their
+     * headline never named, and every one of them reached the scorer as
+     * evidence.
+     *
+     * A boundary either side is what the substring test was reaching for.
+     *
+     * Punctuation inside a name is collapsed to whitespace on both sides before
+     * matching, because an outlet does not spell a name the way its owner
+     * registered it: "d-Matrix" is written "D Matrix", "Daré Bioscience" loses
+     * its accent. Comparing the collapsed forms costs nothing and recovers 190
+     * items that were dropped over a hyphen.
+     */
+    const loose = (t: string) => fold(t).replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
     for (const c of comps) {
       const terms = [c.name, ...(c.aliases ?? [])]
         .filter(Boolean)
         .map(fold)
         // Strip legal suffixes so "Acme, Inc." matches a headline saying "Acme".
         .map((t) => t.replace(/[,.]?\s*(inc|corp|corporation|llc|ltd|limited|co|pbc)\.?$/i, '').trim())
+        .map(loose)
         .filter((t) => t.length >= 3);
-      termsById.set(c.id, [...new Set(terms)]);
+      // Each space in the term matches any run of punctuation or whitespace in
+      // the text, so "d matrix" finds "D-Matrix", "D Matrix" and "d.matrix".
+      termsById.set(c.id, [...new Set(terms)].map(
+        (t) => new RegExp(`\\b${t.split(' ').map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^a-z0-9]+')}\\b`),
+      ));
     }
 
     const drops: Array<{ id: number; reason: string }> = [];
@@ -227,8 +251,8 @@ type ScoreOut = {
       // are exempt: their title is generated from the company name.
       if (it.companyId !== null && it.sourceType !== 'ats') {
         const terms = termsById.get(it.companyId) ?? [];
-        const hay = fold(`${it.title} ${it.snippet ?? ''}`);
-        if (terms.length && !terms.some((t) => hay.includes(t))) {
+        const hay = loose(`${it.title} ${it.snippet ?? ''}`);
+        if (terms.length && !terms.some((re) => re.test(hay))) {
           drops.push({ id: it.id, reason: 'company_mismatch' });
           counts.dropped_company_mismatch++;
           continue;
