@@ -10,7 +10,7 @@
  *
  * Run: npx tsx tests/events-parse.test.ts
  */
-import { parseDateRange, editionDates, plausibleParticipant, directoryLines, withinPlanningWindow } from '../lib/events';
+import { parseDateRange, editionDates, plausibleParticipant, directoryLines, withinPlanningWindow, yearFromUrl } from '../lib/events';
 
 let pass = 0, fail = 0;
 const check = (name: string, got: unknown, want: unknown) => {
@@ -67,6 +67,24 @@ check('edition read from the banner, not a later deadline',
   ]),
   { startsOn: '2026-07-07', endsOn: '2026-07-09' });
 check('undated directory', editionDates(['Exhibitor list', 'Applied Materials', 'Booth 1423']), null);
+
+// AUSA heads its directory "12 - 14 October" and puts the year only in the URL.
+// The other years on the page belong to a "2025 Recap" and an awards link, so
+// the URL is the one trustworthy source for it.
+check('year taken from the url when the banner omits it',
+  editionDates(['Exhibitor List', '12 - 14 October', 'Washington, D.C.', '2025 Recap'], { yearHint: 2026 }),
+  { startsOn: '2026-10-12', endsOn: '2026-10-14' });
+check('a year hint does not invent a date where none is stated',
+  editionDates(['Exhibitor List', 'Washington, D.C.'], { yearHint: 2026 }), null);
+check('a date stated in full still wins over the hint',
+  editionDates(['SEMICON West 2026', 'July 7–9, 2026'], { yearHint: 2027 }),
+  { startsOn: '2026-07-07', endsOn: '2026-07-09' });
+
+const asOf = new Date('2026-09-08T00:00:00Z');
+check('edition year read from a portal url', yearFromUrl('https://meetings.ausa.org/annual/2026/exhibitor_exhibitor_list.cfm', asOf), 2026);
+check('year read from a portal subdomain', yearFromUrl('https://southeastasia2026.smallworldlabs.com/exhibitors', asOf), 2026);
+check('no year in the url', yearFromUrl('https://asiatechxsg.com/sponsors/sponsor-exhibitor-list/', asOf), null);
+check('a year far outside the plausible range is not an edition', yearFromUrl('https://example.com/archive/2011/exhibitors', asOf), null);
 
 // ── Planning window ──────────────────────────────────────────────────────────
 const today = new Date('2026-03-01T00:00:00Z');

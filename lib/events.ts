@@ -331,12 +331,38 @@ export function parseDateRange(text: string): { startsOn: string; endsOn: string
  * dates — registration deadlines, last year's recap, the next edition's
  * save-the-date — and the edition banner is what sits at the top.
  */
-export function editionDates(lines: string[]): { startsOn: string; endsOn: string } | null {
+export function editionDates(
+  lines: string[], opts: { yearHint?: number | null } = {},
+): { startsOn: string; endsOn: string } | null {
   for (const line of lines.slice(0, 40)) {
     const d = parseDateRange(line);
     if (d) return d;
   }
+
+  /*
+   * A banner that names the days but not the year: AUSA heads its directory
+   * "12 - 14 October", and the only 2026 in the first forty lines belongs to an
+   * awards link. The year comes from the URL the page was fetched from, which
+   * is where these portals put it, rather than from anything on the page — the
+   * other candidates there are a "2025 Recap" and next year's save-the-date.
+   */
+  const year = opts.yearHint;
+  if (!year) return null;
+  for (const line of lines.slice(0, 40)) {
+    const d = parseDateRange(`${line} ${year}`);
+    if (d) return d;
+  }
   return null;
+}
+
+/** The edition year a portal puts in its own URL, when it does. */
+export function yearFromUrl(url: string, today = new Date()): number | null {
+  const years = [...url.matchAll(/(?:^|[^0-9])(20\d\d)(?:[^0-9]|$)/g)].map((m) => Number(m[1]));
+  // A plausible edition, not a copyright line or an id that happens to look
+  // like a year.
+  const now = today.getUTCFullYear();
+  const usable = years.filter((y) => y >= now - 1 && y <= now + 3);
+  return usable.length ? Math.max(...usable) : null;
 }
 
 /**

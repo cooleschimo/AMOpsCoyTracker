@@ -32,7 +32,7 @@ import { events, eventParticipants, people, companies, runs, sourceHealth } from
 import { Budget } from '../lib/budget';
 import { normalizeCompanyName, normalizePersonName } from '../lib/normalize';
 import {
-  CONFERENCES, fetchDirectory, robotsAllows, editionDates, extractParticipants,
+  CONFERENCES, fetchDirectory, robotsAllows, editionDates, extractParticipants, yearFromUrl,
   withinPlanningWindow, type Conference, type ExtractedParticipant,
 } from '../lib/events';
 
@@ -169,7 +169,7 @@ async function recordHealth(source: string, count: number, note: string) {
       }
       counts.fetched++;
 
-      const dates = editionDates(page.lines);
+      const dates = editionDates(page.lines, { yearHint: yearFromUrl(page.url) });
       if (dates) counts.dated++;
       if (!all && !withinPlanningWindow(dates?.startsOn ?? null)) {
         counts.outside_window++;
