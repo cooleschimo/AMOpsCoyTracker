@@ -14,7 +14,7 @@
  * possible to tell whether a change helped. Bump RUBRIC_VERSION for any change
  * to the prompt below.
  */
-export const RUBRIC_VERSION = 'item-v6';
+export const RUBRIC_VERSION = 'item-v7';
 
 /**
  * Signal taxonomy. RATIONALE §15.1 flags these weights as a prior with no
@@ -76,6 +76,13 @@ Tokyo is in some ways a harder target than one about to choose.
 2 — A REAL CORPORATE EVENT with no location decision in play. Product launches,
     research results, most partnerships, senior hires into existing offices,
     routine funding at a company already committed elsewhere.
+
+    A PRODUCT BECOMING AVAILABLE IN A MARKET BELONGS HERE, not at 3. An app,
+    a streaming service, a subscription or an online store launching in
+    Singapore puts nothing in Singapore: no site, no staff, no investment
+    decision an RD could shape. "X launches in Singapore" is a 3 only when the
+    text says something physical arrived with it — an office, a team, a
+    facility, a local entity. Availability is distribution, not entry.
 
 1 — REAL NEWS, NO DECISION WINDOW. Accurate reporting an RD cannot act on:
     a conference talk, a research paper, an award, commentary.

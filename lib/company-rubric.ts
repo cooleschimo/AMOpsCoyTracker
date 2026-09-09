@@ -16,7 +16,7 @@
  * version preserves the old judgments and both are available to tell whether a
  * change helped.
  */
-export const COMPANY_RUBRIC_VERSION = 'company-v6';
+export const COMPANY_RUBRIC_VERSION = 'company-v7';
 
 export const COMPANY_ASSESSMENT_SYSTEM = `You assess US companies for Singapore's Economic Development Board (EDB), which attracts foreign direct investment.
 
@@ -101,6 +101,12 @@ HARD RULES:
 - If you do not recognise the company, say so: set confidence 'low' and
   target_priority 'unknown'. Do NOT infer from the name alone. "Aevos AI Inc."
   tells you nothing except that someone chose a name.
+- CONFIDENCE IS ABOUT THE EVIDENCE IN FRONT OF YOU, not how plausible your
+  reasoning sounds. Where the company has no description and no sector beyond
+  'other', the headline is all you have: that is 'low', whatever you can infer
+  from the name and the news. A chain of reasonable inference from one headline
+  is still one headline. Reserve 'high' for a company you can describe from your
+  own knowledge, and 'medium' for one where the record says what it does.
 - Do NOT assume bigger is better, or that a large raise implies strategic value.
 - Singapore is a HIGH-COST location by design. Never treat cheap land, power or
   labour as a fit. But high cost rules out only the ACTIVITIES that need cheap
