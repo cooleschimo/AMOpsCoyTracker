@@ -21,7 +21,7 @@
  */
 import '../lib/loadenv';
 import { eq } from 'drizzle-orm';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, appendFileSync } from 'node:fs';
 import { getDb, getSql } from '../lib/db';
 import { runs } from '../lib/schema';
 import { openBudget } from '../lib/budget-store';
@@ -87,6 +87,9 @@ ${batch.map((c) => `id ${c.id}: ${c.name}
   const batchSize = Number(arg('batch', '15'));
   const limit = Number(arg('limit', '0'));
   const outFile = arg('out', 'data/sectors_classified.csv')!;
+  // Well below the twenty-two keys in the chain: workers share one chain walked
+  // in the same order, so more of them queue rather than spread.
+  const concurrency = Math.max(1, Number(arg('workers', '4')));
   const all = flag('all');
   const dry = flag('dry');
 
@@ -140,23 +143,36 @@ ${batch.map((c) => `id ${c.id}: ${c.name}
     considered: list.length, batches: 0, classified: 0,
     unknown_sector: 0, broad_mismatch: 0, failed_batches: 0, missing: 0,
   };
-  const out: string[] = ['id,name,sector,subsector,tags,confidence,why'];
   const dist: Record<string, number> = {};
 
   const esc = (v: string) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
-  try {
-    for (let i = 0; i < list.length; i += batchSize) {
-      if (budget.halted) { console.warn(`\nBudget halted: ${budget.haltReason}`); break; }
-      const batch = list.slice(i, i + batchSize);
-      counts.batches++;
+  /*
+   * Written batch by batch rather than once at the end.
+   *
+   * The file used to be assembled in memory and written after the loop, so a
+   * run that was killed or halted on budget lost every batch it had already
+   * paid for — which is what happened to the 01:52 run, and why its row still
+   * reads finished_at null with nothing to show for it. Appending means an
+   * interrupted run leaves a loadable file covering the batches that finished.
+   */
+  if (!dry) writeFileSync(outFile, 'id,name,sector,subsector,tags,confidence,why\n');
 
+  const batches: Row[][] = [];
+  for (let i = 0; i < list.length; i += batchSize) batches.push(list.slice(i, i + batchSize));
+
+  const runBatch = async (batch: Row[]) => {
       const res = await callJson<Out>({ system: SYSTEM, user: buildPrompt(batch), budget });
+      // Numbered by completion, not by position: with several workers the order
+      // is not the order the batches were taken in.
+      counts.batches++;
       if (!res.ok || !res.data?.results) {
         counts.failed_batches++;
-        console.warn(`  batch ${counts.batches}: ${res.error ?? 'no results'}`);
-        continue;
+        console.warn(`  batch ${counts.batches}/${batches.length}: ${res.error ?? 'no results'}`);
+        return;
       }
+
+      const lines: string[] = [];
 
       const byId = new Map(batch.map((b) => [b.id, b]));
       const seen = new Set<number>();
@@ -178,7 +194,7 @@ ${batch.map((c) => `id ${c.id}: ${c.name}
         }
         const tags = (r.tags ?? []).filter((t) => isSector(t) || isBroadSector(t));
 
-        out.push([
+        lines.push([
           c.id, esc(c.name), sector, child, esc(tags.join('|')),
           (r.confidence ?? 'low').toLowerCase(), esc((r.why ?? '').slice(0, 90)),
         ].join(','));
@@ -187,8 +203,25 @@ ${batch.map((c) => `id ${c.id}: ${c.name}
         dist[key] = (dist[key] ?? 0) + 1;
       }
       counts.missing += batch.length - seen.size;
-      console.log(`  batch ${counts.batches}/${Math.ceil(list.length / batchSize)}: ${seen.size}/${batch.length} classified`);
-    }
+      // Appended as the batch completes, so an interrupted run keeps its work.
+      if (!dry && lines.length) appendFileSync(outFile, lines.join('\n') + '\n');
+      console.log(`  batch ${counts.batches}/${batches.length}: ${seen.size}/${batch.length} classified`);
+  };
+
+  try {
+    /*
+     * A fixed pool: each worker takes the next batch as it frees up, so a slow
+     * batch does not hold the others behind it the way a chunked split would.
+     */
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(concurrency, batches.length) }, async () => {
+      for (;;) {
+        const mine = batches[next++];
+        if (!mine) return;
+        if (budget.halted) return;
+        await runBatch(mine);
+      }
+    }));
   } finally {
     await budget.done();
     await db.update(runs).set({
@@ -198,7 +231,6 @@ ${batch.map((c) => `id ${c.id}: ${c.name}
     }).where(eq(runs.id, run.id));
   }
 
-  if (!dry) writeFileSync(outFile, out.join('\n') + '\n');
 
   console.log('\ndistribution:');
   for (const [s, n] of Object.entries(dist).sort((a, b) => b[1] - a[1])) {
