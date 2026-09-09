@@ -10,6 +10,7 @@
  * and the weekly email cannot drift apart on which company sits where.
  */
 import { getSql } from './db';
+import { weekOfSaturday, weekEnd } from './week';
 import { COMPANY_SIGNAL_VERSION } from './company-signal';
 import { planDigest, coverageLine, QUALIFY, type PlacementInput, type Placed } from './placement';
 import { assembleWhyNow, type WhyNowInput } from './why-now';
@@ -890,22 +891,22 @@ function weekLabel(weekOf?: string | Date | null): string {
   // moment a run lands on a different day than the reader opens the page.
   //
   // The fallback is THIS week, because that is what score-companies stamps: it
-  // writes the current Monday, so a dashboard with no row to read from should
+  // writes the current Saturday, so a dashboard with no row to read from should
   // name the week it is being read in rather than the one before it. The digest
   // is the place that looks back a week; see scripts/render-digest.ts.
-  const mon = weekOf
-    ? new Date(weekOf)
-    : (() => {
-        const now = new Date();
-        const day = (now.getUTCDay() + 6) % 7;
-        return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day));
-      })();
-  const sun = new Date(mon.getTime() + 6 * 86400_000);
+  //
+  // Weeks run Saturday to Friday — lib/week.ts says why. The label is built
+  // here rather than taken from weekRangeLabel because the dashboard carries
+  // the year and the digest does not.
+  const sat = weekOf
+    ? new Date(`${String(weekOf).slice(0, 10)}T00:00:00Z`)
+    : new Date(`${weekOfSaturday()}T00:00:00Z`);
+  const fri = weekEnd(sat);
   const fmt = (d: Date, opts: Intl.DateTimeFormatOptions) =>
     d.toLocaleDateString('en-GB', { timeZone: 'UTC', ...opts });
-  const sameMonth = mon.getUTCMonth() === sun.getUTCMonth();
-  const from = sameMonth ? fmt(mon, { day: 'numeric' }) : fmt(mon, { day: 'numeric', month: 'long' });
-  return `${from} – ${fmt(sun, { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  const sameMonth = sat.getUTCMonth() === fri.getUTCMonth();
+  const from = sameMonth ? fmt(sat, { day: 'numeric' }) : fmt(sat, { day: 'numeric', month: 'long' });
+  return `${from} – ${fmt(fri, { day: 'numeric', month: 'long', year: 'numeric' })}`;
 }
 
 /** Companies an RD chose to monitor, with their signal row when one exists. */
@@ -1097,29 +1098,40 @@ export async function getCompanyGraph(companyId: number): Promise<CompanyGraph> 
     return p.score >= 2 ? 'plausible' : 'weak';
   };
 
+  /*
+   * A path reaches its destination through a connector, or directly.
+   *
+   * A company-to-company edge — an acquisition, a partnership — runs hub to
+   * target with nobody in between, so `viaId` is null and the walk below joins
+   * the hub straight to the far company. Requiring a connector dropped those
+   * paths from the graph entirely: the list beside it named companies that had
+   * no node.
+   */
   for (const p of paths) {
     const viaId = p.viaPersonId
       ? `p${p.viaPersonId}`
       : p.viaOrgId
         ? `o${p.viaOrgId}`
         : null;
-    if (!viaId) continue;
-    const existing = nodes.get(viaId);
-    if (existing) existing.degree += 1;
-    else
-      nodes.set(viaId, {
-        id: viaId,
-        label: p.viaPersonName ?? p.viaOrgName ?? 'Unknown',
-        kind: p.viaPersonId ? 'person' : 'investor',
-        degree: 1,
-      });
 
-    edges.push({
-      source: hubId,
-      target: viaId,
-      feasibility: feasibilityOf(p),
-      label: p.description,
-    });
+    if (viaId) {
+      const existing = nodes.get(viaId);
+      if (existing) existing.degree += 1;
+      else
+        nodes.set(viaId, {
+          id: viaId,
+          label: p.viaPersonName ?? p.viaOrgName ?? 'Unknown',
+          kind: p.viaPersonId ? 'person' : 'investor',
+          degree: 1,
+        });
+
+      edges.push({
+        source: hubId,
+        target: viaId,
+        feasibility: feasibilityOf(p),
+        label: p.description,
+      });
+    }
 
     if (p.targetCompanyId && p.targetCompanyName) {
       const endId = `c${p.targetCompanyId}`;
@@ -1132,7 +1144,14 @@ export async function getCompanyGraph(companyId: number): Promise<CompanyGraph> 
           kind: 'sg_entity',
           degree: 1,
         });
-      edges.push({ source: viaId, target: endId, feasibility: feasibilityOf(p), label: p.evidence });
+      // From the connector where there is one, from the company itself where
+      // the relationship is direct.
+      edges.push({
+        source: viaId ?? hubId,
+        target: endId,
+        feasibility: feasibilityOf(p),
+        label: viaId ? p.evidence : p.description,
+      });
     }
   }
 
@@ -1193,7 +1212,9 @@ export async function getCompanyPaths(companyId: number): Promise<PathRow[]> {
       const hub = `c${companyId}`;
       const via = p.viaPersonId ? `p${p.viaPersonId}` : p.viaOrgId ? `o${p.viaOrgId}` : null;
       const end = p.targetCompanyId ? `c${p.targetCompanyId}` : null;
-      if (!via) return [];
+      // A direct company-to-company relationship runs hub to target with no
+      // connector, and its single edge is what selecting the row lights up.
+      if (!via) return end ? [`${hub}|${end}`] : [];
       return [`${hub}|${via}`, ...(end ? [`${via}|${end}`] : [])];
     })(),
     nodeIds: [

@@ -83,6 +83,31 @@ export function degreeCoverage(scrapedEdges: number, totalEdges: number): 'scrap
  * changed back — so the page that offers the control asks for them and shows
  * them apart, rather than making a mis-click permanent.
  */
+/**
+ * The edge as a sentence, read from whichever end the page is showing.
+ *
+ * A directed relation means the opposite thing from its other end: the row that
+ * says Broadcom acquired VMware has to read "VMware was acquired by Broadcom"
+ * on VMware's page, and underscore-stripping the relation name produced "has a
+ * supplier to relationship with" either way — the wrong fact in the wrong
+ * English.
+ */
+function edgeSentence(subject: string, relation: string, other: string, subjectIsFrom: boolean): string {
+  const forms: Record<string, [string, string]> = {
+    //            subject is `from`               subject is `to`
+    acquired:     [`acquired ${other}.`,          `was acquired by ${other}.`],
+    subsidiary_of:[`is a subsidiary of ${other}.`,`owns ${other}.`],
+    spun_out_of:  [`was spun out of ${other}.`,   `spun out ${other}.`],
+    customer_of:  [`is a customer of ${other}.`,  `counts ${other} as a customer.`],
+    supplier_to:  [`supplies ${other}.`,          `is supplied by ${other}.`],
+    // Undirected: one row, and it reads the same from either end.
+    partnership:  [`has a partnership with ${other}.`, `has a partnership with ${other}.`],
+  };
+  const pair = forms[relation];
+  if (!pair) return `${subject} is linked to ${other} (${relation.replace(/_/g, ' ')}).`;
+  return `${subject} ${pair[subjectIsFrom ? 0 : 1]}`;
+}
+
 export async function findWarmPaths(
   companyId: number,
   opts: { includeRejected?: boolean } = {},
@@ -180,6 +205,7 @@ export async function findWarmPaths(
   // ── 3. COMPANY-TO-COMPANY edges reaching a known account.
   const edgeRows = await q`
     select ce.relation, ce.source_url, ce.directed,
+           ce.from_company_id = ${companyId} as subject_is_from,
            case when ce.from_company_id = ${companyId} then ce.to_company_id else ce.from_company_id end as other_id,
            case when ce.from_company_id = ${companyId} then c2.name else c1.name end as other_name,
            case when ce.from_company_id = ${companyId} then c2.familiarity else c1.familiarity end as other_status
@@ -191,7 +217,7 @@ export async function findWarmPaths(
   for (const r of edgeRows) {
     paths.push({
       kind: 'company_edge',
-      description: `${subject} has a ${r.relation.replace(/_/g, ' ')} relationship with ${r.other_name}${r.other_status === 'account' ? ', which EDB already holds as an account' : ''}.`,
+      description: `${edgeSentence(subject, String(r.relation), String(r.other_name), Boolean(r.subject_is_from))}${r.other_status === 'account' ? ' EDB already holds them as an account.' : ''}`,
       viaPersonId: null, viaPersonName: null, viaOrgId: null, viaOrgName: null,
       targetCompanyId: Number(r.other_id), targetCompanyName: String(r.other_name),
       evidence: `Company relationship: ${r.relation}.`,
