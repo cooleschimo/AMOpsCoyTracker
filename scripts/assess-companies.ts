@@ -211,7 +211,7 @@ type Assessment = {
 
   const [run] = await db.insert(runs).values({ stage: 'assess' }).returning();
   const budget = await openBudget();
-  const counts = { batches: 0, batches_failed: 0, assessed: 0, sector_assigned: 0, no_sector: 0, unmatched: 0 };
+  const counts = { batches: 0, batches_failed: 0, assessed: 0, sector_assigned: 0, no_sector: 0, unmatched: 0, vanished: 0 };
   const results: Array<Assessment & { id: number }> = [];
 
   for (let i = 0; i < targets.length; i += batchSize) {
@@ -324,18 +324,36 @@ type Assessment = {
       if (inScope) counts.sector_assigned++; else counts.no_sector++;
 
       if (!dry) {
-        // Retried: Neon's HTTP endpoint drops a connection under load, and an
-        // unretried write ended a run at batch nine, losing every company after
-        // it. A dropped connection is not a reason to abandon the batch.
-        await withRetry(() => db.insert(companyAssessments).values({
-          companyId: target.id, ...bands,
-          rationale: a.rationale ?? null,
-          priorityReason: a.priority_reason ?? null,
-          singaporeFitReason: a.singapore_fit_reason ?? null,
-          contributionReason: a.contribution_reason ?? null,
-          confidenceReason: a.confidence_reason ?? null,
-          model: res.model, rubricVersion: COMPANY_RUBRIC_VERSION,
-        }));
+        /*
+         * Retried: Neon's HTTP endpoint drops a connection under load, and an
+         * unretried write ended a run at batch nine, losing every company after
+         * it. A dropped connection is not a reason to abandon the batch.
+         *
+         * A vanished company is not either. The target list is read once at
+         * startup and the run takes hours, so a merge or a cleanup elsewhere
+         * can delete a row this batch is still holding — the foreign key then
+         * fails the insert and, unguarded, killed the whole stage seventeen
+         * batches in. The company is gone; there is nothing to assess and
+         * nothing to fix, so it is counted and stepped over.
+         */
+        try {
+          await withRetry(() => db.insert(companyAssessments).values({
+            companyId: target.id, ...bands,
+            rationale: a.rationale ?? null,
+            priorityReason: a.priority_reason ?? null,
+            singaporeFitReason: a.singapore_fit_reason ?? null,
+            contributionReason: a.contribution_reason ?? null,
+            confidenceReason: a.confidence_reason ?? null,
+            model: res.model, rubricVersion: COMPANY_RUBRIC_VERSION,
+          }));
+        } catch (e) {
+          const msg = (e as Error).message ?? '';
+          if (!/foreign key|companies_id_fk/i.test(msg)) throw e;
+          counts.vanished++;
+          counts.assessed--;
+          console.warn(`    ${target.name} was deleted mid-run; skipped`);
+          continue;
+        }
         // Out of scope is recorded; in scope leaves scope_status alone, since
         // the sector itself is not this script's to write.
         if (!inScope) {
