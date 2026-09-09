@@ -57,7 +57,7 @@ type Out = {
   const seen = new Set<number>();
   const placed: ReviewInput[] = [];
   for (const list of [digest.worthAConversation, digest.newOnTheRadar,
-                      digest.familiarTerritory, digest.monitoring] as any[][]) {
+                      digest.whoWeKnow, digest.monitoring] as any[][]) {
     for (const c of list ?? []) {
       if (seen.has(c.companyId)) continue;
       seen.add(c.companyId);
