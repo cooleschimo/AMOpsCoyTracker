@@ -1,7 +1,8 @@
 "use client";
 
 import { ArrowUpRight, TriangleAlert } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
 import { broadSectorLabel, sectorBroadSector, sectorLabel, sectorShort } from "@/lib/subsectors";
@@ -640,6 +641,8 @@ export function SignalTypeSet({ points }: { points: EvidencePoint[] }) {
  */
 export function NewTodayTag({ count, items }: { count?: number; items?: EvidencePoint[] }) {
   const [shown, setShown] = useState(false);
+  const [at, setAt] = useState<{ top: number; left: number } | null>(null);
+  const ref = useRef<HTMLButtonElement>(null);
   const label = count && count > 1 ? `${count} new items today` : 'New item today';
   const list = items?.filter((p) => p.isNew) ?? [];
 
@@ -653,17 +656,30 @@ export function NewTodayTag({ count, items }: { count?: number; items?: Evidence
     const t = setTimeout(() => setShown(false), 6000);
     const close = () => setShown(false);
     window.addEventListener('click', close);
-    return () => { clearTimeout(t); window.removeEventListener('click', close); };
+    window.addEventListener('scroll', close, true);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('click', close);
+      window.removeEventListener('scroll', close, true);
+    };
   }, [shown]);
 
   return (
     <span className="relative inline-flex">
       <button
+        ref={ref}
         type="button"
         title={label}
         aria-label={label}
         aria-expanded={shown}
-        onClick={(e) => { e.stopPropagation(); setShown((v) => !v); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          const r = ref.current?.getBoundingClientRect();
+          // Viewport coordinates, kept clear of the right edge — the panel is
+          // fixed, so it is positioned against the window rather than the card.
+          if (r) setAt({ top: r.bottom + 6, left: Math.min(r.left, window.innerWidth - 340) });
+          setShown((v) => !v);
+        }}
         className={cn(
           "cursor-pointer font-mono text-[0.65rem] font-semibold lowercase tracking-[0.1em] text-fresh",
           // The glow is the whole signal: it says look here without spending the
@@ -677,11 +693,17 @@ export function NewTodayTag({ count, items }: { count?: number; items?: Evidence
         new{count && count > 1 ? ` ${count}` : ''}
       </button>
 
-      {shown && list.length > 0 && (
+      {/*
+        * Rendered into the body, not the card. The card clips its own children
+        * to keep its rounded corners, so a panel positioned inside it was cut
+        * off at the card's edge — which for a small card meant almost all of it.
+        */}
+      {shown && list.length > 0 && at && createPortal(
         <span
           role="dialog"
           onClick={(e) => e.stopPropagation()}
-          className="absolute left-0 top-full z-30 mt-1.5 w-80 rounded-md border border-fresh/30 bg-popover p-3 shadow-lg"
+          style={{ top: at.top, left: at.left }}
+          className="fixed z-50 w-80 rounded-md border border-fresh/30 bg-popover p-3 shadow-lg"
         >
           <span className="mb-1.5 block font-mono text-2xs uppercase tracking-[0.1em] text-fresh">
             arrived today
@@ -694,7 +716,8 @@ export function NewTodayTag({ count, items }: { count?: number; items?: Evidence
               </span>
             ))}
           </span>
-        </span>
+        </span>,
+        document.body,
       )}
     </span>
   );
