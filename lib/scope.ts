@@ -55,6 +55,28 @@ export type ExclusionReason = (typeof EXCLUSION_REASONS)[number];
 export const SG_APAC_ROLES = ['investor', 'investor_lead', 'partner', 'office'] as const;
 export type SgApacRole = (typeof SG_APAC_ROLES)[number];
 
+/**
+ * The postal codes, so a two-letter hq_state can be told from a country.
+ *
+ * A shape test cannot do it: 'UK' is two capitals and passed as a state, which
+ * filed five London companies — Rolls-Royce among them — under "rest of US".
+ * Non-US rows otherwise carry a spelled-out country ('Singapore', 'Germany'),
+ * so membership is the check that separates them.
+ */
+const US_STATE_CODES = new Set([
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+  // The District and the inhabited territories: US-domestic for this purpose.
+  'DC', 'PR', 'VI', 'GU', 'AS', 'MP',
+]);
+
+/** Whether an hq_state holds a US state code rather than a country name. */
+export const isUsState = (v: unknown): boolean =>
+  typeof v === 'string' && US_STATE_CODES.has(v.trim().toUpperCase());
+
 export const isSector = (v: string): v is Sector => (SECTORS as readonly string[]).includes(v);
 export const isHqRegion = (v: string): v is HqRegion => (HQ_REGIONS as readonly string[]).includes(v);
 export const isRoundStage = (v: string): v is RoundStage => (ROUND_STAGES as readonly string[]).includes(v);
