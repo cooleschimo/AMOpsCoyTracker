@@ -178,6 +178,21 @@ export default async function Dashboard({
         {/* The backlog gets a line rather than a section: it is work outstanding,
             not part of the week's read, and its length varies with how far the
             last assessment run got before its budget ran out. */}
+        {d.lowFit.length > 0 && (
+          <p className="border-t border-border pt-6 text-sm text-muted-foreground">
+            <span className="num">{d.lowFit.length}</span>{' '}
+            {d.lowFit.length === 1 ? 'company' : 'companies'} assessed as a weak fit
+            for Singapore this week.{' '}
+            <Link
+              href="/low-fit"
+              className="text-primary link-underline hover:text-foreground"
+            >
+              See the reasoning
+            </Link>
+            .
+          </p>
+        )}
+
         {d.awaitingAssessment.length > 0 && (
           <p className="border-t border-border pt-6 text-sm text-muted-foreground">
             <span className="num">{d.awaitingAssessment.length}</span>{' '}

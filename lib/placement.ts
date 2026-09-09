@@ -47,7 +47,7 @@ import { parseFundraise } from './fundraise';
 export const SECTIONS = [
   'worth_a_conversation', 'new_on_the_radar', 'who_we_know',
   'awaiting_assessment',
-  'monitoring', 'exploration', 'to_watch', 'omitted',
+  'monitoring', 'exploration', 'to_watch', 'low_fit', 'omitted',
 ] as const;
 export type Section = (typeof SECTIONS)[number];
 
@@ -105,6 +105,9 @@ export const SECTION_CAPS: Partial<Record<Section, number>> = {
   // backlog behind a cap is how it stops being visible work. It has its own
   // page, so length costs the dashboard nothing.
   awaiting_assessment: Number.MAX_SAFE_INTEGER,
+  // Both are complete lists behind their own link rather than sections
+  // competing for a slot, so neither is capped.
+  low_fit: Number.MAX_SAFE_INTEGER,
   exploration: 1,
 };
 
@@ -289,9 +292,18 @@ const NOT_DISCOVERABLE: Familiarity[] = ['known', 'in_conversation'];
  */
 export function discoveryTier(
   it: PlacementInput,
-): 'worth_a_conversation' | 'new_on_the_radar' | 'awaiting_assessment' | null {
+): 'worth_a_conversation' | 'new_on_the_radar' | 'awaiting_assessment' | 'low_fit' | null {
   if (!isDiscovery(it)) return null;
   if (!isAssessed(it)) return 'awaiting_assessment';
+  /*
+   * Assessed, and the answer was no.
+   *
+   * A company the assessment rated low on priority or on Singapore fit has been
+   * judged — it is not a backlog item — but it is also not something to put in
+   * front of an RD beside a company the tool is arguing for. Its own section
+   * keeps the judgment visible and correctable without spending a slot on it.
+   */
+  if (isLowFit(it)) return 'low_fit';
   /*
    * The split is SIZE, not how well the tool rated the company.
    *
@@ -308,6 +320,18 @@ export function discoveryTier(
    * small one among the larger names is merely a lighter entry.
    */
   return isEarlyStageFind(it) ? 'new_on_the_radar' : 'worth_a_conversation';
+}
+
+/**
+ * Assessed, and rated low on either axis that matters.
+ *
+ * Priority is whether EDB should want the company at all; Singapore fit is
+ * whether Singapore is a plausible place for it. Low on either is enough — a
+ * high-priority company that does not fit Singapore is still not a conversation
+ * an RD can open, and the reverse is a good fit for a company nobody wants.
+ */
+export function isLowFit(it: PlacementInput): boolean {
+  return it.targetPriority === 'low' || it.singaporeFit === 'low';
 }
 
 /**
@@ -461,6 +485,7 @@ export type DigestPlan = {
     who_we_know_candidates: number;
     /** Discovery candidates nobody has assessed yet — the backlog. */
     awaiting_assessment: number;
+    low_fit: number;
     early_stage_candidates: number;
     /** Entries carrying a full argument, in either section. */
     worth_a_conversation: number;
@@ -480,6 +505,7 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
     discovery_candidates: 0,
     who_we_know_candidates: 0,
     awaiting_assessment: 0,
+    low_fit: 0,
     early_stage_candidates: 0,
     worth_a_conversation: 0,
     excluded_existing_account: 0,
@@ -515,6 +541,7 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
   counts.who_we_know_candidates = inPlayPool.length;
   const inPlay = dedupeByCompany(inPlayPool);
   counts.company_deduped += inPlay.dropped.length;
+  counts.low_fit = discovery.kept.filter((d) => d.section === 'low_fit').length;
   counts.awaiting_assessment = discovery.kept.filter(
     (d) => d.section === 'awaiting_assessment',
   ).length;
@@ -524,6 +551,7 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
     ['new_on_the_radar', discovery.kept.filter((d) => d.section === 'new_on_the_radar')],
     ['who_we_know', inPlay.kept],
     ['awaiting_assessment', discovery.kept.filter((d) => d.section === 'awaiting_assessment')],
+    ['low_fit', discovery.kept.filter((d) => d.section === 'low_fit')],
   ];
   for (const [name, list] of buckets) {
     const cap = SECTION_CAPS[name]!;
@@ -548,7 +576,7 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
    */
   const placedIds = new Set(
     [...sections.worth_a_conversation, ...sections.new_on_the_radar, ...sections.who_we_know,
-     ...sections.awaiting_assessment]
+     ...sections.awaiting_assessment, ...sections.low_fit]
       .map((i) => i.itemId),
   );
   for (const it of input) {

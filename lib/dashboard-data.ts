@@ -729,6 +729,8 @@ export type WeeklyDigest = {
   whoWeKnow: DashboardCompany[];
   /** Cleared the trigger bar, but nobody has assessed them yet. A backlog. */
   awaitingAssessment: DashboardCompany[];
+  /** Assessed, and rated low on priority or Singapore fit. */
+  lowFit: DashboardCompany[];
   monitoring: DashboardCompany[];
 };
 
@@ -816,6 +818,7 @@ export async function getWeeklyDigest(
   // The assessment backlog. Not a verdict, so it is kept apart from the bands
   // and given its own page rather than a slot in the weekly read.
   const awaitingAssessment = pick(plan.sections.awaiting_assessment);
+  const lowFit = pick(plan.sections.low_fit);
   const monitoring = await getMonitoredCompanies(signalVersion);
 
   return {
@@ -832,6 +835,7 @@ export async function getWeeklyDigest(
     newOnTheRadar,
     whoWeKnow,
     awaitingAssessment,
+    lowFit,
     monitoring,
   };
 }
