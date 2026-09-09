@@ -86,7 +86,7 @@ type CallOpts = {
 };
 
 type RawOk = { text: string; inTok: number; outTok: number; model: string };
-type RawErr = { error: string; exhausted?: boolean };
+type RawErr = { error: string; exhausted?: boolean; transient?: boolean };
 
 async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider): Promise<RawOk | RawErr> {
   // opts.model only overrides within the PRIMARY provider; a fallback provider
@@ -203,7 +203,24 @@ async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider)
       await sleep(waitMs);
     }
   }
-  return { error: `exhausted ${maxRetries + 1} attempts on ${provider.label ?? provider.name}`, exhausted: true };
+  /*
+   * Out of attempts, which is NOT the same as out of capacity.
+   *
+   * A 503 or a dropped socket exhausts the retries here, and returning
+   * `exhausted: true` told the failover to mark the provider spent for the rest
+   * of the run — so one bad minute at Gemini barred it from every later call,
+   * and the run walked the rest of the chain short a provider. Only a real
+   * capacity signal (a daily cap, an auth failure) should retire a key; a
+   * transient fault should cost this call and nothing more.
+   *
+   * `transient` still moves to the next provider for THIS call — the work has
+   * to go somewhere — without recording the provider as finished.
+   */
+  return {
+    error: `exhausted ${maxRetries + 1} attempts on ${provider.label ?? provider.name}`,
+    exhausted: true,
+    transient: true,
+  };
 }
 
 /**
@@ -265,8 +282,12 @@ async function callWithFailover(opts: CallOpts, stricter: boolean): Promise<RawO
      * of backoff each pass — while six configured keys further down the chain
      * were never reached at all.
      */
-    opts.budget?.markExhausted(who, res.error);
-    if (providers.length > 1) console.warn(`[llm] ${who} exhausted; trying next provider`);
+    // A transient fault moves the call along without retiring the provider: it
+    // may well answer the next one.
+    if (!res.transient) opts.budget?.markExhausted(who, res.error);
+    if (providers.length > 1) {
+      console.warn(`[llm] ${who} ${res.transient ? 'failed this call' : 'exhausted'}; trying next provider`);
+    }
   }
   // Only now is the run genuinely out of capacity.
   if (opts.budget?.allExhausted(names)) {
