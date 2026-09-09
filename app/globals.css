@@ -449,13 +449,13 @@
      A literal first: the fallback a compiler writes for color-mix is its
      first argument at full strength, which would be a solid teal bar on any
      engine that cannot mix. */
-  background-color: oklch(1 0 0 / 0.55);
+  background-color: oklch(1 0 0 / 0.82);
   backdrop-filter: blur(24px) saturate(150%);
   -webkit-backdrop-filter: blur(24px) saturate(150%);
   /* The blur separates the bar from what runs under it, so the edge only has
      to finish it. A border dark enough to read as a rule made a boxed panel. */
   /* A thin white edge, the way a pane catches light along its rim. */
-  border-bottom-color: oklch(1 0 0 / 0.55);
+  border-bottom-color: oklch(1 0 0 / 0.7);
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 0.5),
     0 4px 24px -12px oklch(0.4 0.02 200 / 0.45);
@@ -463,14 +463,14 @@
 
 @supports (background: color-mix(in oklch, red 1%, blue)) {
   .glass-bar {
-    background-color: color-mix(in oklch, var(--color-primary) 6%, oklch(1 0 0 / 0.55));
+    background-color: color-mix(in oklch, var(--color-primary) 6%, oklch(1 0 0 / 0.82));
   }
 }
 
 /* Dark mode inverts what the highlight is doing: a white edge on a dark
    surface reads as a scratch, so the light comes from the tint instead. */
 .dark .glass-bar {
-  background-color: oklch(0.35 0.008 200 / 0.45);
+  background-color: oklch(0.3 0.008 200 / 0.78);
   border-bottom-color: oklch(1 0 0 / 0.12);
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 0.08),
@@ -479,7 +479,7 @@
 
 @supports (background: color-mix(in oklch, red 1%, blue)) {
   .dark .glass-bar {
-    background-color: color-mix(in oklch, var(--color-primary) 8%, oklch(0.35 0 0 / 0.45));
+    background-color: color-mix(in oklch, var(--color-primary) 8%, oklch(0.3 0 0 / 0.78));
   }
 }
 
