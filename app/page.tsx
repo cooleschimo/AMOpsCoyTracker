@@ -17,7 +17,7 @@ import { Masonry } from '@/components/masonry';
 import { CollapsedSection, SectionHeading } from '@/components/primitives';
 import { availableWeeks, getWeeklyDigest, type DashboardCompany } from '@/lib/dashboard-data';
 import { WeekPicker } from '@/components/week-picker';
-import { Sidebar } from '@/components/sidebar';
+import { ControlBar } from '@/components/control-bar';
 import { isBroadSector, sectorShort } from '@/lib/subsectors';
 
 export const dynamic = 'force-dynamic';
@@ -104,11 +104,6 @@ export default async function Dashboard({
     }
   }
   const sidebarCounts = {
-    sections: [
-      { id: 'worth', label: 'Worth a conversation', n: inPlace(d.worthAConversation).length },
-      { id: 'radar', label: 'New on the radar', n: inPlace(d.newOnTheRadar).length },
-      { id: 'known', label: 'Who we know', n: inPlace(d.whoWeKnow).length },
-    ],
     places: {
       west_coast: discovery.filter((c) => c.geography === 'west_coast').length,
       other_us: discovery.filter((c) => c.geography === 'other_us').length,
@@ -124,18 +119,14 @@ export default async function Dashboard({
 
   return (
     <>
-      {/* The rail overlays rather than displaces: opening it must not reflow
-          the grid underneath, because a card moving as you reach for it is
-          worse than a card partly covered. The page keeps its full width in
-          both states. */}
-      <Sidebar counts={sidebarCounts} />
       {/* The rail is 48px and fixed, so the page reserves exactly that plus its
           own gutter — pl-24 reserved 96px, which left a gap on the left that
           matched nothing and made the header look inset from a margin that was
           not there. Expanding the sidebar overlays rather than reflows, by
           design: a card that moves as you reach for it is worse than one
           briefly covered. */}
-      <main className="mx-auto max-w-[1400px] py-10 pl-[4.5rem] pr-6 sm:py-14 sm:pl-20 sm:pr-12 lg:pr-16">
+      <main className="mx-auto max-w-[1400px] px-6 py-10 sm:px-12 sm:py-14 lg:px-16">
+      <ControlBar counts={sidebarCounts} />
       <header className="mb-12 max-w-[68ch] space-y-1">
         <h1 className="flex items-center gap-2.5 font-display text-3xl font-semibold tracking-tight">
           {/* A sun, drawn rather than an icon-font glyph: a bare circle with
