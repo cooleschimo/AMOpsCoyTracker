@@ -456,10 +456,11 @@
  * makes the surface read as glass rather than as fog.
  */
 .glass-bar {
-  /* A white pane. The trace of hue is on the blue side rather than the green:
-     at hue 195 the green channel led the other two and the bar read as tinted.
-     Blue keeps it off the warm cast without leaning anywhere the eye names. */
-  background-color: oklch(0.99 0.002 240 / 0.85);
+  /* The same white as a card. Any tint at all separated the bar from the cards
+     sitting under it, and two whites a shade apart read as a mistake rather
+     than as a choice. The alpha is what keeps it glass: high enough to hold
+     the card white, short enough that the blur still shows movement. */
+  background-color: oklch(1 0 0 / 0.92);
   backdrop-filter: blur(24px) saturate(150%);
   -webkit-backdrop-filter: blur(24px) saturate(150%);
   /* The edge is white: a rim reads as light caught along the lip of a pane. */
