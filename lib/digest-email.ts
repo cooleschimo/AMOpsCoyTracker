@@ -213,40 +213,44 @@ function fullCard(c: DashboardCompany, appBaseUrl: string): string {
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                   ${why.length ? `
                   <tr><td style="${MONO} font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:${C.weak}; padding:0 0 5px 0;">Why now</td></tr>
-                  ${why.map((w) => `
+                  <!--
+                    One point, not four. The rest restate the same week from
+                    different angles — a raise, then the hiring the raise paid
+                    for, then the product it funded — and the strongest one is
+                    already first. The others are on the page.
+                  -->
+                  ${why.slice(0, 1).map((w) => `
                   <tr>
                     <td style="${SANS} font-size:14px; line-height:21px; color:${C.ink}; padding:0 0 5px 12px;">
-                      &bull;&nbsp;${esc(w.text)}${w.origin === 'supporting' ? ` <span style="color:${C.weak};">(${esc(w.signalType === 'hiring' ? 'hiring' : 'also reported')})</span>` : ''}
+                      ${esc(w.text)}
                     </td>
                   </tr>`).join('')}` : ''}
 
-                  ${c.offer ? `
-                  <tr>
-                    <td style="padding:12px 0 0 0;">
-                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${C.card}; border:1px solid ${C.hairline};">
-                        <tr><td style="padding:13px 15px;">
-                          <div style="${MONO} font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:${C.weak}; padding-bottom:5px;">Singapore could offer</div>
-                          <div style="${SANS} font-size:14px; line-height:21px; color:${C.ink}; font-weight:600;">${esc(c.offer.title)}</div>
-                          ${c.offer.precedent ? `<div style="${SANS} font-size:13px; line-height:20px; color:${C.muted}; padding-top:5px;">${esc(c.offer.precedent)}${c.offer.precedentSource?.url ? ` <a href="${esc(c.offer.precedentSource.url)}" style="color:${C.primary};">source</a>` : ''}</div>` : ''}
-                          ${c.offer.caveat ? `<div style="${SANS} font-size:12px; line-height:18px; color:${C.caution}; padding-top:5px;">Caveat — ${esc(c.offer.caveat)}</div>` : ''}
-                        </td></tr>
-                      </table>
-                    </td>
-                  </tr>` : ''}
+                  <!--
+                    No 'Singapore could offer' here. It is the tool's pitch
+                    rather than the week's news, it repeats across cards because
+                    the menu is fixed, and a reader who has not yet decided the
+                    company is worth a call has no use for the offer. It stays
+                    on the page, where somebody who has decided will find it.
+                  -->
 
+                  ${c.possiblePathSummary || c.contacts.length ? `
+                  <!--
+                    Only when there is somebody. The block used to print a
+                    paragraph explaining that nothing had been found, which is a
+                    sentence about the tool rather than about the company, on
+                    every card that had no path — and most do.
+                  -->
                   <tr>
                     <td style="padding:12px 0 0 0;">
                       <div style="${MONO} font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:${C.weak}; padding-bottom:3px;">${c.possiblePathSummary ? 'Possible path' : 'Who to approach'}</div>
                       ${c.possiblePathSummary
                         ? `<div style="${SANS} font-style:italic; font-size:13px; line-height:20px; color:${C.muted};">${esc(c.possiblePathSummary)}</div>`
-                        : c.contacts.length
-                        ? `<div style="${SANS} font-size:12px; line-height:18px; color:${C.weak}; padding-bottom:3px;">No connection found in the graph, so this is ${esc(c.name)} directly.</div>`
-                          + c.contacts.map((p) => `<div style="${SANS} font-size:13px; line-height:20px; color:${C.ink};">
+                        : c.contacts.map((p) => `<div style="${SANS} font-size:13px; line-height:20px; color:${C.ink};">
                             <span style="font-weight:600;">${esc(p.name)}</span>${p.title ? ` <span style="color:${C.muted};">· ${esc(p.title)}</span>` : ''}${p.email ? ` · <a href="mailto:${esc(p.email)}" style="color:${C.primary};">${esc(p.email)}</a>` : p.profileUrl ? ` · <a href="${esc(p.profileUrl)}" style="color:${C.primary};">profile</a>` : ''}
-                          </div>`).join('')
-                        : `<div style="${SANS} font-style:italic; font-size:13px; line-height:20px; color:${C.muted};">No connection and no named contact yet. Nothing public has been scraped for ${esc(c.name)}, which is not the same as nothing existing.</div>`}
+                          </div>`).join('')}
                     </td>
-                  </tr>
+                  </tr>` : ''}
 
                   ${c.checkFirst ? `
                   <tr>
@@ -291,13 +295,17 @@ function briefCard(c: DashboardCompany, appBaseUrl: string, withWhy: boolean): s
                   <a href="${esc(appBaseUrl)}/company/${c.companyId}" style="${SERIF} font-size:17px; color:${C.ink}; text-decoration:underline; text-decoration-color:${C.primary}; text-underline-offset:3px;">${esc(c.name)}</a>
                   &nbsp;${badge(c.trigger.score)}
                 </div>
-                <div style="${SANS} font-size:14px; line-height:20px; padding-top:3px;">
-                  <a href="${esc(c.trigger.source.url)}" style="color:${C.primary}; text-decoration:underline; text-underline-offset:2px;">${esc(c.trigger.headline)}</a>
-                </div>
+                <!--
+                  One line under the name, and only for the entries still
+                  carrying detail. The tail is the name, the score and where it
+                  came from — enough to recognise a company worth opening, and
+                  short enough that the whole week fits in the mail.
+                -->
                 ${withWhy && why ? `<div style="${SANS} font-size:13px; line-height:19px; color:${C.muted}; padding-top:2px;">${esc(why)}</div>` : ''}
-                <div style="${SANS} font-size:12px; line-height:17px; color:${C.weak}; padding-top:3px;">
-                  ${esc(c.trigger.source.name)}
-                  ${c.checkFirst ? ` · <span style="color:${C.caution};">check first: export control</span>` : ''}
+                <div style="${SANS} font-size:12px; line-height:17px; color:${C.weak}; padding-top:2px;">
+                  <a href="${esc(c.trigger.source.url)}" style="color:${C.primary}; text-decoration:underline;">${esc(c.trigger.source.name)}</a>
+                  ${c.hq ? ` · ${esc(c.hq)}` : ''}
+                  ${c.checkFirst ? ` · <span style="color:${C.caution};">check first</span>` : ''}
                 </div>
               </td>
             </tr>
@@ -312,33 +320,28 @@ function briefCard(c: DashboardCompany, appBaseUrl: string, withWhy: boolean): s
  * itself.
  */
 /**
- * How many companies an email section shows at all.
+ * The mail is a US list.
  *
- * The dashboard caps a section at 25 because scrolling a page is cheap, but the
- * same 25 in an inbox is a document — the last send ran to 2,600 words. Eight
- * is a section somebody reads to the end, and the count in the heading still
- * says how many cleared the bar, with the rest one link away.
+ * EDB attracts investment INTO Singapore from American companies, so a Japanese
+ * or European firm is context rather than something to act on this week — and
+ * on the last run they were more than half of what went out, which is a lot of
+ * an RD's attention spent on companies nobody was going to call. They stay on
+ * the dashboard, under their own geography tab.
  */
-const EMAIL_SECTION_CAP = 8;
+const isUs = (c: DashboardCompany) => c.geography === 'west_coast' || c.geography === 'other_us';
 
 function sectionBlock(
   title: string, list: DashboardCompany[], appBaseUrl: string,
 ): string {
+  list = list.filter(isUs);
   if (!list.length) return '';
   const total = list.length;
-  list = list.slice(0, EMAIL_SECTION_CAP);
   const cards = list.map((c, i) => {
     const d = detailFor(i);
     return d === 'full' ? fullCard(c, appBaseUrl) : briefCard(c, appBaseUrl, d === 'brief');
   }).join('');
 
-  const more = total > list.length ? `
-      <tr>
-        <td style="${SANS} font-size:13px; line-height:20px; color:${C.weak}; padding:12px 0 4px 0;">
-          ${total - list.length} more cleared the same bar &mdash;
-          <a href="${esc(appBaseUrl)}" style="color:${C.primary}; text-decoration:underline;">open the dashboard</a>.
-        </td>
-      </tr>` : '';
+  const more = '';
 
   return `
       <tr>
@@ -443,18 +446,13 @@ export function renderDigestText(d: WeeklyDigest, appBaseUrl: string): string {
         const a = c.assessment;
         out.push(`    Priority ${a.priority} · SG fit ${a.sgFit} · Value ${c.potentialValue.band} · Confidence ${c.potentialValue.confidence}`);
         if (c.whyNow.length) {
-          out.push('    Why now:');
-          for (const w of c.whyNow.slice(0, 4)) out.push(`      - ${w.text}`);
+          out.push(`    Why now: ${c.whyNow[0]!.text}`);
         }
-        if (c.offer) {
-          out.push(`    Singapore could offer: ${c.offer.title}`);
-          if (c.offer.precedent) out.push(`      Precedent: ${c.offer.precedent}`);
-          if (c.offer.caveat) out.push(`      Caveat: ${c.offer.caveat}`);
-        }
+        // The offer is on the page, not here — see the note in the html card.
         if (c.possiblePathSummary) {
           out.push(`    Possible path: ${c.possiblePathSummary}`);
         } else if (c.contacts.length) {
-          out.push(`    Who to approach (no connection found, so ${c.name} directly):`);
+          out.push(`    Who to approach:`);
           for (const p of c.contacts) {
             out.push(`      - ${p.name}${p.title ? ` · ${p.title}` : ''}${p.email ? ` · ${p.email}` : p.profileUrl ? ` · ${p.profileUrl}` : ''}`);
           }
