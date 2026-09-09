@@ -129,8 +129,14 @@ export default async function Dashboard({
           worse than a card partly covered. The page keeps its full width in
           both states. */}
       <Sidebar counts={sidebarCounts} />
-      <main className="mx-auto max-w-[1400px] px-6 py-10 pl-16 sm:px-12 sm:py-14 sm:pl-20 lg:px-16 lg:pl-24">
-      <header className="mb-12 space-y-1">
+      {/* The rail is 48px and fixed, so the page reserves exactly that plus its
+          own gutter — pl-24 reserved 96px, which left a gap on the left that
+          matched nothing and made the header look inset from a margin that was
+          not there. Expanding the sidebar overlays rather than reflows, by
+          design: a card that moves as you reach for it is worse than one
+          briefly covered. */}
+      <main className="mx-auto max-w-[1400px] py-10 pl-[4.5rem] pr-6 sm:py-14 sm:pl-20 sm:pr-12 lg:pr-16">
+      <header className="mb-12 max-w-[68ch] space-y-1">
         <h1 className="flex items-center gap-2.5 font-display text-3xl font-semibold tracking-tight">
           {/* A sun, drawn rather than an icon-font glyph: a bare circle with
               eight rays, at the weight of the text beside it. */}
@@ -175,7 +181,7 @@ export default async function Dashboard({
             week" mixes all-time with weekly and invites the reader to divide
             one by the other. The week is what the page is about, so it leads;
             the standing totals are context and take a quieter line. */}
-        <dl className="flex flex-wrap items-baseline gap-x-8 gap-y-2 pt-4">
+        <dl className="flex flex-wrap items-baseline gap-x-8 gap-y-2 pt-5">
           {[
             { n: d.coverageStats.readThisWeek, label: "articles read", Icon: Radio },
             { n: d.coverageStats.scoredThisWeek, label: "companies scored", Icon: Building2 },
@@ -193,7 +199,10 @@ export default async function Dashboard({
             </div>
           ))}
         </dl>
-        <p className="pt-1.5 text-2xs text-muted-foreground/70">
+        {/* All-time totals ride on the same rule as the week's numbers rather
+            than starting a third line. They are context for the row above, and
+            a separate line gave them a weight they do not carry. */}
+        <p className="mt-3 border-t border-border pt-2.5 text-2xs text-muted-foreground/70">
           <span className="num">{d.coverageStats.monitored.toLocaleString()}</span> companies tracked
           {' · '}
           <span className="num">{d.coverageStats.processed.toLocaleString()}</span> articles filtered
