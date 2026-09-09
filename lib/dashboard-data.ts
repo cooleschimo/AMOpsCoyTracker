@@ -15,6 +15,7 @@ import { planDigest, coverageLine, type PlacementInput, type Placed } from './pl
 import { assembleWhyNow, type WhyNowInput } from './why-now';
 import { candidateProps } from './proposition';
 import { sectorBroadSector, isBroadSector, isSurfaceable } from './subsectors';
+import { isUsState } from './scope';
 import type { Band } from './company-rubric';
 import type { Familiarity } from './familiarity';
 import { EXPORT_CONTROLLED } from './subsectors';
@@ -303,7 +304,7 @@ function toCompany(
    * companies under "rest of US", which is not how anyone reads that list.
    */
   geography: (typeof r.hq_region === 'string' && r.hq_region !== 'other_us' ? 'west_coast'
-    : typeof r.hq_state === 'string' && /^[A-Z]{2}$/.test(r.hq_state) ? 'other_us'
+    : isUsState(r.hq_state) ? 'other_us'
     : 'non_us') as 'west_coast' | 'other_us' | 'non_us',
     fundingTotal: money(r.total_raised),
     headcount: r.headcount_est ? String(r.headcount_est) : 'Unknown',
@@ -447,6 +448,31 @@ function toCompany(
  * Every scored item for the companies in `rows`, so a why-now point can cite the
  * item it came from rather than the one the company leads with.
  */
+/**
+ * What counts as newly arrived, in SQL.
+ *
+ * The PUBLISHED date, not the fetch date. A story published nine days ago that
+ * today's pull happened to reach is not news to the reader — and today's run
+ * brought in items back to 30 August, so a fetch-based rule marks those as
+ * new every time a feed surfaces something old.
+ *
+ * The window reaches back to the last run rather than to midnight, because the
+ * run is what the mark is really about: everything published since the reader
+ * last had a chance to see it. Monday's pull therefore covers Saturday and
+ * Sunday, which a same-day rule would silently drop — and a weekend's news is
+ * the case where this matters most.
+ *
+ * Three days is the reach. It covers a normal weekend plus a missed run without
+ * marking a week-old story as new. An item with no published date falls back to
+ * when it was fetched, since that is the only date it has.
+ */
+const NEW_SINCE_DAYS = 3;
+
+const arrivedRecently = (col: string) => `
+  coalesce(${col}.published_at, ${col}.fetched_at)
+    >= (date_trunc('day', now() at time zone 'America/Los_Angeles')
+        at time zone 'America/Los_Angeles') - interval '${NEW_SINCE_DAYS} days'`;
+
 async function whyNowContext(
   rows: Row[],
   signalVersion: string,
@@ -480,7 +506,7 @@ async function whyNowContext(
   if (citedIds.length) {
     const cited: any = await sql`
       select id as item_id, source, url, source_type, published_at,
-             (fetched_at >= (date_trunc('day', now() at time zone 'America/Los_Angeles') at time zone 'America/Los_Angeles')) as fetched_today
+             ${sql.unsafe(arrivedRecently('items'))} as fetched_today
       from items where id = any(${citedIds})`;
     for (const row of cited as Row[]) {
       if (row.fetched_today) fetchedToday.add(Number(row.item_id));
@@ -496,7 +522,7 @@ async function whyNowContext(
   const others: any = await sql`
     select cs.company_id, cs.why, i.id as item_id, i.source, i.url,
            i.source_type, i.published_at,
-           (i.fetched_at >= (date_trunc('day', now() at time zone 'America/Los_Angeles') at time zone 'America/Los_Angeles')) as fetched_today
+           ${sql.unsafe(arrivedRecently('i'))} as fetched_today
     from company_signals cs
     join items i on i.id = cs.representative_item_id
     where cs.signal_version = ${signalVersion}
@@ -508,7 +534,7 @@ async function whyNowContext(
   const scored: any = await sql`
     select ic.company_id, s.why, i.id as item_id, i.source, i.url,
            i.source_type, i.published_at,
-           (i.fetched_at >= (date_trunc('day', now() at time zone 'America/Los_Angeles') at time zone 'America/Los_Angeles')) as fetched_today
+           ${sql.unsafe(arrivedRecently('i'))} as fetched_today
     from scores s
     join items i on i.id = s.item_id
     join item_companies ic on ic.item_id = i.id
@@ -659,9 +685,9 @@ const toPlacementInput = (r: Row): PlacementInput => ({
   roundStage: (r.round_stage as string | null) ?? null,
   valuationUsd: r.valuation_est != null ? Number(r.valuation_est) : null,
   roundAmountMusd: r.round_amount_musd != null ? Number(r.round_amount_musd) : null,
-  // A two-letter tail is a US state; anything else is the country, which is
+  // A US state code means the US; anything else is the country itself, which is
   // what marks a Singapore company as not a target.
-  hqCountry: typeof r.hq_state === 'string' && /^[A-Z]{2}$/.test(r.hq_state)
+  hqCountry: isUsState(r.hq_state)
     ? 'United States' : (r.hq_state as string | null) ?? null,
   hqCity: (r.hq_city as string | null) ?? null,
   title: (r.title as string | null) ?? null,
