@@ -11,8 +11,11 @@
  *   irrelevant_company -> entity resolution, or the company rubric
  *   too_early          -> timing weights in the rubric
  *   no_sg_angle        -> the item rubric
- *   already_tracked    -> updates familiarity, which the tool cannot know
  * Without a reason a dismissal is just a lost item.
+ *
+ * Being known to EDB is not among them. That is a fact about the company, not
+ * a fault in the item, and it is recorded by marking the company known — which
+ * moves its news to `who_we_know` rather than throwing it away.
  */
 import { cookies } from 'next/headers';
 import { randomUUID } from 'node:crypto';
@@ -56,17 +59,6 @@ export async function recordDisposition(formData: FormData) {
 
   // ---- Immediate data correction, no ML (RATIONALE §12 loop 1) ----------
 
-  // "Already tracked" is knowledge the tool cannot derive: EDB's own account
-  // history. Record it with its provenance rather than inferring it.
-  if (companyId && reasons.includes('already_tracked')) {
-    await withRetry(() => db.update(companies).set({
-      // 'known' is the value the vocabulary actually carries; the enum has no
-      // 'existing_account', so writing one put a value here nothing reads.
-      familiarity: 'known',
-      familiaritySource: 'rd_review',
-      familiarityReviewedAt: new Date(),
-    }).where(eq(companies.id, companyId)));
-  }
 
   // "Draft an email" opens an opportunity. Owner, next action and due date are
   // optional at creation (§11): demanding a due date before a first internal

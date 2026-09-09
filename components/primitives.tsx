@@ -65,14 +65,12 @@ export const dismissReasonLabel: Record<DismissReason, string> = {
   irrelevant_company: "Irrelevant company",
   too_early: "Too early",
   no_sg_angle: "No Singapore angle",
-  already_tracked: "Already tracked",
 };
 
 export const dismissReasonFeedback: Record<DismissReason, string> = {
   irrelevant_company: "dismissals for 'irrelevant company' tune the company assessment axis",
   too_early: "dismissals for 'too early' tune the stage threshold, not the relevance rubric",
   no_sg_angle: "dismissals for 'no Singapore angle' tune the scoring rubric",
-  already_tracked: "dismissals for 'already tracked' tune deduplication against the account list",
 };
 
 export const pathKindLabel: Record<PathKind, string> = {

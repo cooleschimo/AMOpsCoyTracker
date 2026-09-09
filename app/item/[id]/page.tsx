@@ -210,6 +210,13 @@ export default async function ItemPage(
               <input type="checkbox" name={`reason_${r}`} /> {REASON_LABELS[r]}
             </label>
           ))}
+          {/* Being known to EDB is not a fault in the item, so it is not here.
+              A company already in hand doing something new is worth more, not
+              less, and marking it known moves its news to Who we know. */}
+          <p className={META}>
+            Already known to EDB? That is not a reason to dismiss — mark the company on{' '}
+            <a href="/admin/accounts" className={LINK}>accounts</a> and its news moves to Who we know.
+          </p>
           <p className="mt-2.5">
             <textarea name="note" rows={2} placeholder="Anything worth recording (optional)"
               className="w-full rounded-md border border-input bg-card p-2 font-sans text-2xs" />

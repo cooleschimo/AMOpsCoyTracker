@@ -16,9 +16,14 @@
  *   irrelevant_company -> entity resolution, or the company rubric
  *   too_early          -> timing weights in the rubric
  *   no_sg_angle        -> the item rubric
- *   already_tracked    -> account status, which the tool cannot know on its own
  * Anything that does not route to a fix belongs in `note`, which is why the
  * list is short.
+ *
+ * 'already_tracked' was a fourth, and is not a reason to dismiss: it describes
+ * the COMPANY rather than the item, and a company EDB is already working with
+ * doing something new is more interesting than one it is not. Marking the
+ * company known is the action; `who_we_know` is where its news then surfaces,
+ * which is the section that exists for exactly this.
  */
 export const DISPOSITIONS = ['draft_email', 'monitor', 'dismiss'] as const;
 export type Disposition = (typeof DISPOSITIONS)[number];
@@ -30,7 +35,7 @@ export const DISPOSITION_LABELS: Record<Disposition, string> = {
 };
 
 export const REASONS = [
-  'irrelevant_company', 'too_early', 'no_sg_angle', 'already_tracked',
+  'irrelevant_company', 'too_early', 'no_sg_angle',
 ] as const;
 export type Reason = (typeof REASONS)[number];
 
@@ -38,5 +43,4 @@ export const REASON_LABELS: Record<Reason, string> = {
   irrelevant_company: 'Irrelevant company',
   too_early: 'Too early',
   no_sg_angle: 'No Singapore angle',
-  already_tracked: 'Already tracked',
 };
