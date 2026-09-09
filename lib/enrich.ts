@@ -164,7 +164,19 @@ export async function tryDomain(domain: string, companyName: string): Promise<Si
    */
   const singleToken = tokens.length === 1;
   const stem = domain.replace(/\.[a-z.]+$/, '').replace(/[^a-z0-9]/g, '');
-  const stemIsName = stem === tokens.join('');
+  const word = tokens.join('');
+  /*
+   * The name must OPEN the stem, not merely equal it. A one-word company very
+   * often owns a compound of its own name — aslanprotects.com and
+   * aslandefense.com are both Aslan's — and demanding equality threw those away
+   * while leaving the bare aslan.ai, which belongs to someone else entirely.
+   *
+   * Anchored at the start, because that is what separates a company's own
+   * compound from an unrelated one that happens to contain the word:
+   * cooperleebombardier.com is not Bombardier. The same asymmetry as everywhere
+   * else here — the model still has to agree the business matches.
+   */
+  const stemIsName = stem === word || stem.startsWith(word);
   const verified = singleToken ? stemIsName : (allPresent || contiguous);
 
   // A verified name match still leaves two cases the caller has to tell apart:

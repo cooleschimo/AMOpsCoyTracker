@@ -179,14 +179,29 @@ export async function findCompanyWebsiteWithContext(
   const bare = companyName
     .replace(/,?\s+(inc|incorporated|llc|l\.l\.c|ltd|limited|corp|corporation|co|pbc|plc|lp|llp)\.?$/i, '')
     .trim();
-  // Sector ids are snake_case in the database and prose in a search index.
-  const context = knownFor.replace(/[_-]+/g, ' ').split(/\s+/).slice(0, 12).join(' ').trim();
+  /*
+   * A SHORT query, in the words a company would use about itself.
+   *
+   * Sector ids are snake_case and repeat their family — 'defence_software
+   * ai_software' expands to "defence software ai software", which says
+   * "software" twice and matches nothing a company writes on its own homepage.
+   * Searching "Aslan defence" finds aslanprotects.com; adding that jargon loses
+   * it entirely, because every extra term is another thing the ranker has to
+   * satisfy.
+   *
+   * So the ids are split, deduped and cut to two or three words, and the query
+   * stops there. "company official website" was three more terms that pulled in
+   * directories and social pages rather than the company.
+   */
+  const context = Array.from(
+    new Set(knownFor.toLowerCase().replace(/[_-]+/g, ' ').split(/\s+/).filter(Boolean)),
+  ).slice(0, 3).join(' ').trim();
   if (!context) return [];
 
   // The provider chain (Serper = Google), not webSearch's own endpoint: this
   // query leans on ranking quality, and the plain-name search that already
   // failed is the one webSearch serves.
-  const hits = await search(`${bare} ${context} company official website`, { maxResults: 8 });
+  const hits = await search(`${bare} ${context}`, { maxResults: 8 });
   const out: Array<{ host: string; why: string }> = [];
   const seen = new Set<string>();
   for (const h of hits) {
