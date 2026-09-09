@@ -11,7 +11,7 @@
  */
 import { getSql } from './db';
 import { COMPANY_SIGNAL_VERSION } from './company-signal';
-import { planDigest, coverageLine, type PlacementInput, type Placed } from './placement';
+import { planDigest, coverageLine, QUALIFY, type PlacementInput, type Placed } from './placement';
 import { assembleWhyNow, type WhyNowInput } from './why-now';
 import { candidateProps } from './proposition';
 import { sectorBroadSector, isBroadSector, isSurfaceable } from './subsectors';
@@ -718,7 +718,7 @@ export type WeeklyDigest = {
   /** The same three numbers as `coverage`, for a stat row rather than a sentence. */
   coverageStats: {
     /** Standing totals, since the tool started. */
-    monitored: number; processed: number;
+    monitored: number; processed: number; everSurfaced: number;
     /** This week only. */
     surfaced: number; readThisWeek: number; scoredThisWeek: number;
   };
@@ -789,6 +789,22 @@ export async function getWeeklyDigest(
     select count(*)::int as companies from companies c
     where coalesce(c.discovered_via, '') <> 'portfolio'
       and coalesce(c.scope_status, 'unknown') <> 'out_of_scope'`;
+  /*
+   * Distinct companies ever surfaced, not a sum of weekly counts. A company
+   * that qualifies three weeks running is one company an RD could have been
+   * told about, and adding the weeks up would claim three.
+   *
+   * The bar is QUALIFY, the same threshold that admits a company to a discovery
+   * section. Replaying the full placement over history is not possible — it
+   * reads assessments as they stand now, not as they stood then — but the
+   * trigger bar is what decides whether a company reached the page at all.
+   */
+  const [{ ever_surfaced: everSurfaced = 0 } = {}]: any = await sql`
+    select count(distinct company_id)::int as ever_surfaced
+    from company_signals
+    where greatest(expansion, partnership) >= ${QUALIFY.minTopAxis}
+      and momentum >= ${QUALIFY.minMomentum}`;
+
   const [{ signals = 0 } = {}]: any =
     await sql`select count(*)::int as signals from items where status <> 'fetched'`;
   /*
@@ -827,6 +843,7 @@ export async function getWeeklyDigest(
     coverageStats: {
       monitored: Number(companies),
       processed: Number(signals),
+      everSurfaced: Number(everSurfaced),
       surfaced: worthAConversation.length + newOnTheRadar.length,
       readThisWeek: Number(read),
       scoredThisWeek: Number(scored),
@@ -1165,5 +1182,37 @@ export async function getCompanyPaths(companyId: number): Promise<PathRow[]> {
       p.viaPersonId ? `p${p.viaPersonId}` : p.viaOrgId ? `o${p.viaOrgId}` : null,
       p.targetCompanyId ? `c${p.targetCompanyId}` : null,
     ].filter((x): x is string => x !== null),
+  }));
+}
+
+/**
+ * Every company that has ever cleared the trigger bar, newest first.
+ *
+ * The dashboard says how many; this is the list behind that number. Deduped by
+ * company — a company that qualified in three separate weeks is one entry, with
+ * the week it was last seen.
+ */
+export async function everSurfacedCompanies(): Promise<Array<{
+  id: number; name: string; sectors: string[]; hq: string;
+  lastWeek: string; weeks: number;
+}>> {
+  const sql = getSql();
+  const rows: any = await sql`
+    select c.id, c.name, c.sectors, c.hq_city, c.hq_state,
+           max(cs.week_of) as last_week,
+           count(distinct cs.week_of)::int as weeks
+    from company_signals cs
+    join companies c on c.id = cs.company_id
+    where greatest(cs.expansion, cs.partnership) >= ${QUALIFY.minTopAxis}
+      and cs.momentum >= ${QUALIFY.minMomentum}
+    group by c.id, c.name, c.sectors, c.hq_city, c.hq_state
+    order by max(cs.week_of) desc, c.name`;
+  return (rows as Row[]).map((r) => ({
+    id: Number(r.id),
+    name: String(r.name ?? ''),
+    sectors: Array.isArray(r.sectors) ? (r.sectors as string[]) : [],
+    hq: [r.hq_city, r.hq_state].filter(Boolean).join(', ') || 'Unknown',
+    lastWeek: asDate(r.last_week),
+    weeks: Number(r.weeks ?? 1),
   }));
 }

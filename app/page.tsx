@@ -156,24 +156,40 @@ export default async function Dashboard({
           </>
         }
         summary={
-          <dl className="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
-            {/* Numbers first, label after, on one baseline. The icons that led
-                each stat were three more shapes competing with the filter pills
-                on the same row for a reader's attention. */}
+          <dl className="flex flex-wrap items-baseline gap-x-6 gap-y-1.5 text-sm">
+            {/*
+              * The all-time figure sits inline after its own stat, not stacked
+              * under it and not gathered into a separate line below the row.
+              * Each measure reads as one phrase — "27 surfaced of 224 ever" —
+              * so the week's number and the standing one are compared where
+              * they are read, on a single baseline.
+              */}
             {[
-              { n: d.coverageStats.readThisWeek, label: 'articles read' },
-              { n: d.coverageStats.scoredThisWeek, label: 'companies scored' },
-              { n: d.coverageStats.surfaced, label: 'surfaced' },
-            ].map(({ n, label }) => (
+              { n: d.coverageStats.readThisWeek, label: 'articles read',
+                all: d.coverageStats.processed, allLabel: 'filtered' },
+              { n: d.coverageStats.scoredThisWeek, label: 'companies scored',
+                all: d.coverageStats.monitored, allLabel: 'tracked' },
+              { n: d.coverageStats.surfaced, label: 'surfaced',
+                all: d.coverageStats.everSurfaced, allLabel: 'ever', href: '/surfaced' },
+            ].map(({ n, label, all, allLabel, href }) => (
               <div key={label} className="flex items-baseline gap-1.5">
                 <dt className="sr-only">{label} this week</dt>
                 <dd className="num font-semibold">{n.toLocaleString()}</dd>
                 <span className="text-xs text-muted-foreground">{label}</span>
+                <span className="text-2xs text-muted-foreground/50">
+                  of{' '}
+                  {href ? (
+                    <Link href={href} className="link-underline hover:text-foreground">
+                      <span className="num">{all.toLocaleString()}</span> {allLabel}
+                    </Link>
+                  ) : (
+                    <>
+                      <span className="num">{all.toLocaleString()}</span> {allLabel}
+                    </>
+                  )}
+                </span>
               </div>
             ))}
-            <span className="text-2xs text-muted-foreground/60">
-              of <span className="num">{d.coverageStats.monitored.toLocaleString()}</span> tracked
-            </span>
           </dl>
         }
       />
