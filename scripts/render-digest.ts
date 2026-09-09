@@ -17,6 +17,7 @@ import { digests, runs } from '../lib/schema';
 import { COMPANY_SIGNAL_VERSION } from '../lib/company-signal';
 import { planDigest, coverageLine, type PlacementInput } from '../lib/placement';
 import { renderHtml, renderText, type RenderRow } from '../lib/digest-render';
+import { dismissalFilter } from '../lib/dashboard-data';
 import { assembleWhyNow, hasCoOccurrence, type WhyNowInput } from '../lib/why-now';
 import { env } from '../lib/env';
 import type { Band } from '../lib/company-rubric';
@@ -56,7 +57,7 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
    * the conversation with. A company scored without one is held back, since
    * presence in the digest requires something to point at.
    */
-  const rows: any = await sqlc`
+  let rows: any = await sqlc`
     select
       cs.company_id, c.name as company_name, c.familiarity, c.sectors,
       cs.expansion, cs.momentum, cs.partnership, cs.signal_type,
@@ -90,6 +91,13 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
     console.log(`No company signals at '${signalVersion}'. Run score-companies first.`);
     return;
   }
+
+  // A company dismissed on the dashboard does not arrive in the week's email.
+  // The rule lives in dashboard-data so the two cannot disagree about it.
+  const keep = await dismissalFilter();
+  const before = rows.length;
+  rows = (rows as any[]).filter((r: any) => keep(Number(r.company_id), r.published_at));
+  if (rows.length < before) console.log(`  ${before - rows.length} dismissed by an RD, left out`);
 
   const input: PlacementInput[] = rows.map((r: any) => ({
     itemId: r.item_id,

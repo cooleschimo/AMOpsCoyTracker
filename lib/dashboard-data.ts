@@ -145,11 +145,19 @@ const band = (v: unknown): Band =>
 const asDate = (d: unknown): string =>
   d instanceof Date ? d.toISOString().slice(0, 10) : typeof d === 'string' ? d.slice(0, 10) : '';
 
-/** Amounts are stored in dollars. Render at the scale a reader thinks in. */
+/**
+ * Takes dollars. Renders at the scale a reader thinks in.
+ *
+ * Callers hold millions — total_raised and valuation_est both — so they scale
+ * up before calling rather than this guessing which unit it was handed.
+ */
 const money = (n: unknown): string => {
   if (n === null || n === undefined) return 'Unknown';
   const v = Number(n);
   if (!Number.isFinite(v) || v <= 0) return 'Unknown';
+  // A market cap runs to trillions, and "$1454B" is a number a reader has to
+  // convert themselves.
+  if (v >= 1e12) return `$${(v / 1e12).toFixed(2)}T`;
   if (v >= 1e9) return `$${(v / 1e9).toFixed(v >= 1e10 ? 0 : 2)}B`;
   if (v >= 1e6) return `$${Math.round(v / 1e6)}M`;
   if (v >= 1e3) return `$${Math.round(v / 1e3)}K`;
@@ -307,7 +315,9 @@ function toCompany(
   geography: (typeof r.hq_region === 'string' && r.hq_region !== 'other_us' ? 'west_coast'
     : isUsState(r.hq_state) ? 'other_us'
     : 'non_us') as 'west_coast' | 'other_us' | 'non_us',
-    fundingTotal: money(r.total_raised),
+    // Millions, like valuation_est below, so it is scaled before money(), which
+    // formats dollars.
+    fundingTotal: r.total_raised != null ? money(Number(r.total_raised) * 1e6) : 'Unknown',
     headcount: r.headcount_est ? String(r.headcount_est) : 'Unknown',
     founded: r.founded_year ? Number(r.founded_year) : null,
     lastRound: (() => {
@@ -688,9 +698,68 @@ async function signalRows(signalVersion: string, weekOf?: string): Promise<Row[]
   const hidden: any = await sql`
     select company_id from company_reviews
     where hide_from_dashboard = true and resolved_at is null`;
-  if (!hidden.length) return surfaceable;
-  const hide = new Set(hidden.map((h: any) => Number(h.company_id)));
-  return surfaceable.filter((r) => !hide.has(Number(r.company_id)));
+  const hide = new Set<number>(hidden.map((h: any) => Number(h.company_id)));
+
+  const dismissal = await dismissalFilter();
+  return surfaceable.filter(
+    (r) => !hide.has(Number(r.company_id))
+      && dismissal(Number(r.company_id), r.published_at as string | Date | null),
+  );
+}
+
+/**
+ * Companies an RD has dismissed, as a predicate over (company, signal date).
+ *
+ * A dismissal was written down and never read, so the same company cleared the
+ * same bar the following week and came back — the reader's judgment survived in
+ * the table and not on the page.
+ *
+ * What a dismissal means depends on the reason it carries, and the two kinds
+ * cannot be suppressed alike:
+ *
+ *  - 'irrelevant_company' and 'no_sg_angle' are verdicts about the company.
+ *    Nothing it does next week changes them, so they hold until someone
+ *    revisits the row.
+ *  - 'too_early' and 'already_tracked' are about the moment. A company
+ *    dismissed as too early is exactly the one worth showing when it raises a
+ *    larger round, so these hold only against the news already seen: a signal
+ *    published after the dismissal surfaces the company again.
+ *
+ * A dismissal carrying no reason is read as being about the moment, that being
+ * the weaker of the two claims.
+ *
+ * Shared by the dashboard and the digest, which build their rows from separate
+ * queries: a company dismissed on the page would otherwise still arrive in the
+ * week's email.
+ */
+export async function dismissalFilter(): Promise<
+  (companyId: number, publishedAt: string | Date | null) => boolean
+> {
+  const sql = getSql();
+  const rows: any = await sql`
+    select company_id, reasons, created_at from dispositions
+    where disposition = 'dismiss' and company_id is not null`;
+
+  const ABOUT_THE_COMPANY = ['irrelevant_company', 'no_sg_angle'];
+  const forever = new Set<number>();
+  const until = new Map<number, Date>();
+  for (const d of rows) {
+    const id = Number(d.company_id);
+    const reasons: string[] = Array.isArray(d.reasons) ? d.reasons : [];
+    if (reasons.some((x) => ABOUT_THE_COMPANY.includes(x))) { forever.add(id); continue; }
+    const at = new Date(d.created_at as string);
+    const prev = until.get(id);
+    if (!prev || at > prev) until.set(id, at);
+  }
+
+  return (companyId, publishedAt) => {
+    if (forever.has(companyId)) return false;
+    const cutoff = until.get(companyId);
+    if (!cutoff) return true;
+    // News newer than the dismissal is a new reason to look.
+    const published = publishedAt ? new Date(publishedAt as string) : null;
+    return published !== null && published > cutoff;
+  };
 }
 
 const toPlacementInput = (r: Row): PlacementInput => ({
