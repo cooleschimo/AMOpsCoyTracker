@@ -452,12 +452,6 @@
     0 4px 24px -12px oklch(0.4 0.02 200 / 0.45);
 }
 
-@supports (background: color-mix(in oklch, red 1%, blue)) {
-  .glass-bar {
-    background-color: color-mix(in oklch, var(--color-primary) 6%, oklch(1 0 0 / 0.82));
-  }
-}
-
 /* Dark mode inverts what the highlight is doing: a white edge on a dark
    surface reads as a scratch, so the light comes from the tint instead. */
 .dark .glass-bar {
@@ -466,12 +460,6 @@
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 0.08),
     0 4px 24px -12px oklch(0 0 0 / 0.6);
-}
-
-@supports (background: color-mix(in oklch, red 1%, blue)) {
-  .dark .glass-bar {
-    background-color: color-mix(in oklch, var(--color-primary) 8%, oklch(0.3 0 0 / 0.78));
-  }
 }
 
 
