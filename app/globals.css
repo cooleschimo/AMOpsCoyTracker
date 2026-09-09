@@ -437,38 +437,44 @@
  * makes the surface read as glass rather than as fog.
  */
 .glass-bar {
-  /* A literal first, because the fallback a compiler writes for color-mix is
-     the first colour at full strength — a solid teal bar on any engine that
-     cannot mix. These are the mixed values resolved by hand. */
-  background-color: oklch(0.963 0.009 195);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  border-bottom-color: oklch(0.79 0.021 195);
-  /* A single hairline of light along the top inside edge, the way a pane of
-     glass catches it. Kept under the border so the two do not compete. */
-  box-shadow:
-    inset 0 1px 0 color-mix(in oklch, white 55%, transparent),
-    0 1px 12px -6px color-mix(in oklch, var(--color-primary) 35%, transparent);
+  /* Mostly transparent, so the blur is what you see rather than a fill.
+     A near-opaque tint reads as pale coloured paper; glass is the layer
+     underneath still being legible through it.
+
+     The tint is desaturated on purpose — a teal at full chroma over white
+     goes pastel. Pulling the chroma down to 0.006 and the lightness under
+     the page's 0.982 leaves a cool grey-green that reads as a material
+     rather than as a colour choice.
+
+     A literal first: the fallback a compiler writes for color-mix is its
+     first argument at full strength, which would be a solid teal bar on any
+     engine that cannot mix. */
+  background-color: oklch(0.95 0.006 200 / 0.62);
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  /* The blur separates the bar from what runs under it, so the edge only has
+     to finish it. A border dark enough to read as a rule made a boxed panel. */
+  border-bottom-color: oklch(0.88 0.008 200 / 0.7);
+  box-shadow: 0 1px 10px -9px oklch(0.5 0.02 200 / 0.5);
 }
 
 @supports (background: color-mix(in oklch, red 1%, blue)) {
   .glass-bar {
-    background-color: color-mix(in oklch, var(--color-primary) 7%, var(--color-background) 88%);
-    border-bottom-color: color-mix(in oklch, var(--color-primary) 22%, var(--color-border));
+    background-color: color-mix(in oklch, var(--color-primary) 5%, oklch(0.95 0 0 / 0.62));
+    border-bottom-color: color-mix(in oklch, var(--color-primary) 14%, oklch(0.88 0 0 / 0.7));
   }
 }
 
 /* Dark mode inverts what the highlight is doing: a white edge on a dark
    surface reads as a scratch, so the light comes from the tint instead. */
 .dark .glass-bar {
-  background-color: oklch(0.225 0.011 195);
-  box-shadow:
-    inset 0 1px 0 color-mix(in oklch, var(--color-primary) 25%, transparent),
-    0 1px 14px -6px color-mix(in oklch, black 60%, transparent);
+  background-color: oklch(0.2 0.008 200 / 0.62);
+  border-bottom-color: oklch(0.34 0.01 200 / 0.6);
+  box-shadow: 0 1px 12px -9px oklch(0 0 0 / 0.55);
 }
 
 @supports (background: color-mix(in oklch, red 1%, blue)) {
   .dark .glass-bar {
-    background-color: color-mix(in oklch, var(--color-primary) 10%, var(--color-background) 85%);
+    background-color: color-mix(in oklch, var(--color-primary) 7%, oklch(0.2 0 0 / 0.62));
   }
 }
