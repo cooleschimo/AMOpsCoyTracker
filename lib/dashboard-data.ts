@@ -480,7 +480,7 @@ async function whyNowContext(
   if (citedIds.length) {
     const cited: any = await sql`
       select id as item_id, source, url, source_type, published_at,
-             (fetched_at >= date_trunc('day', now())) as fetched_today
+             (fetched_at >= (date_trunc('day', now() at time zone 'America/Los_Angeles') at time zone 'America/Los_Angeles')) as fetched_today
       from items where id = any(${citedIds})`;
     for (const row of cited as Row[]) {
       if (row.fetched_today) fetchedToday.add(Number(row.item_id));
@@ -496,7 +496,7 @@ async function whyNowContext(
   const others: any = await sql`
     select cs.company_id, cs.why, i.id as item_id, i.source, i.url,
            i.source_type, i.published_at,
-           (i.fetched_at >= date_trunc('day', now())) as fetched_today
+           (i.fetched_at >= (date_trunc('day', now() at time zone 'America/Los_Angeles') at time zone 'America/Los_Angeles')) as fetched_today
     from company_signals cs
     join items i on i.id = cs.representative_item_id
     where cs.signal_version = ${signalVersion}
@@ -508,7 +508,7 @@ async function whyNowContext(
   const scored: any = await sql`
     select ic.company_id, s.why, i.id as item_id, i.source, i.url,
            i.source_type, i.published_at,
-           (i.fetched_at >= date_trunc('day', now())) as fetched_today
+           (i.fetched_at >= (date_trunc('day', now() at time zone 'America/Los_Angeles') at time zone 'America/Los_Angeles')) as fetched_today
     from scores s
     join items i on i.id = s.item_id
     join item_companies ic on ic.item_id = i.id
