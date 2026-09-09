@@ -49,6 +49,25 @@ export function CompanyHeading({ company, note }: { company: Company; note?: str
   );
 }
 
+/**
+ * What the company does, under its name.
+ *
+ * A reader scanning the week meets most of these companies for the first time,
+ * and until now the card answered what JUST HAPPENED without ever saying what
+ * the company IS — leaving them to infer it from a headline and a sector tag.
+ *
+ * Absent for a company whose evidence was about the wrong entity, which is
+ * common enough to design for: the line is generated from scraped search text,
+ * and scripts/write-one-liners.ts returns nothing rather than guess. So this
+ * renders only when there is something to say.
+ */
+function OneLiner({ text }: { text: string }) {
+  if (!text.trim()) return null;
+  return (
+    <p className="measure mt-1 text-sm leading-snug text-muted-foreground">{text}</p>
+  );
+}
+
 export function CompanyCase({
   company,
   note,
@@ -103,6 +122,7 @@ export function CompanyCase({
         </div>
         <div>
           <CompanyHeading company={company} note={note} />
+          <OneLiner text={company.oneLiner} />
           <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <a
               href={company.trigger.source.url}

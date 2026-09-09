@@ -290,7 +290,7 @@ function toCompany(
     // honest fallback for a company nothing has classified.
     sector: sectors[0] ?? 'other',
     sectors,
-    oneLiner: String(r.description ?? ''),
+    oneLiner: String(r.one_liner ?? ''),
     hq: [r.hq_city, r.hq_state].filter(Boolean).join(', ') || 'Unknown',
   hqSource: (r.hq_source as string | null) ?? null,
   /**
@@ -323,7 +323,9 @@ function toCompany(
     })(),
     valuation: r.valuation_est
       ? {
-          value: money(r.valuation_est),
+          // Stored in millions USD, like round_amount_musd and for the same
+          // reason, so it is scaled before money(), which expects dollars.
+          value: money(Number(r.valuation_est) * 1e6),
           source: {
             name: String(r.valuation_source ?? 'Reported'),
             url: '',
@@ -600,7 +602,7 @@ async function signalRows(signalVersion: string, weekOf?: string): Promise<Row[]
   const rows: any = await sql`
     select
       cs.company_id, c.name as company_name, c.familiarity, c.sectors,
-      c.description, c.hq_city, c.hq_state, c.hq_region, c.total_raised, c.headcount_est,
+      c.description, c.one_liner, c.hq_city, c.hq_state, c.hq_region, c.total_raised, c.headcount_est,
       c.founded_year, c.hq_source, c.round_date, c.round_stage, c.round_amount_musd, c.valuation_est, c.valuation_source,
       cs.expansion, cs.momentum, cs.partnership, cs.signal_type,
       cs.expansion_language, cs.why, cs.why_item_ids, cs.week_of,
@@ -706,7 +708,9 @@ const toPlacementInput = (r: Row): PlacementInput => ({
   publishedAt: r.published_at ? new Date(r.published_at as string) : null,
   clusterSize: Number(r.cluster_size ?? 0),
   roundStage: (r.round_stage as string | null) ?? null,
-  valuationUsd: r.valuation_est != null ? Number(r.valuation_est) : null,
+  // valuation_est is millions; the field is dollars, and the early-stage cap it
+  // feeds is 5e9. Unscaled, no stored valuation could ever exceed that cap.
+  valuationUsd: r.valuation_est != null ? Number(r.valuation_est) * 1e6 : null,
   roundAmountMusd: r.round_amount_musd != null ? Number(r.round_amount_musd) : null,
   // A US state code means the US; anything else is the country itself, which is
   // what marks a Singapore company as not a target.
@@ -918,7 +922,7 @@ export async function getMonitoredCompanies(
   const sql = getSql();
   const rows: any = await sql`
     select c.id as company_id, c.name as company_name, c.familiarity, c.sectors,
-           c.description, c.hq_city, c.hq_state, c.hq_region, c.total_raised, c.headcount_est,
+           c.description, c.one_liner, c.hq_city, c.hq_state, c.hq_region, c.total_raised, c.headcount_est,
            c.founded_year, c.hq_source, c.round_date, c.round_stage, c.round_amount_musd, c.valuation_est, c.valuation_source,
            m.added_at, m.note,
            cs.expansion, cs.momentum, cs.partnership, cs.signal_type, cs.why,

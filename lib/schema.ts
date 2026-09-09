@@ -39,6 +39,17 @@ export const companies = pgTable('companies', {
   foundedYear: integer('founded_year'),
   headcountEst: integer('headcount_est'),
   description: text('description'),
+  /**
+   * One line on what the company does, for the dashboard card.
+   *
+   * Separate from `description`, which is the raw capture — a scraped meta tag
+   * or a search snippet, written by enrich-websites as a side effect of
+   * resolving a domain. That text is often about the wrong entity (a Rolls-Royce
+   * chauffeur hire service, a Tesla fan blog) and far too long to sit under a
+   * company name. Keeping both means a bad generation can be re-run against the
+   * evidence that produced it rather than having overwritten it.
+   */
+  oneLiner: text('one_liner'),
   sgApac: text('sg_apac'),
   totalRaised: numeric('total_raised'),
   roundStage: text('round_stage'),
