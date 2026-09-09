@@ -10,6 +10,7 @@
  *
  * Usage: npx tsx scripts/assess-companies.ts [--limit N] [--batch 12] [--dry] [--force]
  *        npx tsx scripts/assess-companies.ts --with-signals
+ *        npx tsx scripts/assess-companies.ts --stale
  *
  * --with-signals targets companies that have a SCORED ITEM at 2 or better and
  * no assessment yet. This is the set the digest actually needs: brief §7a
@@ -110,6 +111,7 @@ type Assessment = {
   const force = flag('force');
 
   const withSignals = flag('with-signals');
+  const stale = flag('stale');
 
   /**
    * Default target: any company with activity this window and no assessment at
@@ -125,7 +127,32 @@ type Assessment = {
    *
    * --with-signals narrows to companies holding a scored item at 2+.
    */
-  const pending = withSignals
+  /*
+   * --stale: companies judged BEFORE the evidence arrived.
+   *
+   * An assessment is skipped once one exists at the current rubric version, so
+   * a company assessed from a bare name stays at that judgment even after
+   * enrich-websites and classify-sectors give it a website and a sector. That
+   * is the ordinary case when enrichment and assessment run out of order: the
+   * answer is not wrong so much as made from less than was available.
+   *
+   * --force would re-assess every company; this re-assesses only the ones whose
+   * evidence changed after they were judged.
+   */
+  const pending = stale
+    ? await db.select({
+        id: companies.id, name: companies.name, hqState: companies.hqState,
+        website: companies.website, description: companies.description,
+      }).from(companies)
+        .where(and(
+          sql`coalesce(${companies.scopeStatus}, 'unknown') <> 'out_of_scope'`,
+          sql`(${companies.website} is not null or cardinality(coalesce(${companies.sectors}, '{}')) > 0)`,
+          sql`exists (select 1 from company_assessments ca
+                      where ca.company_id = ${companies.id}
+                        and ca.rubric_version = ${COMPANY_RUBRIC_VERSION}
+                        and ca.confidence = 'low')`,
+        ))
+    : withSignals
     ? await db.select({
         id: companies.id, name: companies.name, hqState: companies.hqState,
         website: companies.website, description: companies.description,
