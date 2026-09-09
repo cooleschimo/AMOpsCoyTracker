@@ -106,6 +106,9 @@ type Assessment = {
   const db = getDb();
   const sqlc = getSql();
   const batchSize = Number(arg('batch', '11'));
+  // Well below the twenty-two keys in the chain: workers share one chain walked
+  // in the same order, so more of them queue rather than spread.
+  const concurrency = Math.max(1, Number(arg('workers', '4')));
   const limit = Number(arg('limit', '0'));
   const dry = flag('dry');
   const force = flag('force');
@@ -214,8 +217,23 @@ type Assessment = {
   const counts = { batches: 0, batches_failed: 0, assessed: 0, sector_assigned: 0, no_sector: 0, unmatched: 0, vanished: 0 };
   const results: Array<Assessment & { id: number }> = [];
 
-  for (let i = 0; i < targets.length; i += batchSize) {
-    const batch = targets.slice(i, i + batchSize);
+  /*
+   * Batches run several at a time.
+   *
+   * Every limit is per KEY — lib/llm.ts throttles per key for the same reason —
+   * so twenty-two keys carry twenty-two separate RPM allowances, and running
+   * one batch at a time left twenty-one of them idle. A run that took three
+   * hours was waiting on rate limits it was not actually hitting.
+   *
+   * Kept well below the key count. Each worker walks the same chain in the same
+   * order, so more workers than keys would have them queueing behind the first
+   * few rather than spreading out, and a burst large enough to trip a provider
+   * costs more than it saves.
+   */
+  const batches: typeof targets[] = [];
+  for (let i = 0; i < targets.length; i += batchSize) batches.push(targets.slice(i, i + batchSize));
+
+  const runBatch = async (batch: typeof targets) => {
     // The standing judgment and what has been learned since. Each run revises
     // rather than replaces, so a band moves on accumulated evidence and a quiet
     // week leaves it where it was.
@@ -267,8 +285,11 @@ type Assessment = {
       evidence: evidence.get(c.id) ?? [],
     })));
 
+    // Numbered by completion, not by position: with several workers the order
+    // is not the order the batches were taken in, and a number that implies one
+    // is worse than a count.
     counts.batches++;
-    console.log(`  batch ${counts.batches}: ${batch.length} companies...`);
+    console.log(`  batch ${counts.batches}/${batches.length}: ${batch.length} companies...`);
 
     const res = await callJson<{ assessments: Assessment[] }>({
       system: COMPANY_ASSESSMENT_SYSTEM,
@@ -280,10 +301,10 @@ type Assessment = {
     });
 
     if (!res.ok || !res.data?.assessments) {
-      // Logged and skipped; the run continues.
+      // Logged and skipped; the other workers carry on.
       counts.batches_failed++;
       console.warn(`    FAILED: ${res.error}`);
-      continue;
+      return;
     }
 
     for (const a of res.data.assessments) {
@@ -363,7 +384,21 @@ type Assessment = {
         }
       }
     }
-  }
+  };
+
+  /*
+   * A fixed pool: each worker takes the next batch as it frees up, so a slow
+   * batch does not hold the others behind it the way a chunked split would.
+   */
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(concurrency, batches.length) }, async () => {
+    for (;;) {
+      const mine = batches[next++];
+      if (!mine) return;
+      if (budget.halted) return;
+      await runBatch(mine);
+    }
+  }));
 
   if (!dry) {
     await budget.done();
