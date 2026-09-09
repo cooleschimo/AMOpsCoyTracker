@@ -18,11 +18,13 @@ import type { DashboardCompany } from '@/lib/ui-types';
  */
 export function GeographySection({
   title,
+  blurb,
   companies,
   empty,
   id,
 }: {
   title: string;
+  blurb?: string;
   companies: DashboardCompany[];
   empty: string;
   id?: string;
@@ -31,6 +33,7 @@ export function GeographySection({
     <section id={id} className="scroll-mt-6 space-y-4">
       <SectionHeading
         title={title}
+        blurb={blurb}
         right={
           <span className="num text-2xs text-muted-foreground">
             {companies.length} {companies.length === 1 ? 'company' : 'companies'}

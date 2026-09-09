@@ -30,11 +30,13 @@ export const dynamic = 'force-dynamic';
  */
 function Section({
   title,
+  blurb,
   companies,
   empty,
   id,
 }: {
   title: string;
+  blurb?: string;
   companies: DashboardCompany[];
   empty: string;
   /** Scroll target for the sidebar's jump links. */
@@ -44,6 +46,7 @@ function Section({
     <section id={id} className="scroll-mt-6 space-y-4">
       <SectionHeading
         title={title}
+        blurb={blurb}
         right={
           <span className="num text-2xs text-muted-foreground">
             {companies.length} {companies.length === 1 ? 'company' : 'companies'}
@@ -202,23 +205,27 @@ export default async function Dashboard({
         <GeographySection
           id="worth"
           title="Worth a conversation"
+          blurb="Something happening now, at a company past the early rounds."
           companies={inPlace(d.worthAConversation)}
           empty="Nothing cleared the bar this week."
         />
         <GeographySection
           id="radar"
           title="New on the radar"
+          blurb="Earlier stage, by the round or valuation reported."
           companies={inPlace(d.newOnTheRadar)}
           empty="No early-stage finds this week."
         />
         <Section
           id="known"
           title="Who we know"
+          blurb="Already known or in conversation, and something moved."
           companies={inPlace(d.whoWeKnow)}
           empty="No companies marked as known yet."
         />
         <Section
           title="Monitoring"
+          blurb="Companies someone chose to follow."
           companies={inPlace(d.monitoring)}
           empty="Nothing monitored yet."
         />
@@ -233,7 +240,7 @@ export default async function Dashboard({
         <CollapsedSection
           title="Assessed as a weak fit"
           count={d.lowFit.length}
-          blurb="Cleared the same trigger bar, then rated low on priority or on Singapore fit. Each card carries the reasoning — if one looks wrong, that is the part worth correcting."
+          blurb="Rated low on priority or Singapore fit."
         >
           <Masonry className="dense-cards">
             {inPlace(d.lowFit).map((c) => (
@@ -245,7 +252,7 @@ export default async function Dashboard({
         <CollapsedSection
           title="Awaiting assessment"
           count={d.awaitingAssessment.length}
-          blurb="Surfaced this week with nobody having assessed them yet. A gap in the work rather than a judgment — any of these could turn out to be worth a conversation."
+          blurb="Surfaced this week but not yet assessed."
         >
           <Masonry className="dense-cards">
             {inPlace(d.awaitingAssessment).map((c) => (

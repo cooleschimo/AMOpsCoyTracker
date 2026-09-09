@@ -892,7 +892,7 @@ export function CollapsedSection({
             {open ? 'hide' : 'show'}
           </span>
         </span>
-        <span className="mt-1 block max-w-[68ch] pl-[1.4rem] text-sm text-muted-foreground">
+        <span className="mt-1 block pl-[1.4rem] text-sm text-muted-foreground">
           {blurb}
         </span>
       </button>
@@ -905,10 +905,13 @@ export function CollapsedSection({
 export function SectionHeading({
   title,
   subtitle,
+  blurb,
   right,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
+  /** A sentence saying what the section holds. */
+  blurb?: ReactNode;
   right?: ReactNode;
 }) {
   return (
@@ -924,6 +927,10 @@ export function SectionHeading({
           {subtitle}
         </p>
       )}
+      {/* Sentence case, unlike `subtitle`: this says what the section is, and
+          sits in the same column as a collapsed section's blurb, so the voice
+          should not change with whether a section happens to be open. */}
+      {blurb && <p className="mt-1 text-sm text-muted-foreground">{blurb}</p>}
     </div>
   );
 }
