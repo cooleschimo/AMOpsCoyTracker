@@ -30,7 +30,7 @@ import { env } from '../lib/env';
 import {
   COMPANY_ASSESSMENT_SYSTEM, COMPANY_RUBRIC_VERSION, buildAssessmentPrompt, isBand,
 } from '../lib/company-rubric';
-import { isSector } from '../lib/scope';
+import { isSector, isUsState } from '../lib/scope';
 import { CONTRIBUTION_DRIVERS } from '../lib/company-rubric';
 
 const arg = (n: string, d?: string) => {
@@ -41,6 +41,53 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
 
 /** The states hq_region treats as West Coast, for ordering the queue. */
 const WEST_COAST_STATES = new Set(['CA', 'WA', 'OR', 'NV', 'AZ', 'CO', 'UT', 'ID', 'NM']);
+
+/**
+ * The shape the assessment must return.
+ *
+ * Without it the call described its shape in the prompt and hoped, which is
+ * what emptied the last four runs — 4 of 4 batches failing and nothing
+ * assessed. Groq's JSON mode requires every property in `required`, so the
+ * optional fields are nullable strings rather than absent ones.
+ */
+const str = { type: ['string', 'null'] } as const;
+const ASSESSMENT_SCHEMA = {
+  type: 'object',
+  properties: {
+    assessments: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          sectors: { type: 'array', items: { type: 'string' } },
+          target_priority: { type: 'string' },
+          singapore_fit: { type: 'string' },
+          potential_contribution: { type: 'string' },
+          contribution_drivers: { type: 'array', items: { type: 'string' } },
+          apac_footprint: str, apac_footprint_detail: str,
+          prior_expansions: str, prior_expansions_detail: str,
+          financial_health: str, financial_health_detail: str,
+          confidence: { type: 'string' },
+          rationale: { type: 'string' },
+          revision_note: str,
+          priority_reason: str, singapore_fit_reason: str,
+          contribution_reason: str, confidence_reason: str,
+        },
+        required: [
+          'name', 'sectors', 'target_priority', 'singapore_fit', 'potential_contribution',
+          'contribution_drivers', 'apac_footprint', 'apac_footprint_detail',
+          'prior_expansions', 'prior_expansions_detail', 'financial_health',
+          'financial_health_detail', 'confidence', 'rationale', 'revision_note',
+          'priority_reason', 'singapore_fit_reason', 'contribution_reason', 'confidence_reason',
+        ],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['assessments'],
+  additionalProperties: false,
+} as const;
 
 type Assessment = {
   name: string; sectors: string[];
@@ -124,7 +171,7 @@ type Assessment = {
    */
   const geoRank = (c: { hqState: string | null }) => {
     const st = (c.hqState ?? '').trim();
-    if (!/^[A-Z]{2}$/.test(st)) return 2;
+    if (!isUsState(st)) return 2;
     return WEST_COAST_STATES.has(st) ? 0 : 1;
   };
   const ordered = [...pending].sort((a, b) => geoRank(a) - geoRank(b));
@@ -202,6 +249,7 @@ type Assessment = {
       model: env.groqModelScoring(),
       budget,
       temperature: 0.1,
+      schema: ASSESSMENT_SCHEMA,
     });
 
     if (!res.ok || !res.data?.assessments) {

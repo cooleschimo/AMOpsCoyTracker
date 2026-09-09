@@ -46,6 +46,33 @@ function weekOfMonday(): string {
     .toISOString().slice(0, 10);
 }
 
+/**
+ * The shape one company's signal must come back in.
+ *
+ * Described in the prompt but never given to the provider, which is the same
+ * omission that had filter-score losing a third of its batches to malformed
+ * JSON. Groq's JSON mode requires every property in `required`, so `momentum`
+ * is nullable rather than optional — "not judged" and "no momentum" are
+ * different facts and the dashboard ranks on the difference.
+ */
+const SIGNAL_SCHEMA = {
+  type: 'object',
+  properties: {
+    expansion: { type: 'number' },
+    momentum: { type: ['number', 'null'] },
+    partnership: { type: 'number' },
+    signal_type: { type: 'string' },
+    representative_item: { type: ['number', 'null'] },
+    expansion_language: { type: 'boolean' },
+    why: { type: ['array', 'string'], items: {} },
+  },
+  required: [
+    'expansion', 'momentum', 'partnership', 'signal_type',
+    'representative_item', 'expansion_language', 'why',
+  ],
+  additionalProperties: false,
+} as const;
+
 type Out = {
   expansion: number; momentum: number; partnership: number; signal_type: string;
   representative_item: number; expansion_language: boolean; why: string[] | string;
@@ -233,6 +260,7 @@ type Out = {
         }),
         budget,
         temperature: 0.1,
+        schema: SIGNAL_SCHEMA,
       });
 
       if (!res.ok || !res.data) {
