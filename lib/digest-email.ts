@@ -119,14 +119,6 @@ function band(name: string, value: string, reason?: string): string {
 }
 
 /** A hard fact about the company, as the dashboard's FactGrid. */
-function fact(name: string, value: string): string {
-  return `
-                <td style="${SANS} font-size:13px; line-height:18px; color:${C.ink}; padding:0 14px 0 0; vertical-align:top;">
-                  <span style="${MONO} font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:${C.weak};">${esc(name)}</span><br>
-                  <span style="font-weight:600;">${esc(value)}</span>
-                </td>`;
-}
-
 /**
  * The full entry: the dashboard card, flattened into rows Word will not
  * collapse. Zones are separated by a hairline, in the card's own order.
@@ -158,7 +150,7 @@ function fullCard(c: DashboardCompany, appBaseUrl: string, rank = 0): string {
 
             <!-- heading zone -->
             <tr>
-              <td style="padding:18px 20px 15px 20px; background-color:${C.accentBg}; border-bottom:1px solid ${C.hairline};">
+              <td style="padding:13px 20px 12px 20px; background-color:${C.accentBg}; border-bottom:1px solid ${C.hairline};">
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                   <tr>
                     <td>
@@ -191,35 +183,29 @@ function fullCard(c: DashboardCompany, appBaseUrl: string, rank = 0): string {
               </td>
             </tr>
 
-            ${facts.length ? `<!-- facts -->
-            <tr>
-              <td style="padding:14px 20px 12px 20px; border-bottom:1px solid ${C.hairline};">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${facts.map(([n, v]) => fact(n, v)).join('')}</tr></table>
-              </td>
-            </tr>` : ''}
-
             <!--
-              The four bands as a single line, without their reasoning.
-              A sentence under each ran to some seventy words a card, which is
-              most of what made the mail long — and it argues a case the reader
-              has not yet decided to hear. The bands themselves say where the
-              tool landed; the reasoning behind any of them is on the page, one
-              click away, where somebody who disagrees is going to go anyway.
+              Facts and bands on one line rather than two banded rows.
+              Eight short values were taking two full-width strips and a divider
+              between them, which is most of a card's height spent on numbers a
+              reader takes in at a glance. Run together they read as one line of
+              context under the headline, and the card loses a third of its
+              depth without losing a value.
             -->
             <tr>
-              <td style="padding:12px 20px; border-bottom:1px solid ${C.hairline};">
-                <span style="${MONO} font-size:12px; color:${C.weak};">
-                  Priority <span style="color:${C.ink}; font-weight:600;">${esc(a.priority)}</span>
-                  &nbsp;&middot;&nbsp; SG fit <span style="color:${C.ink}; font-weight:600;">${esc(a.sgFit)}</span>
-                  &nbsp;&middot;&nbsp; Value <span style="color:${C.ink}; font-weight:600;">${esc(c.potentialValue.band)}</span>
-                  &nbsp;&middot;&nbsp; Confidence <span style="color:${C.ink}; font-weight:600;">${esc(c.potentialValue.confidence)}</span>
+              <td style="padding:10px 20px; border-bottom:1px solid ${C.hairline};">
+                <span style="${MONO} font-size:12px; line-height:20px; color:${C.weak};">
+                  ${facts.map(([n, v]) => `${esc(n)} <span style="color:${C.ink}; font-weight:600;">${esc(String(v))}</span>`).join('&nbsp;&nbsp;·&nbsp;&nbsp;')}
+                  ${facts.length ? '&nbsp;&nbsp;·&nbsp;&nbsp;' : ''}Priority <span style="color:${C.ink}; font-weight:600;">${esc(a.priority)}</span>
+                  &nbsp;&nbsp;·&nbsp;&nbsp; SG fit <span style="color:${C.ink}; font-weight:600;">${esc(a.sgFit)}</span>
+                  &nbsp;&nbsp;·&nbsp;&nbsp; Value <span style="color:${C.ink}; font-weight:600;">${esc(c.potentialValue.band)}</span>
+                  &nbsp;&nbsp;·&nbsp;&nbsp; Confidence <span style="color:${C.ink}; font-weight:600;">${esc(c.potentialValue.confidence)}</span>
                 </span>
               </td>
             </tr>
 
             <!-- evidence -->
             <tr>
-              <td style="padding:15px 20px 16px 20px;">
+              <td style="padding:11px 20px 13px 20px;">
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                   ${why.length > 1 ? `
                   <tr><td style="${MONO} font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:${C.weak}; padding:0 0 5px 0;">Also this week</td></tr>
