@@ -65,9 +65,23 @@ export function ControlBar({
   const open = !scrolled || hovered;
 
   useEffect(() => {
-    // A threshold rather than any scroll at all: a page that flinches at two
-    // pixels of trackpad drift reads as unstable.
-    const onScroll = () => setScrolled(window.scrollY > 120);
+    /*
+     * Two thresholds, not one.
+     *
+     * Collapsing shortens the bar by around 180px, which lengthens the
+     * scrollable page by the same amount. On a page scrolled near its end
+     * there is no room to grow, so the browser reduces scrollY instead — back
+     * under a single threshold, which re-expands the bar, which restores the
+     * scroll position, which collapses it again. The bar flickers at a rate
+     * set by how fast React can re-render.
+     *
+     * A gap wider than the height the bar gives up breaks the loop: the
+     * position the collapse lands on is still above the re-expand line.
+     */
+    const onScroll = () => {
+      const y = window.scrollY;
+      setScrolled((was) => (was ? y > 40 : y > 260));
+    };
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
