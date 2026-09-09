@@ -98,7 +98,7 @@ export default async function Dashboard({
         </h1>
         <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
           <span>
-            {isArchive ? 'Looking back at ' : 'Here\u2019s what happened last week, '}
+            {isArchive ? 'Looking back at ' : 'Here\u2019s what happened this week, '}
             {d.weekLabel}.
           </span>
           <WeekPicker weeks={weeks} current={currentWeek} />
@@ -117,19 +117,21 @@ export default async function Dashboard({
           </p>
         )}
 
-        {/* The coverage numbers as a stat row rather than a sentence: three
-            figures read faster as figures, and "monitored / processed" stays
-            in the labels so the wording still avoids claiming more than the
-            tool does. */}
+        {/* This week's work, then what stands behind it.
+            The two spans used to sit in one row reading as one sentence:
+            "646 companies monitored, 89,396 signals processed, 27 surfaced this
+            week" mixes all-time with weekly and invites the reader to divide
+            one by the other. The week is what the page is about, so it leads;
+            the standing totals are context and take a quieter line. */}
         <dl className="flex flex-wrap items-baseline gap-x-8 gap-y-2 pt-4">
           {[
-            { n: d.coverageStats.monitored, label: "companies monitored", Icon: Building2 },
-            { n: d.coverageStats.processed, label: "signals processed", Icon: Radio },
-            { n: d.coverageStats.surfaced, label: "surfaced this week", Icon: Sparkles },
+            { n: d.coverageStats.readThisWeek, label: "articles read", Icon: Radio },
+            { n: d.coverageStats.scoredThisWeek, label: "companies scored", Icon: Building2 },
+            { n: d.coverageStats.surfaced, label: "surfaced", Icon: Sparkles },
           ].map(({ n, label, Icon }) => (
             <div key={label} className="flex items-center gap-2">
               <Icon className="size-4 shrink-0 text-primary/70" strokeWidth={1.5} aria-hidden />
-              <dt className="sr-only">{label}</dt>
+              <dt className="sr-only">{label} this week</dt>
               <dd className="flex items-baseline gap-1.5">
                 <span className="num text-lg font-semibold leading-none">
                   {n.toLocaleString()}
@@ -139,6 +141,12 @@ export default async function Dashboard({
             </div>
           ))}
         </dl>
+        <p className="pt-1.5 text-2xs text-muted-foreground/70">
+          <span className="num">{d.coverageStats.monitored.toLocaleString()}</span> companies tracked
+          {' · '}
+          <span className="num">{d.coverageStats.processed.toLocaleString()}</span> articles filtered
+          {' '}all time
+        </p>
       </header>
 
       <div className="space-y-14">
@@ -153,8 +161,8 @@ export default async function Dashboard({
           empty="No new finds this week."
         />
         <Section
-          title="Familiar territory"
-          companies={inPlace(d.familiarTerritory)}
+          title="Who we know"
+          companies={inPlace(d.whoWeKnow)}
           empty="No companies marked as known yet."
         />
         <Section
@@ -162,6 +170,24 @@ export default async function Dashboard({
           companies={inPlace(d.monitoring)}
           empty="Nothing monitored yet."
         />
+
+        {/* The backlog gets a line rather than a section: it is work outstanding,
+            not part of the week's read, and its length varies with how far the
+            last assessment run got before its budget ran out. */}
+        {d.awaitingAssessment.length > 0 && (
+          <p className="border-t border-border pt-6 text-sm text-muted-foreground">
+            <span className="num">{d.awaitingAssessment.length}</span>{' '}
+            {d.awaitingAssessment.length === 1 ? 'company' : 'companies'} surfaced this
+            week without an assessment.{' '}
+            <Link
+              href="/awaiting-assessment"
+              className="text-primary link-underline hover:text-foreground"
+            >
+              Review them
+            </Link>
+            .
+          </p>
+        )}
       </div>
     </main>
   );

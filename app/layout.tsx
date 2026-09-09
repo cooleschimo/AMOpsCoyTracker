@@ -29,7 +29,7 @@ export const metadata: Metadata = {
 };
 
 const NAV = [
-  { href: "/", label: "Last week" },
+  { href: "/", label: "This week" },
   { href: "/monitoring", label: "Monitoring" },
   { href: "/graph", label: "Connections" },
 ];

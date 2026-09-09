@@ -716,12 +716,19 @@ export type WeeklyDigest = {
   weekLabel: string;
   coverage: string;
   /** The same three numbers as `coverage`, for a stat row rather than a sentence. */
-  coverageStats: { monitored: number; processed: number; surfaced: number };
+  coverageStats: {
+    /** Standing totals, since the tool started. */
+    monitored: number; processed: number;
+    /** This week only. */
+    surfaced: number; readThisWeek: number; scoredThisWeek: number;
+  };
   /** A real trigger at a company the tool can argue for. */
   worthAConversation: DashboardCompany[];
-  /** A strong trigger the tool cannot yet argue for. */
+  /** Assessed, and argued down — a low band is still a judgment worth showing. */
   newOnTheRadar: DashboardCompany[];
-  familiarTerritory: DashboardCompany[];
+  whoWeKnow: DashboardCompany[];
+  /** Cleared the trigger bar, but nobody has assessed them yet. A backlog. */
+  awaitingAssessment: DashboardCompany[];
   monitoring: DashboardCompany[];
 };
 
@@ -782,12 +789,33 @@ export async function getWeeklyDigest(
       and coalesce(c.scope_status, 'unknown') <> 'out_of_scope'`;
   const [{ signals = 0 } = {}]: any =
     await sql`select count(*)::int as signals from items where status <> 'fetched'`;
+  /*
+   * The same reading, for this week alone.
+   *
+   * The three figures used to mix spans without saying so: two counted
+   * everything since the tool started and one counted the current week, which
+   * read as one sentence and measured three different things. Both are worth
+   * knowing — what the week produced, and how much stands behind it — so both
+   * are carried and the UI separates them.
+   */
+  const [{ read = 0 } = {}]: any = await sql`
+    select count(*)::int as read from items
+    where status <> 'fetched'
+      and coalesce(published_at, fetched_at) > now() - interval '7 days'`;
+  const [{ scored = 0 } = {}]: any = await sql`
+    select count(distinct company_id)::int as scored from company_signals
+    where signal_version = ${signalVersion}
+      and week_of = coalesce(${weekOf ?? null}::date,
+        (select max(week_of) from company_signals where signal_version = ${signalVersion}))`;
 
   const worthAConversation = pick(plan.sections.worth_a_conversation);
   const newOnTheRadar = pick(plan.sections.new_on_the_radar);
   // Account activity: companies EDB already holds or is talking to, where
   // something moved this week.
-  const familiarTerritory = pick(plan.sections.familiar_territory);
+  const whoWeKnow = pick(plan.sections.who_we_know);
+  // The assessment backlog. Not a verdict, so it is kept apart from the bands
+  // and given its own page rather than a slot in the weekly read.
+  const awaitingAssessment = pick(plan.sections.awaiting_assessment);
   const monitoring = await getMonitoredCompanies(signalVersion);
 
   return {
@@ -797,10 +825,13 @@ export async function getWeeklyDigest(
       monitored: Number(companies),
       processed: Number(signals),
       surfaced: worthAConversation.length + newOnTheRadar.length,
+      readThisWeek: Number(read),
+      scoredThisWeek: Number(scored),
     },
     worthAConversation,
     newOnTheRadar,
-    familiarTerritory,
+    whoWeKnow,
+    awaitingAssessment,
     monitoring,
   };
 }
