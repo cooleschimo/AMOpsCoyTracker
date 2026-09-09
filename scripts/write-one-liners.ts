@@ -14,7 +14,8 @@
  * rather than throwing, and the failed batch is logged and skipped.
  *
  * Usage: npx tsx scripts/write-one-liners.ts [--limit N] [--batch 12] [--dry] [--force]
- *        npx tsx scripts/write-one-liners.ts --all   (every tracked company)
+ *        npx tsx scripts/write-one-liners.ts --weeks  (every week's dashboard)
+ *        npx tsx scripts/write-one-liners.ts --all    (every tracked company)
  */
 import '../lib/loadenv';
 import { getDb, getSql, withRetry } from '../lib/db';
@@ -61,10 +62,17 @@ const LINES_SCHEMA = {
   const db = getDb();
   const sqlc = getSql();
   const batchSize = Number(arg('batch', '12'));
+  // Well below the key count: workers share one chain walked in the same order,
+  // so more of them queue rather than spread.
+  const concurrency = Math.max(1, Number(arg('workers', '4')));
   const limit = Number(arg('limit', '0'));
   const dry = flag('dry');
   const force = flag('force');
   const all = flag('all');
+  // Every company that has ever held a signal, rather than only this week's.
+  // The dashboard is readable week by week, so a company that surfaced in
+  // August still needs its line when someone looks back at that week.
+  const weeks = flag('weeks');
 
   /*
    * The dashboard's own set: a signal in the most recent week, and not the
@@ -91,6 +99,23 @@ const LINES_SCHEMA = {
           select c.id, c.name, c.sectors, c.description, c.website
             from companies c
            where coalesce(c.discovered_via,'') <> 'portfolio'
+             and coalesce(c.scope_status,'unknown') <> 'out_of_scope'
+           order by length(coalesce(c.description,'')) desc`
+    : weeks
+    ? onlyMissing
+      ? await sqlc`
+          select c.id, c.name, c.sectors, c.description, c.website
+            from companies c
+           where exists (select 1 from company_signals cs where cs.company_id = c.id)
+             and coalesce(c.discovered_via,'') <> 'portfolio'
+             and coalesce(c.scope_status,'unknown') <> 'out_of_scope'
+             and (c.one_liner is null or length(trim(c.one_liner)) = 0)
+           order by length(coalesce(c.description,'')) desc`
+      : await sqlc`
+          select c.id, c.name, c.sectors, c.description, c.website
+            from companies c
+           where exists (select 1 from company_signals cs where cs.company_id = c.id)
+             and coalesce(c.discovered_via,'') <> 'portfolio'
              and coalesce(c.scope_status,'unknown') <> 'out_of_scope'
            order by length(coalesce(c.description,'')) desc`
     : onlyMissing
@@ -124,8 +149,10 @@ const LINES_SCHEMA = {
   const budget = await openBudget();
   const counts = { batches: 0, batches_failed: 0, written: 0, abstained: 0, unmatched: 0 };
 
-  for (let i = 0; i < targets.length; i += batchSize) {
-    const batch = targets.slice(i, i + batchSize);
+  const allBatches: any[][] = [];
+  for (let i = 0; i < targets.length; i += batchSize) allBatches.push(targets.slice(i, i + batchSize));
+
+  const runBatch = async (batch: any[]) => {
 
     // The headline that surfaced each company. Context for what the company is,
     // not a description of it — the prompt says so, because a model given only
@@ -158,13 +185,14 @@ const LINES_SCHEMA = {
       schema: LINES_SCHEMA,
     });
 
-    if (!res.ok || !res.data?.lines) {
+    const lines = res.ok ? res.data?.lines : null;
+    if (!lines) {
       counts.batches_failed++;
       console.warn(`    FAILED: ${res.error}`);
-      continue;
+      return;
     }
 
-    for (const r of res.data.lines) {
+    for (const r of lines) {
       // Matched back by name; the model is told to echo it exactly.
       const target = batch.find((c: any) => c.name === r.name)
         ?? batch.find((c: any) => String(c.name).toLowerCase() === String(r.name ?? '').toLowerCase());
@@ -186,7 +214,21 @@ const LINES_SCHEMA = {
           db.update(companies).set({ oneLiner: line }).where(eq(companies.id, target.id)));
       }
     }
-  }
+  };
+
+  /*
+   * A fixed pool: each worker takes the next batch as it frees up, so a slow
+   * batch does not hold the others behind it.
+   */
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(concurrency, allBatches.length) }, async () => {
+    for (;;) {
+      const mine = allBatches[next++];
+      if (!mine) return;
+      if (budget.halted) return;
+      await runBatch(mine);
+    }
+  }));
 
   if (!dry) {
     await budget.done();
