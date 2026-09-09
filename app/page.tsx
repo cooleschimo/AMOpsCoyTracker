@@ -132,7 +132,7 @@ export default async function Dashboard({
           to the viewport top, so padding above it both pushed the masthead down
           the page and stopped the bar sitting flush when scrolled. The bar
           carries its own spacing; the page keeps its padding at the bottom. */}
-      <main className="mx-auto max-w-[1400px] px-6 pb-10 sm:px-12 sm:pb-14 lg:px-16">
+      <main className="glass-ground mx-auto max-w-[1400px] px-6 pb-10 sm:px-12 sm:pb-14 lg:px-16">
       <ControlBar
         counts={sidebarCounts}
         masthead={
