@@ -82,8 +82,14 @@ export function qualifies(it: PlacementInput): boolean {
  * section. The first few carry the full opportunity structure; past that the
  * reader is scanning, so an entry becomes a headline and one line of why, and
  * the detail waits behind the link.
+ *
+ * Three full entries rather than five: an email is a prompt to open the
+ * dashboard, and every entry already carries a Review link to the page that
+ * holds the whole case. Five full entries across three sections ran the week
+ * to some two and a half thousand words, which is a document rather than a
+ * message.
  */
-export const DETAIL_BUDGET = { full: 5, brief: 12 } as const;
+export const DETAIL_BUDGET = { full: 3, brief: 10 } as const;
 export type Detail = 'full' | 'brief' | 'line';
 
 export function detailFor(indexInSection: number): Detail {
@@ -168,7 +174,10 @@ const LATE_ROUNDS = [
   // company is usually established enough that an RD has heard of it.
   'series_c', 'series_c_ext',
   'series_d', 'series_e', 'series_f', 'series_g', 'series_h',
+  'series_i', 'series_j', 'series_k', 'series_l',
   'series_d_ext', 'series_e_ext', 'series_f_ext',
+  'series_g_ext', 'series_h_ext', 'series_i_ext', 'series_j_ext',
+  'series_k_ext', 'series_l_ext',
   'growth', 'late', 'ipo', 'strategic', 'multiple',
 ] as const;
 

@@ -158,6 +158,27 @@ const C = {
 const FONT = "font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;";
 
 /**
+ * How many why-now bullets an entry carries.
+ *
+ * Three establishes a pattern — a hire, a round, an announcement in the same
+ * window — which is what the section is claiming. A fourth and fifth are
+ * corroboration the reader can take on the dashboard.
+ */
+const WHY_LINES = 3;
+
+/**
+ * The first sentence, for a rationale that runs to a paragraph.
+ *
+ * The assessment writes as much as it needs to; the email has room for the
+ * claim, not the argument behind it, and the whole text is on the item page.
+ */
+function firstSentence(text: string): string {
+  const t = text.trim();
+  const stop = t.search(/[.!?](\s|$)/);
+  return stop > 0 && stop < t.length - 1 ? t.slice(0, stop + 1) : t;
+}
+
+/**
  * A compact row: company, headline, one line of why. Used once a section is
  * long enough that the reader is scanning rather than reading — the argument
  * for each of twenty companies is a wall, and the dashboard is where the
@@ -220,22 +241,21 @@ function itemHtml(r: RenderRow, appBaseUrl: string): string {
               ${(r.whyPointsMerged?.length ?? 0) > 0
                 ? `<tr><td style="${FONT} font-size:13px; line-height:19px; color:#3A3A36; padding:1px 0;">
                     <span style="color:#6E6E68;">Why now:</span></td></tr>`
-                  + r.whyPointsMerged!.map((w) => `<tr><td style="${FONT} font-size:13px; line-height:19px; color:${w.primary ? '#333333' : '#555555'}; padding:0 0 0 14px;">&bull;&nbsp;${esc(w.text)}${w.primary ? '' : ` <span style="color:#93938C;">(${w.sourceType === 'ats' ? 'hiring' : 'also reported'})</span>`}</td></tr>`).join('')
+                  + r.whyPointsMerged!.slice(0, WHY_LINES).map((w) => `<tr><td style="${FONT} font-size:13px; line-height:19px; color:${w.primary ? '#333333' : '#555555'}; padding:0 0 0 14px;">&bull;&nbsp;${esc(w.text)}${w.primary ? '' : ` <span style="color:#93938C;">(${w.sourceType === 'ats' ? 'hiring' : 'also reported'})</span>`}</td></tr>`).join('')
                   + (r.coOccurrence ? `<tr><td style="${FONT} font-size:12px; line-height:18px; color:#3A5A78; padding:2px 0 0 14px;">Hiring and a corporate event in the same window.</td></tr>` : '')
                 : whyPoints(r.why).length > 1
                 ? `<tr><td style="${FONT} font-size:13px; line-height:19px; color:#3A3A36; padding:1px 0;">
                     <span style="color:#6E6E68;">Why now:</span></td></tr>`
-                  + whyPoints(r.why).map((w) => `<tr><td style="${FONT} font-size:13px; line-height:19px; color:#3A3A36; padding:0 0 0 14px;">&bull;&nbsp;${esc(w)}</td></tr>`).join('')
+                  + whyPoints(r.why).slice(0, WHY_LINES).map((w) => `<tr><td style="${FONT} font-size:13px; line-height:19px; color:#3A3A36; padding:0 0 0 14px;">&bull;&nbsp;${esc(w)}</td></tr>`).join('')
                 : line('Why now:', esc(r.why))}
               ${r.section !== 'new_on_the_radar' ? line('Why EDB:',
-                  `${esc(String(r.targetPriority ?? 'unassessed'))} priority · Singapore fit ${esc(String(r.singaporeFit ?? 'unassessed'))}${r.familiarity === 'in_conversation' ? ' · already in conversation' : ''}`
-                  + (r.assessmentRationale ? `<br><span style="color:#3A3A36;">${esc(r.assessmentRationale)}</span>` : ''))
+                  `${esc(String(r.targetPriority ?? 'unassessed'))} priority · Singapore fit ${esc(String(r.singaporeFit ?? 'unassessed'))}${r.familiarity === 'in_conversation' ? ' · already in conversation' : ''}`)
                 : ''}
               ${r.section !== 'new_on_the_radar' && r.proposition ? line('Singapore could offer:',
-                  `${esc(r.proposition.line)}${statusNote(r.proposition.status) ? ` <span style="color:#7A5C2E;">${esc(statusNote(r.proposition.status)!)}</span>` : ''}${r.proposition.framedBy === 'organised_demand' ? ` <span style="color:#6E6E68;">Route in: access to Singapore end users is the commercial case that makes this worth their time.</span>` : ''}${r.proposition.precedent ? ` <span style="color:#3A3A36;">Precedent: ${esc(r.proposition.precedent)}${r.proposition.precedentUrl ? ` <a href="${esc(r.proposition.precedentUrl)}" style="color:#3A5A78;">source</a>` : ''}</span>` : ''}${r.proposition.caveat ? ` <span style="color:#7A5C2E;">Caveat: ${esc(r.proposition.caveat)}</span>` : ''}`)
+                  `${esc(r.proposition.line)}${statusNote(r.proposition.status) ? ` <span style="color:#7A5C2E;">${esc(statusNote(r.proposition.status)!)}</span>` : ''}`)
                 : ''}
               ${r.section === 'new_on_the_radar' && r.assessmentRationale ? line('Not yet a priority because:',
-                  `${esc(r.assessmentRationale)}${(r.assessmentConfidence ?? '').toLowerCase() === 'low' ? ' <span style="color:#7A5C2E;">— thin evidence, correct it if it is wrong</span>' : ''}`)
+                  `${esc(firstSentence(r.assessmentRationale))}${(r.assessmentConfidence ?? '').toLowerCase() === 'low' ? ' <span style="color:#7A5C2E;">— thin evidence</span>' : ''}`)
                 : ''}
               ${r.section === 'new_on_the_radar' && !r.assessmentRationale ? line('Assessment:',
                   '<span style="color:#93938C;">not yet assessed \u2014 shown because the trigger is strong</span>')
@@ -385,19 +405,16 @@ export function renderText(input: RenderInput): string {
     out.push(isWrappedUrl(r.url) ? `    (${r.source} — open via Review link below)` : `    ${r.url}`);
     if (r.whyPointsMerged?.length) {
       out.push('    Why now:');
-      for (const w of r.whyPointsMerged) {
+      for (const w of r.whyPointsMerged.slice(0, WHY_LINES)) {
         out.push(`      - ${w.text}${w.primary ? '' : ` (${w.sourceType === 'ats' ? 'hiring' : 'also reported'})`}`);
       }
       if (r.coOccurrence) out.push('      Hiring and a corporate event in the same window.');
     } else if (whyPoints(r.why).length > 1) {
-      const pts = whyPoints(r.why);
+      const pts = whyPoints(r.why).slice(0, WHY_LINES);
       out.push('    Why now:');
       for (const w of pts) out.push(`      - ${w}`);
     } else {
       out.push(`    Why now: ${r.why}`);
-    }
-
-    if (r.section === 'who_we_know') {
     }
 
     // The full opportunity structure belongs only to the tier the tool can
@@ -405,18 +422,9 @@ export function renderText(input: RenderInput): string {
     // not been made.
     if (r.section !== 'new_on_the_radar') {
       out.push(`    Why EDB: ${r.targetPriority ?? 'unassessed'} priority · Singapore fit ${r.singaporeFit ?? 'unassessed'}${r.familiarity === 'in_conversation' ? ' · already in conversation' : ''}`);
-      if (r.assessmentRationale) out.push(`      ${r.assessmentRationale}`);
       if (r.proposition) {
         const note = statusNote(r.proposition.status);
         out.push(`    Singapore could offer: ${r.proposition.line}${note ? ` (${note})` : ''}`);
-        if (r.proposition.framedBy === 'organised_demand') {
-          out.push('      Route in: access to Singapore end users is the commercial case that makes this worth their time');
-        }
-        if (r.proposition.precedent) {
-          out.push(`      Precedent: ${r.proposition.precedent}`);
-          if (r.proposition.precedentUrl) out.push(`        ${r.proposition.precedentUrl}`);
-        }
-        if (r.proposition.caveat) out.push(`      Caveat: ${r.proposition.caveat}`);
       }
       if (r.warmPath) out.push(`    Possible path: ${r.warmPath}`);
       const dr = (r.contributionDrivers ?? []).filter(Boolean);
@@ -430,7 +438,7 @@ export function renderText(input: RenderInput): string {
     // correcting this reasoning is worth more than a better-phrased guess.
     if (r.section === 'new_on_the_radar') {
       out.push(r.assessmentRationale
-        ? `    Not yet a priority because: ${r.assessmentRationale}`
+        ? `    Not yet a priority because: ${firstSentence(r.assessmentRationale)}`
         : '    Assessment: not yet assessed — shown because the trigger is strong');
       if (r.assessmentRationale && (r.assessmentConfidence ?? '').toLowerCase() === 'low') {
         out.push('      (thin evidence — correct it if it is wrong)');
