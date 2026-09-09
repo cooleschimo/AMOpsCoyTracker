@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Globe2, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SearchBox } from '@/components/search-box';
 
 /**
  * The dashboard's standing controls, across the top.
@@ -119,7 +120,9 @@ export function ControlBar({
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
             {masthead}
           </div>
-          <nav className="flex shrink-0 items-baseline gap-x-5">
+          <div className="flex shrink-0 items-center gap-x-5">
+            <SearchBox />
+          <nav className="flex items-baseline gap-x-5">
             {NAV.map((n) => (
               <Link
                 key={n.href}
@@ -138,7 +141,8 @@ export function ControlBar({
                 )}
               </Link>
             ))}
-          </nav>
+            </nav>
+          </div>
         </div>
 
         {/*
