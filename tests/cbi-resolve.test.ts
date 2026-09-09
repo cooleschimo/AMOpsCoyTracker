@@ -76,6 +76,20 @@ check(!verifyMatch({ name: 'Everspin', website: 'everspin.com' }, { url: 'eversp
 check(!verifyMatch({ name: 'Sierra', website: 'sierra.ai' }, { url: 'sierracorporation.com', address: { country: 'United States' } }, []).ok,
   'Sierra: the McLean IT firm rejected, though the name matches exactly');
 
+console.log('\nverifyMatch — a domain can be the trap too');
+// plusai.com is a Seattle slide-deck tool; plus.ai is the trucking company.
+// Storing the wrong one makes the domain lookup confidently wrong, so the
+// description still has to be read even when the domain "matched".
+const plusai = {
+  name: 'PlusAI',
+  website: 'plus.ai',
+  scopeReason: 'Autonomous trucking software firm PlusAI to go public in $800 million SPAC',
+};
+check(verifyMatch(plusai, { url: 'plus.ai', address: { country: 'United States' } }, []).ok,
+  'plus.ai accepted — the domain we hold');
+check(!verifyMatch(plusai, { url: 'plusai.com', address: { country: 'United States' } }, []).ok,
+  'plusai.com rejected — a different company that spells the name');
+
 console.log('\ntoRoundStage');
 check(toRoundStage('Series B - II') === 'series_b', 'a numbered extension keeps its letter');
 check(toRoundStage('Seed VC') === 'seed', 'Seed VC');

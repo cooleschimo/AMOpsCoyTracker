@@ -326,11 +326,16 @@ export function CompanyCase({
               {company.name}, which is not the same as nothing existing.
             </p>
           )}
-          <Link href={`/company/${company.id}`}
-            className="inline-block text-xs text-muted-foreground link-underline hover:text-foreground"
-          >
-            {company.possiblePathSummary ? "See all possible paths" : "See everyone we have"}
-          </Link>
+          {/* Only when there is something on the other side. With no path and
+              no contact the link led to a page repeating this line, and a link
+              that goes nowhere costs a click to learn it goes nowhere. */}
+          {(company.possiblePathSummary || company.contacts.length > 0) && (
+            <Link href={`/company/${company.id}`}
+              className="inline-block text-xs text-muted-foreground link-underline hover:text-foreground"
+            >
+              {company.possiblePathSummary ? "See all possible paths" : "See everyone we have"}
+            </Link>
+          )}
         </div>
       </div>
 

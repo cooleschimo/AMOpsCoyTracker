@@ -22,7 +22,10 @@
  * Order matters, cheapest and most specific first:
  *   1. cbi_org_id, once known. Addresses the entity and cannot be ambiguous.
  *   2. the website. A domain has one owner; "aslanprotects.com" resolves where
- *      "Aslan" does not.
+ *      "Aslan" does not. But it has to be OUR company's domain: plusai.com is a
+ *      Seattle slide-deck tool and plus.ai is the autonomous-trucking company,
+ *      so a domain that merely spells the name resolves confidently to the
+ *      wrong business. Verification below still applies to a domain match.
  *   3. the name, then read `alternates`. Roche, Rolls-Royce, Micron and BYD all
  *      failed to resolve by name while sitting in their own alternates list, so
  *      an error is a shortlist rather than an absence.
