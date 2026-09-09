@@ -113,6 +113,11 @@ export default async function Dashboard({
       sectorCounts.set(sub, (sectorCounts.get(sub) ?? 0) + 1);
     }
   }
+  // Filtered once and used for both the count and the cards, so the two cannot
+  // disagree about how much a section holds.
+  const shownLowFit = inPlace(d.lowFit);
+  const shownAwaiting = inPlace(d.awaitingAssessment);
+
   const sidebarCounts = {
     places: {
       west_coast: discovery.filter((c) => c.geography === 'west_coast').length,
@@ -126,7 +131,9 @@ export default async function Dashboard({
       .slice(0, 8)
       .map(([id, n]) => ({ id, label: sectorShort(id), n })),
     monitoring: d.monitoring.length,
-    awaiting: d.lowFit.length,
+    // What /awaiting-assessment actually lists. It counted lowFit, so the badge
+    // read five and the page it linked to showed none.
+    awaiting: d.awaitingAssessment.length,
   };
 
   return (
@@ -250,13 +257,19 @@ export default async function Dashboard({
           * on the page instead of as footnotes bolted underneath it, and neither
           * pushes the sections carrying a live argument off screen.
           */}
+        {/* The count is of what the section will SHOW, not of what it holds
+            before the filters run. Counting first promised five companies and
+            then opened on nothing: the whole weak-fit list is international,
+            and the page defaults to the West Coast. A section that says five
+            and reveals none reads as broken, where a section that says nothing
+            is there is merely a filtered view. */}
         <CollapsedSection
           title="Assessed as a weak fit"
-          count={d.lowFit.length}
+          count={shownLowFit.length}
           blurb="Rated low on priority or Singapore fit."
         >
           <Masonry className="dense-cards">
-            {inPlace(d.lowFit).map((c) => (
+            {shownLowFit.map((c) => (
               <CompanyCase key={c.id} company={c} />
             ))}
           </Masonry>
@@ -264,11 +277,11 @@ export default async function Dashboard({
 
         <CollapsedSection
           title="Awaiting assessment"
-          count={d.awaitingAssessment.length}
+          count={shownAwaiting.length}
           blurb="Surfaced this week but not yet assessed."
         >
           <Masonry className="dense-cards">
-            {inPlace(d.awaitingAssessment).map((c) => (
+            {shownAwaiting.map((c) => (
               <CompanyCase key={c.id} company={c} />
             ))}
           </Masonry>
