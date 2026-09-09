@@ -150,6 +150,78 @@ export function parseFeed(xml: string): FeedItem[] {
   return out;
 }
 
+/**
+ * Read vcnewsdaily's front page as though it were a feed.
+ *
+ * It publishes one story per fundraise — company, amount and round in the
+ * headline — which is the same shape as Fundraise Insider and the grammar
+ * lib/fundraise.ts parses without a model. There is simply no feed to read: it
+ * declares none, and /feed, /rss, /rss.php, /rss.xml and /feed.xml all 404.
+ *
+ * The page is server-rendered despite the site using Vue, so the stories are in
+ * the HTML that arrives. Each sits in an anchor wrapping an <h5>, with a posted
+ * date and a lede paragraph beside it — enough to build a real item from.
+ *
+ * Anchored on that markup rather than on class names, which are Bootstrap
+ * utilities here and would change with a restyle. A layout change still breaks
+ * it, and the zero-items path is what makes that visible: ingest-context marks
+ * a source that parses to nothing as a health event rather than skipping it.
+ */
+export function parseVcNewsDaily(html: string): FeedItem[] {
+  const out: FeedItem[] = [];
+  const seen = new Set<string>();
+
+  // The tail stops at the end of the lede paragraph. Stopping at the next
+  // anchor of any kind cut the snippet off, because the lede contains its own
+  // "Read More" link back to the story; running to the next headline instead
+  // swallowed the stories in between.
+  const re = /<a\s+href="([^"]+)"[^>]*>\s*<h5[^>]*>([\s\S]*?)<\/h5>\s*<\/a>([\s\S]{0,700}?<\/p>)/gi;
+  for (const m of html.matchAll(re)) {
+    const link = m[1];
+    const title = decodeEntities(m[2].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+    if (!title || !link || seen.has(link)) continue;
+    // Only story pages. The same markup carries navigation and company links.
+    if (!/\/venture-capital-funding\//i.test(link)) continue;
+    seen.add(link);
+
+    const tail = m[3];
+    const dateRaw = tail.match(/class="[^"]*posted-date[^"]*"[^>]*>([^<]+)</i)?.[1]?.trim() ?? null;
+    let publishedAt: Date | null = null;
+    if (dateRaw) {
+      const d = new Date(dateRaw);
+      if (!Number.isNaN(d.getTime())) publishedAt = d;
+    }
+    const snippet = tail.match(/class="[^"]*article-paragraph[^"]*"[^>]*>([\s\S]*?)<\/p>/i)?.[1] ?? null;
+
+    out.push({
+      title,
+      link,
+      publishedAt,
+      source: 'VC News Daily',
+      snippet: snippet ? decodeEntities(snippet.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim() : null,
+    });
+  }
+  return out;
+}
+
+/** Fetch a page-based source, in the shape fetchFeed returns. */
+export async function fetchScraped(
+  url: string, how: 'vcnewsdaily',
+): Promise<{ items: FeedItem[]; error: string | null }> {
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': UA, Accept: 'text/html,*/*' },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(25000),
+    });
+    if (!res.ok) return { items: [], error: `HTTP ${res.status}` };
+    const items = how === 'vcnewsdaily' ? parseVcNewsDaily(await res.text()) : [];
+    return { items, error: items.length ? null : 'page parsed to zero items' };
+  } catch (e) {
+    return { items: [], error: (e as Error).message };
+  }
+}
+
 export async function fetchFeed(url: string): Promise<{ items: FeedItem[]; error: string | null }> {
   try {
     const res = await fetch(url, {
@@ -233,6 +305,13 @@ export type ContextSource = {
   /** Sectors this bears on. Empty means all four. */
   sectors: string[];
   enabled: boolean;
+  /**
+   * Read the page itself rather than a feed. Some publications that are dense
+   * with fundraises serve no RSS at all — vcnewsdaily declares none and 404s on
+   * every conventional path — but render every story into the HTML, which is
+   * the same content by a different route.
+   */
+  scrape?: 'vcnewsdaily';
   note?: string;
 };
 
@@ -595,6 +674,21 @@ export const CONTEXT_SOURCES: ContextSource[] = [
    * moving. A daily pull is what makes that acceptable, and the staleness check
    * in ingest-context says so if the site goes quiet for good.
    */
+  /*
+   * One story per fundraise, company and amount in the headline, with the lede
+   * naming the city — 30 on the front page against Fundraise Insider's 10.
+   * Scraped rather than pulled: it declares no feed and 404s on every
+   * conventional path, but renders every story into the HTML it serves.
+   */
+  {
+    id: 'vcnewsdaily',
+    name: 'VC News Daily',
+    url: 'https://vcnewsdaily.com/',
+    kind: 'trade',
+    sectors: [],
+    scrape: 'vcnewsdaily',
+    enabled: true,
+  },
   {
     id: 'fundraise_insider',
     name: 'Fundraise Insider',

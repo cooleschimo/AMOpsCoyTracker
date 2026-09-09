@@ -13,7 +13,7 @@ import '../lib/loadenv';
 import { eq } from 'drizzle-orm';
 import { getDb, withRetry } from '../lib/db';
 import { items, runs, sourceHealth } from '../lib/schema';
-import { CONTEXT_SOURCES, fetchFeed } from '../lib/news-sources';
+import { CONTEXT_SOURCES, fetchFeed, fetchScraped } from '../lib/news-sources';
 import { NEWSLETTERS, fetchNewsletter } from '../lib/newsletters';
 import { canonicalizeUrl, splitGoogleTitle } from '../lib/news-ingest';
 
@@ -88,7 +88,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
         continue;
       }
 
-      const { items: feed, error } = await fetchFeed(src.url);
+      // A source that declares a scraper reads its page; the rest read a feed.
+      // Both return the same shape, so everything downstream is unchanged.
+      const { items: feed, error } = src.scrape
+        ? await fetchScraped(src.url, src.scrape)
+        : await fetchFeed(src.url);
       counts.sources++;
       if (error && !feed.length) counts.source_errors++;
       console.log(`  ${src.name}: ${feed.length} items${error ? ` (${error})` : ''}`);
