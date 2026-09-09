@@ -452,26 +452,44 @@ function toCompany(
  * What counts as newly arrived, in SQL.
  *
  * The PUBLISHED date, not the fetch date. A story published nine days ago that
- * today's pull happened to reach is not news to the reader — and today's run
- * brought in items back to 30 August, so a fetch-based rule marks those as
- * new every time a feed surfaces something old.
+ * today's pull happened to reach is not news to the reader — and one run
+ * brought in items back three weeks, so a fetch-based rule marks those as new
+ * every time a feed surfaces something old.
  *
- * The window reaches back to the last run rather than to midnight, because the
- * run is what the mark is really about: everything published since the reader
- * last had a chance to see it. Monday's pull therefore covers Saturday and
- * Sunday, which a same-day rule would silently drop — and a weekend's news is
- * the case where this matters most.
+ * The window is the gap since the PREVIOUS ingest, not a fixed number of days.
+ * That is the only definition that holds on every day of the week: on a Tuesday
+ * it reaches back to Monday's run, and on a Monday it reaches back to Sunday's
+ * — or, if the weekend was missed, to Friday's, which is exactly when a reader
+ * wants the weekend included. A fixed three-day window gets Monday right and
+ * then keeps showing the weekend all week.
  *
- * Three days is the reach. It covers a normal weekend plus a missed run without
- * marking a week-old story as new. An item with no published date falls back to
- * when it was fetched, since that is the only date it has.
+ * Capped at seven days so a long outage cannot mark a fortnight of news as new,
+ * and floored at six hours so two runs in one morning do not blank the mark.
+ * An item with no published date falls back to when it was fetched, that being
+ * the only date it has.
  */
-const NEW_SINCE_DAYS = 3;
+const NEW_WINDOW_MAX_DAYS = 7;
+const NEW_WINDOW_MIN_HOURS = 6;
+
+/**
+ * The start of the previous ingest, which is the moment the reader last had a
+ * chance to see anything. `ingest_news` is the pull that brings company news
+ * in; the run in progress is skipped, since its own items are the ones being
+ * marked.
+ */
+const PREVIOUS_RUN = `
+  greatest(
+    least(
+      coalesce(
+        (select max(r.started_at) from runs r
+          where r.stage = 'ingest_news'
+            and r.started_at < (select max(r2.started_at) from runs r2 where r2.stage = 'ingest_news')),
+        now() - interval '${NEW_WINDOW_MAX_DAYS} days'),
+      now() - interval '${NEW_WINDOW_MIN_HOURS} hours'),
+    now() - interval '${NEW_WINDOW_MAX_DAYS} days')`;
 
 const arrivedRecently = (col: string) => `
-  coalesce(${col}.published_at, ${col}.fetched_at)
-    >= (date_trunc('day', now() at time zone 'America/Los_Angeles')
-        at time zone 'America/Los_Angeles') - interval '${NEW_SINCE_DAYS} days'`;
+  coalesce(${col}.published_at, ${col}.fetched_at) >= (${PREVIOUS_RUN})`;
 
 async function whyNowContext(
   rows: Row[],
