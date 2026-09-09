@@ -12,7 +12,7 @@ import { SectionHeading } from '@/components/primitives';
 // From lib, not primitives: primitives is a client module, and a server
 // component cannot call a function that lives on the client.
 import { sectorLabel } from '@/lib/subsectors';
-import { getCompanyGraph, getCompanyPaths, getWeeklyDigest } from '@/lib/dashboard-data';
+import { everSurfacedCompanies, getCompanyGraph, getCompanyPaths } from '@/lib/dashboard-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,20 +22,29 @@ export default async function GraphPage({
   searchParams: Promise<{ company?: string }>;
 }) {
   const { company } = await searchParams;
-  const digest = await getWeeklyDigest();
-  const candidates = [
-    ...digest.worthAConversation,
-    ...digest.newOnTheRadar,
-    ...digest.whoWeKnow,
-  ];
+  /*
+   * Every company that ever cleared the trigger bar, not this week's digest.
+   *
+   * The picker used to read the current week and then take the first
+   * twenty-four, so 24 of 491 companies were reachable and a company assessed
+   * low never appeared at all. A connection does not expire with the week it
+   * was found in — an RD looking up who they know at a company from a fortnight
+   * ago is the ordinary case, and a low band is a judgment about whether to
+   * approach, not about whether the graph is worth reading.
+   *
+   * everSurfacedCompanies filters on the trigger bar rather than on the
+   * assessment, which is the same rule the "ever surfaced" count on the
+   * dashboard uses, so the list and the number cannot disagree.
+   */
+  const candidates = await everSurfacedCompanies();
 
-  const selectedId = company ?? candidates[0]?.id;
+  const selectedId = company ? Number(company) : candidates[0]?.id;
   const selected = candidates.find((c) => c.id === selectedId) ?? candidates[0];
 
   const [graph, paths] = selected
     ? await Promise.all([
-        getCompanyGraph(selected.companyId),
-        getCompanyPaths(selected.companyId),
+        getCompanyGraph(selected.id),
+        getCompanyPaths(selected.id),
       ])
     : [{ nodes: [], edges: [] }, []];
 
@@ -55,11 +64,15 @@ export default async function GraphPage({
       </header>
 
       {candidates.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No companies surfaced this week.</p>
+        <p className="text-sm text-muted-foreground">No companies have surfaced yet.</p>
       ) : (
         <div className="space-y-6">
-          <div className="flex flex-wrap gap-x-1 gap-y-1.5">
-            {candidates.slice(0, 24).map((c) => (
+          {/* Every company, in a scrolling strip rather than a truncated list:
+              a picker that silently stops at twenty-four is one that cannot
+              answer "who do we know at X" for most of the list. */}
+          <div className="max-h-40 overflow-y-auto rounded-sm border border-border/60 p-2">
+            <div className="flex flex-wrap gap-x-1 gap-y-1.5">
+            {candidates.map((c) => (
               <Link
                 key={c.id}
                 href={`/graph?company=${c.id}`}
@@ -72,13 +85,14 @@ export default async function GraphPage({
                 {c.name}
               </Link>
             ))}
+            </div>
           </div>
 
           {selected && (
             <section className="space-y-4">
               <SectionHeading
                 title={selected.name}
-                subtitle={`${sectorLabel(selected.sector)} · ${selected.hq}`}
+                subtitle={`${selected.sectors.map(sectorLabel).slice(0, 2).join(' · ')} · ${selected.hq}`}
                 right={
                   <span className="num text-2xs text-muted-foreground">
                     {paths.length} {paths.length === 1 ? 'path' : 'paths'}
