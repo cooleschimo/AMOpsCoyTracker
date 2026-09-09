@@ -91,14 +91,18 @@ const isWrappedUrl = (u: string) => /news\.google\.com|\/rss\/articles\//.test(u
  * The signal score, as the dashboard's badge. A number on its own invites
  * being read as a percentage, so it carries its scale.
  */
-/** The scale's own words, so the email and the page agree on what a score means. */
-const SIGNAL_LABEL: Record<number, string> = {
-  3: 'deciding now', 2: 'something happened', 1: 'in the news', 0: 'noise',
-};
-
+/*
+ * The score alone, without the scale's wording.
+ *
+ * "3/3 deciding now" reads as a claim the card has not earned — deciding what,
+ * and says who — and the phrase means something only to somebody who already
+ * knows the rubric. The number against its scale is honest about being an
+ * internal ranking, and the why-now underneath is where the reader finds out
+ * what actually happened.
+ */
 function badge(score: number): string {
   const strong = score >= 3;
-  return `<span style="${MONO} font-size:12px; font-weight:600; color:${strong ? C.primary : C.muted}; background-color:${strong ? C.accentBg : C.secondary}; border:1px solid ${strong ? C.primary : C.border}; border-radius:3px; padding:2px 7px; white-space:nowrap;">${score}/3 ${esc(SIGNAL_LABEL[score] ?? '')}</span>`;
+  return `<span style="${MONO} font-size:12px; font-weight:600; color:${strong ? C.primary : C.muted}; background-color:${strong ? C.accentBg : C.secondary}; border:1px solid ${strong ? C.primary : C.border}; border-radius:3px; padding:2px 7px; white-space:nowrap;">${score}/3</span>`;
 }
 
 /** One band and the reasoning that would have been a hover on the page. */
@@ -161,14 +165,16 @@ function fullCard(c: DashboardCompany, appBaseUrl: string): string {
                       <a href="${esc(appBaseUrl)}/company/${c.companyId}" style="color:${C.ink}; text-decoration:underline; text-decoration-color:${C.primary}; text-underline-offset:3px;">${esc(c.name)}</a>
                     </td>
                   </tr>
-                  <tr>
-                    <td colspan="2" style="${SERIF} font-style:italic; font-size:16px; line-height:23px; padding:5px 0 0 0;">
-                      <a href="${esc(headlineHref)}" style="color:${C.primary}; text-decoration:underline; text-underline-offset:2px;">${esc(c.trigger.headline)}</a>
-                    </td>
-                  </tr>
+                  <!--
+                    No trigger headline here. It said the same thing as the
+                    first why-now point directly beneath it, in the publication's
+                    words rather than the tool's — two lines for one fact. The
+                    source and date stay, since they are what makes the point
+                    checkable, and the headline is still one click away.
+                  -->
                   <tr>
                     <td colspan="2" style="${SANS} font-size:12px; line-height:17px; color:${C.weak}; padding:5px 0 0 0;">
-                      ${esc(c.trigger.source.name)}${c.trigger.source.date ? ` · ${esc(c.trigger.source.date)}` : ''}${c.clusterSize > 1 ? ` · ${c.clusterSize} outlets ran it` : ''}
+                      <a href="${esc(headlineHref)}" style="color:${C.primary}; text-decoration:underline;">${esc(c.trigger.source.name)}</a>${c.trigger.source.date ? ` · ${esc(c.trigger.source.date)}` : ''}${c.clusterSize > 1 ? ` · ${c.clusterSize} outlets` : ''}
                     </td>
                   </tr>
                 </table>
@@ -182,17 +188,22 @@ function fullCard(c: DashboardCompany, appBaseUrl: string): string {
               </td>
             </tr>` : ''}
 
-            <!-- the four bands, with the reasoning the page keeps on hover -->
+            <!--
+              The four bands as a single line, without their reasoning.
+              A sentence under each ran to some seventy words a card, which is
+              most of what made the mail long — and it argues a case the reader
+              has not yet decided to hear. The bands themselves say where the
+              tool landed; the reasoning behind any of them is on the page, one
+              click away, where somebody who disagrees is going to go anyway.
+            -->
             <tr>
-              <td style="padding:14px 20px 8px 20px; border-bottom:1px solid ${C.hairline};">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                  ${band('Priority', a.priority, a.bandReasons?.priority)}
-                  ${band('SG fit', a.sgFit, a.bandReasons?.sgFit)}
-                  ${band('Value', c.potentialValue.band, (c.potentialValue.dimensions ?? []).length
-                      ? `${a.bandReasons?.contribution ?? ''} Driven by ${c.potentialValue.dimensions.join(', ')}.`
-                      : a.bandReasons?.contribution)}
-                  ${band('Confidence', c.potentialValue.confidence, a.bandReasons?.confidence)}
-                </table>
+              <td style="padding:12px 20px; border-bottom:1px solid ${C.hairline};">
+                <span style="${MONO} font-size:12px; color:${C.weak};">
+                  Priority <span style="color:${C.ink}; font-weight:600;">${esc(a.priority)}</span>
+                  &nbsp;&middot;&nbsp; SG fit <span style="color:${C.ink}; font-weight:600;">${esc(a.sgFit)}</span>
+                  &nbsp;&middot;&nbsp; Value <span style="color:${C.ink}; font-weight:600;">${esc(c.potentialValue.band)}</span>
+                  &nbsp;&middot;&nbsp; Confidence <span style="color:${C.ink}; font-weight:600;">${esc(c.potentialValue.confidence)}</span>
+                </span>
               </td>
             </tr>
 
@@ -423,8 +434,7 @@ export function renderDigestText(d: WeeklyDigest, appBaseUrl: string): string {
     out.push(title.toUpperCase(), '-'.repeat(60));
     list.forEach((c, i) => {
       const detail = detailFor(i);
-      out.push(`  ${c.name} — signal ${c.trigger.score}/3, ${SIGNAL_LABEL[c.trigger.score] ?? ''}`);
-      out.push(`    ${c.trigger.headline}`);
+      out.push(`  ${c.name} — signal ${c.trigger.score}/3`);
       out.push(isWrappedUrl(c.trigger.source.url)
         ? `    (${c.trigger.source.name} — open via the company page below)`
         : `    ${c.trigger.source.url}`);
