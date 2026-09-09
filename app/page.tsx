@@ -71,7 +71,14 @@ export default async function Dashboard({
 }: {
   searchParams: Promise<{ place?: string; week?: string; geo?: string; sector?: string }>;
 }) {
-  const { place, week, geo, sector } = await searchParams;
+  const { place, week, geo: geoParam, sector } = await searchParams;
+  /*
+   * The West Coast is where the target list actually lives, so an unfiltered
+   * dashboard was answering a wider question than the one an RD opens it with.
+   * Arriving with no geography in the URL means the West Coast; 'all' is what
+   * a reader picks to widen it, and is what clearing the filter now sets.
+   */
+  const geo = geoParam ?? 'west_coast';
   const [d, weeks] = await Promise.all([getWeeklyDigest(undefined, week), availableWeeks()]);
   const currentWeek = weeks.find((w) => w.label === d.weekLabel)?.weekOf ?? weeks[0]?.weekOf ?? '';
   const isArchive = Boolean(week) && week !== weeks[0]?.weekOf;
@@ -88,7 +95,7 @@ export default async function Dashboard({
    */
   const inPlace = (list: DashboardCompany[]) => list.filter((c) =>
     (!place || c.hq === place)
-    && (!geo || c.geography === geo)
+    && (geo === 'all' || c.geography === geo)
     && (!sector || (c.sectors ?? []).includes(sector)));
 
   /*

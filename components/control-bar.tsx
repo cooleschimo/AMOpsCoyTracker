@@ -31,6 +31,9 @@ const PLACES = [
   { id: 'west_coast', label: 'West Coast' },
   { id: 'other_us', label: 'Rest of US' },
   { id: 'non_us', label: 'International' },
+  // The dashboard opens on the West Coast, so seeing everything is a choice a
+  // reader makes rather than the absence of one.
+  { id: 'all', label: 'Everywhere' },
 ] as const;
 
 export type ControlCounts = {
@@ -87,11 +90,19 @@ export function ControlBar({
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  /** Set or clear one filter, keeping every other one. */
-  const setParam = (key: string, value: string | null) => {
+  /**
+   * Set or clear one filter, keeping every other one.
+   *
+   * `clearable: false` is for a filter with a default: clicking the active
+   * geography would otherwise remove the param and land back on the West
+   * Coast, which looks like the click did nothing.
+   */
+  const setParam = (key: string, value: string | null, opts?: { clearable?: boolean }) => {
     const next = new URLSearchParams(params.toString());
-    if (value === null || next.get(key) === value) next.delete(key);
-    else next.set(key, value);
+    const clearing = value === null
+      || (next.get(key) === value && opts?.clearable !== false);
+    if (clearing) next.delete(key);
+    else if (value !== null) next.set(key, value);
     const qs = next.toString();
     router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   };
@@ -103,10 +114,13 @@ export function ControlBar({
     { href: '/graph', label: 'Connections', count: undefined as number | undefined },
   ];
 
-  const geo = params.get('geo');
+  // No geography in the URL means the West Coast, matching what the page
+  // renders — the pill has to show that, or the dashboard opens filtered with
+  // nothing on the bar saying so.
+  const geo = params.get('geo') ?? 'west_coast';
   const sector = params.get('sector');
   const place = params.get('place');
-  const anyFilter = Boolean(geo || sector || place);
+  const anyFilter = Boolean((geo && geo !== 'all') || sector || place);
 
   return (
     <div
@@ -183,7 +197,7 @@ export function ControlBar({
                     key={p.id}
                     active={geo === p.id}
                     n={counts.places[p.id] ?? 0}
-                    onClick={() => setParam('geo', p.id)}
+                    onClick={() => setParam('geo', p.id, { clearable: false })}
                   >
                     {p.label}
                   </Pill>
@@ -217,7 +231,7 @@ export function ControlBar({
           */}
         {!open && anyFilter && (
           <div className="flex items-center gap-2 pb-2.5">
-            {geo && <Chip label={PLACES.find((p) => p.id === geo)?.label ?? geo} onClear={() => setParam('geo', null)} />}
+            {geo && geo !== 'all' && <Chip label={PLACES.find((p) => p.id === geo)?.label ?? geo} onClear={() => setParam('geo', 'all')} />}
             {sector && <Chip label={counts.sectors.find((s) => s.id === sector)?.label ?? sector} onClear={() => setParam('sector', null)} />}
             {place && <Chip label={place} onClear={() => setParam('place', null)} />}
           </div>
