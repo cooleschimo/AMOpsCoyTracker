@@ -898,8 +898,10 @@ function weekLabel(weekOf?: string | Date | null): string {
   // Weeks run Saturday to Friday — lib/week.ts says why. The label is built
   // here rather than taken from weekRangeLabel because the dashboard carries
   // the year and the digest does not.
+  // A Date from the driver, or a YYYY-MM-DD string from the URL: normalise
+  // through the string form so both land on UTC midnight.
   const sat = weekOf
-    ? new Date(`${String(weekOf).slice(0, 10)}T00:00:00Z`)
+    ? new Date(`${(weekOf instanceof Date ? weekOf.toISOString() : String(weekOf)).slice(0, 10)}T00:00:00Z`)
     : new Date(`${weekOfSaturday()}T00:00:00Z`);
   const fri = weekEnd(sat);
   const fmt = (d: Date, opts: Intl.DateTimeFormatOptions) =>

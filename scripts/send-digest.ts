@@ -24,6 +24,7 @@
  *   npx tsx scripts/send-digest.ts --preview [--week D]     write the mail to out/
  */
 import '../lib/loadenv';
+import { lastWeekSaturday } from '../lib/week';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { getWeeklyDigest } from '../lib/dashboard-data';
 import { renderDigestEmail, renderDigestText } from '../lib/digest-email';
@@ -40,13 +41,6 @@ const arg = (n: string, d?: string) => {
 const flag = (n: string) => process.argv.includes(`--${n}`);
 
 /** Monday of the week just finished — the same default render-digest uses. */
-function lastWeekMonday(): string {
-  const now = new Date();
-  const day = (now.getUTCDay() + 6) % 7;
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day) - 7 * 86400_000)
-    .toISOString().slice(0, 10);
-}
-
 async function renderFor(weekOf: string) {
   const digest = await getWeeklyDigest(undefined, weekOf);
   const base = env.appBaseUrl();
@@ -59,7 +53,7 @@ async function renderFor(weekOf: string) {
 }
 
 (async () => {
-  const weekOf = arg('week', lastWeekMonday())!;
+  const weekOf = arg('week', lastWeekSaturday())!;
 
   if (flag('status') || process.argv.length <= 2) {
     const rows = await listDigests();

@@ -9,6 +9,7 @@
  *   --save  also records the digests row (status 'draft')
  */
 import '../lib/loadenv';
+import { weekOfSaturday, lastWeekSaturday } from '../lib/week';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { eq } from 'drizzle-orm';
 import { getDb, getSql, withRetry } from '../lib/db';
@@ -38,27 +39,13 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
  * looks back one. `--week` overrides, which is how an earlier week is
  * re-rendered.
  */
-function lastWeekMonday(): string {
-  const now = new Date();
-  const day = (now.getUTCDay() + 6) % 7;
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day) - 7 * 86400_000)
-    .toISOString().slice(0, 10);
-}
-
-/** Monday of the current week, so a mid-week re-run updates one digest row. */
-function weekOfMonday(): string {
-  const now = new Date();
-  const day = (now.getUTCDay() + 6) % 7;
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day))
-    .toISOString().slice(0, 10);
-}
 
 (async () => {
   const db = getDb();
   const sqlc = getSql();
   const signalVersion = arg('signals', COMPANY_SIGNAL_VERSION)!;
   const save = flag('save');
-  const weekOf = arg('week', lastWeekMonday())!;
+  const weekOf = arg('week', lastWeekSaturday())!;
 
   // Latest assessment per company, at whatever version is current — a lateral
   // join rather than a plain one, so an unassessed company still yields a row.

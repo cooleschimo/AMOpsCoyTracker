@@ -31,20 +31,13 @@ import { classifyExecHire } from '../lib/exec-hire';
 import { hiringIsTheNews } from '../lib/job-signal';
 import { volumeTriggerFires } from '../lib/ats';
 import { parseFundraise } from '../lib/fundraise';
+import { weekOfSaturday } from '../lib/week';
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
   return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : d;
 };
 const flag = (n: string) => process.argv.includes(`--${n}`);
-
-/** Monday of the current week, so a mid-week re-run replaces one row. */
-function weekOfMonday(): string {
-  const now = new Date();
-  const day = (now.getUTCDay() + 6) % 7;
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day))
-    .toISOString().slice(0, 10);
-}
 
 /**
  * The shape one company's signal must come back in.
@@ -81,7 +74,7 @@ type Out = {
 (async () => {
   const db = getDb();
   const sqlc = getSql();
-  const weekOf = arg('week', weekOfMonday())!;
+  const weekOf = arg('week', weekOfSaturday())!;
   const limit = Number(arg('limit', '0'));
   const dry = flag('dry');
   const force = flag('force');
