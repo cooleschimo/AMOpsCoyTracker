@@ -415,14 +415,19 @@ export function discoveryRank(it: PlacementInput): number {
     // Both openings strong is a better week than one, and the max above cannot
     // say so — a company siting AND ready to partner scores the same there as
     // one only siting. Worth less than a whole step of the lead axis, so it
-    // orders companies that tie on it rather than promoting a weaker opening,
-    // and more than cluster size can reach, so the second signal outranks how
-    // widely the first was reported.
+    // orders companies that tie on it rather than promoting a weaker opening.
     (Math.min(it.expansion, it.partnership) >= 2 ? 5_000 : 0) +
     // A live conversation is slightly below a cold company here: the point of
     // this section is finding what EDB does not already have in hand.
     (it.familiarity === 'in_conversation' ? -5_000 : 0) +
-    Math.min(it.clusterSize, 30) * 100 +
+    // Pace, under both openings. It is not an opening — a company can be moving
+    // fast with nowhere to propose into — so it separates companies that tie on
+    // what is open rather than deciding what opens.
+    it.momentum * 1_000 +
+    // Corroboration, last. Every term above is something the company did; this
+    // is how many outlets noticed, so it decides only what they cannot. Capped
+    // at 9 so a syndicated wire release cannot climb a full step of pace.
+    Math.min(it.clusterSize, 9) * 100 +
     (it.publishedAt ? Math.max(0, 30 - daysOld(it.publishedAt)) : 10)
   );
 }

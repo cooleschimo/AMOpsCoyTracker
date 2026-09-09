@@ -487,10 +487,10 @@ export function SignalBadge({
   const lead: AxisKey = partnership > expansion ? "partnership" : "expansion";
   // Both openings strong reads as one label and one set of dots, the same as a
   // company with only one — and it now ranks above such a company, so the badge
-  // has to say why. The dots stay on the lead axis; this only adds that the
-  // other one is there too.
+  // has to say why. Naming the second axis doubled the pill's width for a word
+  // the hover card already gives, so it is a mark rather than a label: the
+  // reader learns it once, and the dots and the lead label keep their room.
   const bothOpen = Math.min(expansion, partnership) >= 2;
-  const other: AxisKey = lead === "expansion" ? "partnership" : "expansion";
 
   // Deliberately hueless. The sector tags own the colour wheel, and a badge
   // beside a deeptech tag in the same blue read as one label in two halves.
@@ -517,7 +517,7 @@ export function SignalBadge({
           <AxisDots value={Math.max(expansion, partnership)} />
           <span className="text-2xs font-medium uppercase tracking-[0.1em]">
             {AXIS_SCALE[lead].label}
-            {bothOpen && <span className="opacity-60"> + {AXIS_SCALE[other].label}</span>}
+            {bothOpen && <span className="ml-0.5 opacity-60">+1</span>}
           </span>
         </button>
       </HoverCardTrigger>
@@ -538,6 +538,14 @@ export function SignalBadge({
           ))}
         </dl>
         <p className="mt-3 border-t border-border pt-2 text-2xs leading-relaxed text-muted-foreground">
+          {bothOpen && (
+            // What the +1 on the pill counts. The mark is short enough to need
+            // saying once, and this is where a reader checks.
+            <span className="text-foreground">
+              Both siting and opening are live here, which ranks {companyName} above a
+              company open on one.{" "}
+            </span>
+          )}
           What is happening at {companyName} right now. Whether it is a company worth pursuing is a
           separate judgment, shown below.
         </p>
