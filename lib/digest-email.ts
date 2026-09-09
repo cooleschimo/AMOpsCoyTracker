@@ -291,40 +291,59 @@ function fullCard(c: DashboardCompany, appBaseUrl: string, rank = 0): string {
 }
 
 /**
- * The compact entry: heading, score and one line. Used once a section is long
- * enough that the reader is scanning — twenty full cases is a wall, and the
- * dashboard is where the rest of the argument lives.
+ * The compact entry, written to sit in one cell of a two-column grid.
+ *
+ * These companies cleared the same bar as the ones above them and were being
+ * reduced to a name and a headline, which is less than the scorer actually
+ * found — several carry three or four signals. Two columns is what buys the
+ * room to print them: a full-width card wastes most of a 780px line on an
+ * entry this short, where a pair side by side fills it.
+ *
+ * Outlook renders through Word, so the grid is a table with two cells per row
+ * rather than anything that would need flexbox, and a narrow client collapses
+ * it to one column on its own.
  */
 function briefCard(c: DashboardCompany, appBaseUrl: string, withWhy: boolean): string {
-  const why = c.whyNow[0]?.text ?? '';
+  const why = c.whyNow.slice(1, withWhy ? 4 : 2);
   return `
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+                   style="width:100%; border:1px solid ${C.hairline};">
+              <tr>
+                <td style="padding:12px 14px;" valign="top">
+                  <div>
+                    <a href="${esc(appBaseUrl)}/company/${c.companyId}" style="${SERIF} font-size:16px; color:${C.ink}; text-decoration:underline; text-decoration-color:${C.primary}; text-underline-offset:3px;">${esc(c.name)}</a>
+                    &nbsp;${badge(c.trigger.score)}
+                  </div>
+                  <div style="${SANS} font-style:italic; font-size:13px; line-height:19px; color:${C.primary}; padding-top:4px;">
+                    <a href="${esc(c.trigger.source.url)}" style="color:${C.primary}; text-decoration:underline;">${esc(c.trigger.headline)}</a>
+                  </div>
+                  ${why.map((w) => `<div style="${SANS} font-size:13px; line-height:19px; color:${C.muted}; padding-top:3px;">${esc(w.text)}</div>`).join('')}
+                  <div style="${SANS} font-size:12px; line-height:17px; color:${C.weak}; padding-top:5px;">
+                    ${esc(c.trigger.source.name)}${c.hq ? ` · ${esc(c.hq)}` : ''}${c.checkFirst ? ` · <span style="color:${C.caution};">check first</span>` : ''}
+                  </div>
+                </td>
+              </tr>
+            </table>`;
+}
+
+/** Lay the compact entries out two to a row. */
+function briefGrid(list: DashboardCompany[], appBaseUrl: string, firstIsBrief: number): string {
+  const rows: string[] = [];
+  for (let i = 0; i < list.length; i += 2) {
+    const pair = list.slice(i, i + 2);
+    rows.push(`
       <tr>
-        <td style="padding:0 0 3px 0;">
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
-                 style="width:100%; border-bottom:1px solid ${C.hairline};">
+        <td style="padding:0 0 10px 0;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
             <tr>
-              <td style="padding:11px 2px 11px 0;">
-                <div>
-                  <a href="${esc(appBaseUrl)}/company/${c.companyId}" style="${SERIF} font-size:17px; color:${C.ink}; text-decoration:underline; text-decoration-color:${C.primary}; text-underline-offset:3px;">${esc(c.name)}</a>
-                  &nbsp;${badge(c.trigger.score)}
-                </div>
-                <!--
-                  One line under the name, and only for the entries still
-                  carrying detail. The tail is the name, the score and where it
-                  came from — enough to recognise a company worth opening, and
-                  short enough that the whole week fits in the mail.
-                -->
-                ${withWhy && why ? `<div style="${SANS} font-size:13px; line-height:19px; color:${C.muted}; padding-top:2px;">${esc(why)}</div>` : ''}
-                <div style="${SANS} font-size:12px; line-height:17px; color:${C.weak}; padding-top:2px;">
-                  <a href="${esc(c.trigger.source.url)}" style="color:${C.primary}; text-decoration:underline;">${esc(c.trigger.source.name)}</a>
-                  ${c.hq ? ` · ${esc(c.hq)}` : ''}
-                  ${c.checkFirst ? ` · <span style="color:${C.caution};">check first</span>` : ''}
-                </div>
-              </td>
+              <td width="50%" valign="top" style="padding-right:5px;">${briefCard(pair[0]!, appBaseUrl, i < firstIsBrief)}</td>
+              <td width="50%" valign="top" style="padding-left:5px;">${pair[1] ? briefCard(pair[1], appBaseUrl, i + 1 < firstIsBrief) : ''}</td>
             </tr>
           </table>
         </td>
-      </tr>`;
+      </tr>`);
+  }
+  return rows.join('');
 }
 
 /*
@@ -349,10 +368,11 @@ function sectionBlock(
   list = list.filter(isUs);
   if (!list.length) return '';
   const total = list.length;
-  const cards = list.map((c, i) => {
-    const d = detailFor(i);
-    return d === 'full' ? fullCard(c, appBaseUrl, i) : briefCard(c, appBaseUrl, d === 'brief');
-  }).join('');
+  // The full cases run down the page; everything after them goes two to a row.
+  const fulls = list.filter((_, i) => detailFor(i) === 'full');
+  const rest = list.slice(fulls.length);
+  const cards = fulls.map((c, i) => fullCard(c, appBaseUrl, i)).join('')
+    + briefGrid(rest, appBaseUrl, DETAIL_BUDGET.brief - fulls.length);
 
   const more = '';
 
