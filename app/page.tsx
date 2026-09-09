@@ -118,6 +118,8 @@ export default async function Dashboard({
       west_coast: discovery.filter((c) => c.geography === 'west_coast').length,
       other_us: discovery.filter((c) => c.geography === 'other_us').length,
       non_us: discovery.filter((c) => c.geography === 'non_us').length,
+      // Everywhere is the whole set rather than a geography of its own.
+      all: discovery.length,
     },
     sectors: [...sectorCounts.entries()]
       .sort((a, b) => b[1] - a[1])
