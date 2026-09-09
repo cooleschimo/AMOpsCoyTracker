@@ -42,6 +42,7 @@ export function NetworkGraph({
   highlight,
   highlightEdges,
   onSelect,
+  onOpen,
   className,
 }: {
   nodes: NetNode[];
@@ -63,6 +64,14 @@ export function NetworkGraph({
    */
   highlightEdges?: string[] | null;
   onSelect?: (id: string | null) => void;
+  /**
+   * A double click on a node, for opening whatever it stands for.
+   *
+   * Kept apart from onSelect because selecting and leaving are different
+   * intentions: a reader clicks a node to light up its edges and reads the
+   * panel beside it, and navigates away only when they have decided to.
+   */
+  onOpen?: (id: string) => void;
   className?: string;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -260,6 +269,11 @@ export function NetworkGraph({
                   drag.current = null;
                   if (!moved.current) onSelect?.(active ? null : n.id);
                 }}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  onOpen?.(n.id);
+                }}
+                style={onOpen ? { cursor: 'pointer' } : undefined}
               >
                 {(active || hot) && (
                   <circle

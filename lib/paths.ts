@@ -108,6 +108,53 @@ function edgeSentence(subject: string, relation: string, other: string, subjectI
   return `${subject} ${pair[subjectIsFrom ? 0 : 1]}`;
 }
 
+/**
+ * Which of a set of companies have at least one warm path.
+ *
+ * The connections picker listed every company that had ever surfaced, and
+ * better than half of them opened an empty graph — a link that leads nowhere
+ * is worse than no link, because the reader spends the click finding out.
+ *
+ * Running findWarmPaths per company answers this exactly and took 108 seconds
+ * over 211 companies, which is not a page load. This mirrors the same four
+ * joins in one query: a shared person, a shared investor reaching an account or
+ * a Singapore-linked company, a company-to-company edge, or a forthcoming
+ * event. It answers whether there is a path, not what the paths are.
+ */
+export async function companiesWithPaths(ids: number[]): Promise<Set<number>> {
+  if (!ids.length) return new Set();
+  const sql = getSql();
+  const rows: any = await sql`
+    with ids as (select unnest(${ids}::int[]) as id)
+    select distinct ids.id from ids where
+      exists (
+        select 1 from roles r1
+        join roles r2 on r2.person_id = r1.person_id and r2.company_id <> r1.company_id
+        where r1.company_id = ids.id
+      )
+      or exists (
+        select 1 from investments i1
+        join organizations o on o.id = i1.org_id
+        join investments i2 on i2.org_id = o.id and i2.company_id <> i1.company_id
+        join companies c2 on c2.id = i2.company_id
+        where i1.company_id = ids.id
+          and (c2.familiarity = 'account' or o.sg_presence = true
+               or exists (select 1 from sg_links s
+                          where s.subject_type = 'company' and s.subject_id = i2.company_id))
+      )
+      or exists (
+        select 1 from company_edges ce
+        where ce.from_company_id = ids.id or ce.to_company_id = ids.id
+      )
+      or exists (
+        select 1 from event_participants ep
+        join events e on e.id = ep.event_id
+        where ep.company_id = ids.id
+          and (e.starts_on is null or e.starts_on >= current_date)
+      )`;
+  return new Set(rows.map((r: any) => Number(r.id)));
+}
+
 export async function findWarmPaths(
   companyId: number,
   opts: { includeRejected?: boolean } = {},

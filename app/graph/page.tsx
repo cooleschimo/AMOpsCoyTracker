@@ -13,6 +13,7 @@ import { SectionHeading } from '@/components/primitives';
 // component cannot call a function that lives on the client.
 import { sectorLabel } from '@/lib/subsectors';
 import { everSurfacedCompanies, getCompanyGraph, getCompanyPaths } from '@/lib/dashboard-data';
+import { companiesWithPaths } from '@/lib/paths';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +37,19 @@ export default async function GraphPage({
    * assessment, which is the same rule the "ever surfaced" count on the
    * dashboard uses, so the list and the number cannot disagree.
    */
-  const candidates = await everSurfacedCompanies();
+  const everSurfaced = await everSurfacedCompanies();
+
+  /*
+   * Only the companies that have something to show.
+   *
+   * Better than half of those that had surfaced opened an empty graph, and a
+   * link that leads nowhere is worse than no link: the reader spends the click
+   * finding out. The ones with no path are still listed, unlinked, so the
+   * picker does not quietly lose companies a reader is looking for.
+   */
+  const withPaths = await companiesWithPaths(everSurfaced.map((c) => c.id));
+  const candidates = everSurfaced.filter((c) => withPaths.has(c.id));
+  const unlinked = everSurfaced.filter((c) => !withPaths.has(c.id));
 
   const selectedId = company ? Number(company) : candidates[0]?.id;
   const selected = candidates.find((c) => c.id === selectedId) ?? candidates[0];
@@ -84,6 +97,18 @@ export default async function GraphPage({
               >
                 {c.name}
               </Link>
+            ))}
+            {/* No path to show, so no link to follow. Still named, because a
+                reader looking for a company needs to see that it is tracked
+                and that the graph simply has nothing on it yet. */}
+            {unlinked.map((c) => (
+              <span
+                key={c.id}
+                title="No connections recorded yet"
+                className="cursor-default rounded-sm px-2 py-1 text-xs text-muted-foreground/45"
+              >
+                {c.name}
+              </span>
             ))}
             </div>
           </div>

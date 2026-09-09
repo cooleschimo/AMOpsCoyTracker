@@ -11,6 +11,7 @@
  * association, and the wording stays "possible" until a human says otherwise.
  */
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { NetworkGraph, radialLayout, type NetEdge, type NetNode } from './network-graph';
 import { cn } from '@/lib/utils';
@@ -31,6 +32,7 @@ export function CompanyGraphView({
   paths: PathRow[];
   companyName: string;
 }) {
+  const router = useRouter();
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   // Hover previews a path, a click pins it. Hovering wins while it lasts, so
@@ -110,6 +112,17 @@ export function CompanyGraphView({
             // questions — everything this node touches, versus this one path.
             setSelectedPath(null);
             setSelected((cur) => (cur === id ? null : id));
+          }}
+          /*
+           * A double click opens whatever the node stands for. The id carries
+           * its own kind — c for a company, p for a person, o for an
+           * organisation — which is the same encoding getCompanyGraph writes.
+           */
+          onOpen={(id) => {
+            const n = Number(id.slice(1));
+            if (!Number.isFinite(n)) return;
+            const route = id[0] === 'c' ? 'company' : id[0] === 'p' ? 'person' : id[0] === 'o' ? 'org' : null;
+            if (route) router.push(`/${route}/${n}`);
           }}
         />
 
