@@ -584,6 +584,25 @@ export const CONTEXT_SOURCES: ContextSource[] = [
     sectors: [],
     enabled: true,
   },
+  /*
+   * Every headline is a fundraise, stated in the title with the amount and
+   * usually the round: "Gimlet Labs Raises $300M Series B at $3B Valuation".
+   * That is the grammar lib/fundraise.ts parses without a model, so this feed
+   * reaches discovery at the cheapest point in the cascade — 10 of 10 headlines
+   * name a company doing something, against 10 of 25 for the sector trade press.
+   *
+   * The feed is shallow: ten items, and it can sit a couple of days without
+   * moving. A daily pull is what makes that acceptable, and the staleness check
+   * in ingest-context says so if the site goes quiet for good.
+   */
+  {
+    id: 'fundraise_insider',
+    name: 'Fundraise Insider',
+    url: 'https://fundraiseinsider.com/feed',
+    kind: 'trade',
+    sectors: [],
+    enabled: true,
+  },
   {
     id: 'techcrunch_fundraising',
     name: 'TechCrunch — Fundraising',
