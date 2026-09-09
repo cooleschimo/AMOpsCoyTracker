@@ -52,6 +52,42 @@ function Heading({ title, right }: { title: string; right?: React.ReactNode }) {
     </div>
   );
 }
+
+/** The posting tiles, in one shape for both the APAC list and the folded rest. */
+function PostingGrid({ postings }: { postings: any[] }) {
+  return (
+    <div className="mt-2 grid items-start gap-2 [grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr))]">
+      {postings.map((j: any, i: number) => (
+        <a
+          key={i}
+          href={j.url}
+          target="_blank"
+          rel="noreferrer"
+          className={
+            j.is_apac
+              ? 'block rounded-md border border-primary/30 bg-primary/[0.06] px-2.5 py-2 no-underline transition-colors hover:border-primary'
+              : 'block rounded-md border border-border bg-card px-2.5 py-2 no-underline transition-colors hover:border-primary/40'
+          }
+        >
+          <span
+            className={
+              j.is_apac
+                ? 'block text-[9px] font-semibold uppercase tracking-[0.1em] text-confirmed'
+                : 'block text-[9px] uppercase tracking-[0.1em] text-muted-foreground'
+            }
+          >
+            {j.is_apac ? 'APAC' : 'Non-US'}
+          </span>
+          <span className="mt-0.5 block text-sm leading-snug text-foreground">{j.title}</span>
+          {j.location ? (
+            <span className="mt-0.5 block text-2xs leading-snug text-muted-foreground">{j.location}</span>
+          ) : null}
+        </a>
+      ))}
+    </div>
+  );
+}
+
 const band = (v: string | null) => v ?? 'unassessed';
 
 /** A date column comes back as a Date; only the day matters here. */
@@ -140,6 +176,11 @@ export default async function CompanyPage(
         -- thousands are already excluded by the filter above.
         limit 400`,
   ]);
+
+  // The APAC roles carry the placement signal; the rest of the non-US roles
+  // are context, and the query has already sorted the APAC ones to the front.
+  const apacPostings = postings.filter((j: any) => j.is_apac);
+  const restPostings = postings.filter((j: any) => !j.is_apac);
 
   const rawPaths = await findWarmPaths(companyId);
 
@@ -409,36 +450,18 @@ export default async function CompanyPage(
             <>
               {/* The roles behind the count, so the claim is checkable. US
                   postings are excluded: a company can carry two thousand of
-                  them and none bears on where it puts something next. */}
-              <div className="mt-2 grid items-start gap-2 [grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr))]">
-                {postings.map((j: any, i: number) => (
-                  <a
-                    key={i}
-                    href={j.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={
-                      j.is_apac
-                        ? 'block rounded-md border border-primary/30 bg-primary/[0.06] px-2.5 py-2 no-underline transition-colors hover:border-primary'
-                        : 'block rounded-md border border-border bg-card px-2.5 py-2 no-underline transition-colors hover:border-primary/40'
-                    }
-                  >
-                    <span
-                      className={
-                        j.is_apac
-                          ? 'block text-[9px] font-semibold uppercase tracking-[0.1em] text-confirmed'
-                          : 'block text-[9px] uppercase tracking-[0.1em] text-muted-foreground'
-                      }
-                    >
-                      {j.is_apac ? 'APAC' : 'Non-US'}
-                    </span>
-                    <span className="mt-0.5 block text-sm leading-snug text-foreground">{j.title}</span>
-                    {j.location ? (
-                      <span className="mt-0.5 block text-2xs leading-snug text-muted-foreground">{j.location}</span>
-                    ) : null}
-                  </a>
-                ))}
-              </div>
+                  them and none bears on where it puts something next. The
+                  APAC roles are the ones that bear on placement, so they read
+                  in the open and the rest of the non-US roles fold away. */}
+              {apacPostings.length ? <PostingGrid postings={apacPostings} /> : null}
+              {restPostings.length ? (
+                <details className="mt-2">
+                  <summary className={`${META} cursor-pointer`}>
+                    {restPostings.length} other non-US {restPostings.length === 1 ? 'role' : 'roles'}
+                  </summary>
+                  <PostingGrid postings={restPostings} />
+                </details>
+              ) : null}
               <p className={META}>Non-US and APAC roles only.</p>
             </>
           )}
