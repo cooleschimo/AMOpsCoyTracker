@@ -31,8 +31,10 @@ export function FamiliarityControl({ company }: { company: Company }) {
   // and rarely changed. The help text moves to the option titles.
   return (
     <label className="flex items-center gap-x-2">
+      {/* Status, not Account: the field is familiarity — no status, known, in
+          conversation, not known — and none of those says an account exists. */}
       <span className="shrink-0 text-2xs uppercase tracking-[0.12em] text-muted-foreground">
-        Account
+        Status
       </span>
       <select
         value={value}
