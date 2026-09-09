@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Globe2, Layers, Eye, Network, ClipboardList } from 'lucide-react';
+import { Globe2, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -39,7 +39,17 @@ export type ControlCounts = {
   awaiting: number;
 };
 
-export function ControlBar({ counts }: { counts: ControlCounts }) {
+export function ControlBar({
+  counts,
+  masthead,
+  summary,
+}: {
+  counts: ControlCounts;
+  /** Title and week. Stays visible in both states — it is what the page IS. */
+  masthead: React.ReactNode;
+  /** The week's numbers. Shown open, dropped when the bar shrinks. */
+  summary: React.ReactNode;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -71,6 +81,13 @@ export function ControlBar({ counts }: { counts: ControlCounts }) {
     router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   };
 
+  const NAV = [
+    { href: '/', label: 'This week', count: undefined as number | undefined },
+    { href: '/monitoring', label: 'Monitoring', count: counts.monitoring },
+    { href: '/awaiting-assessment', label: 'Awaiting', count: counts.awaiting },
+    { href: '/graph', label: 'Connections', count: undefined as number | undefined },
+  ];
+
   const geo = params.get('geo');
   const sector = params.get('sector');
   const place = params.get('place');
@@ -80,9 +97,55 @@ export function ControlBar({ counts }: { counts: ControlCounts }) {
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="sticky top-0 z-30 -mx-6 mb-8 border-b border-border bg-background/85 backdrop-blur sm:-mx-12 lg:-mx-16"
+      className="sticky top-0 z-30 -mx-6 mb-10 border-b border-border bg-background/85 backdrop-blur sm:-mx-12 lg:-mx-16"
     >
       <div className="mx-auto max-w-[1400px] px-6 sm:px-12 lg:px-16">
+        {/* The masthead is the one part that never collapses: shrunk, it is the
+            line that says which page and which week you are on, and losing it
+            would leave a bare strip of filter chips. */}
+        <div
+          className={cn(
+            'flex flex-wrap items-baseline justify-between gap-x-8 gap-y-1 transition-all duration-200',
+            open ? 'pt-8 pb-1' : 'py-2',
+          )}
+        >
+          <div className="min-w-0 flex-1">{masthead}</div>
+          {/* The page links ride with the masthead rather than in a bar of
+              their own. They were a second fixed strip above this one, saying
+              Monitoring and Connections while this bar said the same in icons.
+              Here they stay reachable at any scroll position, which is what the
+              separate bar was really for. */}
+          <nav className="flex shrink-0 flex-wrap items-baseline gap-x-4 gap-y-1">
+            {NAV.map((n) => (
+              <Link
+                key={n.href}
+                href={n.href}
+                aria-current={pathname === n.href ? 'page' : undefined}
+                className={cn(
+                  'text-xs transition-colors',
+                  pathname === n.href
+                    ? 'font-medium text-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {n.label}
+                {n.count !== undefined && n.count > 0 && (
+                  <span className="num ml-1 text-2xs text-muted-foreground/60">{n.count}</span>
+                )}
+              </Link>
+            ))}
+          </nav>
+        </div>
+
+        <div
+          className={cn(
+            'overflow-hidden transition-all duration-200',
+            open ? 'h-auto pb-5 opacity-100' : 'h-0 opacity-0',
+          )}
+          aria-hidden={!open}
+        >
+          {summary}
+        </div>
         {/* Closed: a single quiet strip. Only what is ON stays legible, because
             a narrowed page with no visible cause reads as a quiet week. */}
         <div
@@ -142,12 +205,11 @@ export function ControlBar({ counts }: { counts: ControlCounts }) {
             </FilterRow>
           )}
 
-          <div className="ml-auto flex items-center gap-1">
-            {place && <Chip label={place} onClear={() => setParam('place', null)} />}
-            <IconLink href="/monitoring" title="Monitoring" Icon={Eye} n={counts.monitoring} />
-            <IconLink href="/awaiting-assessment" title="Awaiting assessment" Icon={ClipboardList} n={counts.awaiting} />
-            <IconLink href="/graph" title="Connections" Icon={Network} />
-          </div>
+          {place && (
+            <div className="ml-auto flex items-center gap-1">
+              <Chip label={place} onClear={() => setParam('place', null)} />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -214,33 +276,5 @@ function Chip({ label, onClear }: { label: string; onClear: () => void }) {
       {label}
       <span className="ml-1.5 text-muted-foreground">×</span>
     </button>
-  );
-}
-
-function IconLink({
-  href,
-  title,
-  Icon,
-  n,
-}: {
-  href: string;
-  title: string;
-  Icon: React.ComponentType<{ className?: string }>;
-  n?: number;
-}) {
-  return (
-    <Link
-      href={href}
-      title={title}
-      aria-label={title}
-      className="relative flex size-8 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-    >
-      <Icon className="size-4" />
-      {n !== undefined && n > 0 && (
-        <span className="num absolute -right-0.5 -top-0.5 text-[0.6rem] text-muted-foreground/70">
-          {n}
-        </span>
-      )}
-    </Link>
   );
 }

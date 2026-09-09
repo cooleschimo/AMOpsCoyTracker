@@ -126,80 +126,75 @@ export default async function Dashboard({
           design: a card that moves as you reach for it is worse than one
           briefly covered. */}
       <main className="mx-auto max-w-[1400px] px-6 py-10 sm:px-12 sm:py-14 lg:px-16">
-      <ControlBar counts={sidebarCounts} />
-      <header className="mb-12 max-w-[68ch] space-y-1">
-        <h1 className="flex items-center gap-2.5 font-display text-3xl font-semibold tracking-tight">
-          {/* A sun, drawn rather than an icon-font glyph: a bare circle with
-              eight rays, at the weight of the text beside it. */}
-          Good AM
-          <svg
-            viewBox="0 0 24 24"
-            className="size-7 shrink-0 text-primary"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            aria-hidden
-          >
-            <circle cx="12" cy="12" r="4.25" />
-            <path d="M12 2.5v2.25M12 19.25v2.25M21.5 12h-2.25M4.75 12H2.5M18.72 5.28l-1.6 1.6M6.88 17.12l-1.6 1.6M18.72 18.72l-1.6-1.6M6.88 6.88l-1.6-1.6" />
-          </svg>
-        </h1>
-        <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-          <span>
-            {isArchive ? 'Looking back at ' : 'Here\u2019s what happened this week, '}
-            {d.weekLabel}.
-          </span>
-          <WeekPicker weeks={weeks} current={currentWeek} />
-        </p>
-
-        {/* A filter has to announce itself. An emptier page with no explanation
-            reads as a quiet week rather than as a narrowed view. */}
-        {place && (
-          <p className="pt-1 text-sm">
-            <span className="text-muted-foreground">Showing only</span>{' '}
-            <span className="font-medium">{place}</span>
+      <ControlBar
+        counts={sidebarCounts}
+        masthead={
+          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+            <h1 className="flex items-center gap-2.5 font-display text-3xl font-semibold tracking-tight">
+              {/* A sun, drawn rather than an icon-font glyph: a bare circle with
+                  eight rays, at the weight of the text beside it. */}
+              Good AM
+              <svg
+                viewBox="0 0 24 24"
+                className="size-7 shrink-0 text-primary"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                aria-hidden
+              >
+                <circle cx="12" cy="12" r="4.25" />
+                <path d="M12 2.5v2.25M12 19.25v2.25M21.5 12h-2.25M4.75 12H2.5M18.72 5.28l-1.6 1.6M6.88 17.12l-1.6 1.6M18.72 18.72l-1.6-1.6M6.88 6.88l-1.6-1.6" />
+              </svg>
+            </h1>
+            <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+              <span>
+                {isArchive ? 'Looking back at ' : 'Here\u2019s what happened this week, '}
+                {d.weekLabel}.
+              </span>
+              <WeekPicker weeks={weeks} current={currentWeek} />
+            </p>
+          </div>
+        }
+        summary={
+          <div className="space-y-1">
+          {place && (
+            <p className="pt-1 text-sm">
+              <span className="text-muted-foreground">Showing only</span>{' '}
+              <span className="font-medium">{place}</span>
+              {' · '}
+              <Link href="/" className="text-muted-foreground link-underline hover:text-foreground">
+                show everywhere
+              </Link>
+            </p>
+          )}
+          <dl className="flex flex-wrap items-baseline gap-x-8 gap-y-2 pt-5">
+            {[
+              { n: d.coverageStats.readThisWeek, label: "articles read", Icon: Radio },
+              { n: d.coverageStats.scoredThisWeek, label: "companies scored", Icon: Building2 },
+              { n: d.coverageStats.surfaced, label: "surfaced", Icon: Sparkles },
+            ].map(({ n, label, Icon }) => (
+              <div key={label} className="flex items-center gap-2">
+                <Icon className="size-4 shrink-0 text-primary/70" strokeWidth={1.5} aria-hidden />
+                <dt className="sr-only">{label} this week</dt>
+                <dd className="flex items-baseline gap-1.5">
+                  <span className="num text-lg font-semibold leading-none">
+                    {n.toLocaleString()}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{label}</span>
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-3 border-t border-border pt-2.5 text-2xs text-muted-foreground/70">
+            <span className="num">{d.coverageStats.monitored.toLocaleString()}</span> companies tracked
             {' · '}
-            <Link href="/" className="text-muted-foreground link-underline hover:text-foreground">
-              show everywhere
-            </Link>
+            <span className="num">{d.coverageStats.processed.toLocaleString()}</span> articles filtered
+            {' '}all time
           </p>
-        )}
-
-        {/* This week's work, then what stands behind it.
-            The two spans used to sit in one row reading as one sentence:
-            "646 companies monitored, 89,396 signals processed, 27 surfaced this
-            week" mixes all-time with weekly and invites the reader to divide
-            one by the other. The week is what the page is about, so it leads;
-            the standing totals are context and take a quieter line. */}
-        <dl className="flex flex-wrap items-baseline gap-x-8 gap-y-2 pt-5">
-          {[
-            { n: d.coverageStats.readThisWeek, label: "articles read", Icon: Radio },
-            { n: d.coverageStats.scoredThisWeek, label: "companies scored", Icon: Building2 },
-            { n: d.coverageStats.surfaced, label: "surfaced", Icon: Sparkles },
-          ].map(({ n, label, Icon }) => (
-            <div key={label} className="flex items-center gap-2">
-              <Icon className="size-4 shrink-0 text-primary/70" strokeWidth={1.5} aria-hidden />
-              <dt className="sr-only">{label} this week</dt>
-              <dd className="flex items-baseline gap-1.5">
-                <span className="num text-lg font-semibold leading-none">
-                  {n.toLocaleString()}
-                </span>
-                <span className="text-xs text-muted-foreground">{label}</span>
-              </dd>
-            </div>
-          ))}
-        </dl>
-        {/* All-time totals ride on the same rule as the week's numbers rather
-            than starting a third line. They are context for the row above, and
-            a separate line gave them a weight they do not carry. */}
-        <p className="mt-3 border-t border-border pt-2.5 text-2xs text-muted-foreground/70">
-          <span className="num">{d.coverageStats.monitored.toLocaleString()}</span> companies tracked
-          {' · '}
-          <span className="num">{d.coverageStats.processed.toLocaleString()}</span> articles filtered
-          {' '}all time
-        </p>
-      </header>
+          </div>
+        }
+      />
 
       <div className="space-y-14">
         {/* The two sections split on company SIZE, not on how the tool rated
