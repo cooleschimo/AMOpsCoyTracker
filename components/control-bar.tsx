@@ -97,32 +97,36 @@ export function ControlBar({
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="sticky top-0 z-30 -mx-6 mb-10 border-b border-border bg-background/85 backdrop-blur sm:-mx-12 lg:-mx-16"
+      className="sticky top-0 z-30 -mx-6 mb-10 border-b border-border bg-background/90 backdrop-blur sm:-mx-12 lg:-mx-16"
     >
       <div className="mx-auto max-w-[1400px] px-6 sm:px-12 lg:px-16">
-        {/* The masthead is the one part that never collapses: shrunk, it is the
-            line that says which page and which week you are on, and losing it
-            would leave a bare strip of filter chips. */}
+        {/*
+          * ROW 1 — identity and navigation, always visible.
+          *
+          * One baseline, three things on it: who this is, which week, where
+          * else to go. The week sits next to the title rather than opposite it,
+          * because they are one statement — "Good AM, 7-13 September" — and
+          * pushing them to opposite ends of a 1400px bar made a reader's eye
+          * travel the whole width to finish a phrase. The links go right, which
+          * is the only thing here that is not about this page.
+          */}
         <div
           className={cn(
-            'flex flex-wrap items-baseline justify-between gap-x-8 gap-y-1 transition-all duration-200',
-            open ? 'pt-8 pb-1' : 'py-2',
+            'flex items-baseline justify-between gap-x-8 transition-[padding] duration-200',
+            open ? 'pt-7 pb-3' : 'py-3',
           )}
         >
-          <div className="min-w-0 flex-1">{masthead}</div>
-          {/* The page links ride with the masthead rather than in a bar of
-              their own. They were a second fixed strip above this one, saying
-              Monitoring and Connections while this bar said the same in icons.
-              Here they stay reachable at any scroll position, which is what the
-              separate bar was really for. */}
-          <nav className="flex shrink-0 flex-wrap items-baseline gap-x-4 gap-y-1">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+            {masthead}
+          </div>
+          <nav className="flex shrink-0 items-baseline gap-x-5">
             {NAV.map((n) => (
               <Link
                 key={n.href}
                 href={n.href}
                 aria-current={pathname === n.href ? 'page' : undefined}
                 className={cn(
-                  'text-xs transition-colors',
+                  'whitespace-nowrap text-xs transition-colors',
                   pathname === n.href
                     ? 'font-medium text-foreground'
                     : 'text-muted-foreground hover:text-foreground',
@@ -137,80 +141,69 @@ export function ControlBar({
           </nav>
         </div>
 
+        {/*
+          * ROW 2 — the week's numbers and the filters, on one line.
+          *
+          * They were two stacked blocks with their own rules and spacing, which
+          * is what made the bar look assembled rather than designed. They are
+          * the same kind of thing — what this page is showing — so they share a
+          * line: the count on the left, what narrows it on the right.
+          */}
         <div
           className={cn(
             'overflow-hidden transition-all duration-200',
-            open ? 'h-auto pb-5 opacity-100' : 'h-0 opacity-0',
+            open ? 'max-h-40 pb-4 opacity-100' : 'max-h-0 opacity-0',
           )}
           aria-hidden={!open}
         >
-          {summary}
-        </div>
-        {/* Closed: a single quiet strip. Only what is ON stays legible, because
-            a narrowed page with no visible cause reads as a quiet week. */}
-        <div
-          className={cn(
-            'flex items-center gap-3 overflow-hidden transition-all duration-200',
-            open ? 'h-0 opacity-0' : 'h-10 opacity-100',
-          )}
-          aria-hidden={open}
-        >
-          <span className="text-2xs uppercase tracking-[0.14em] text-muted-foreground/70">
-            Filters
-          </span>
-          {anyFilter ? (
-            <span className="flex items-center gap-2 text-xs">
-              {geo && <Chip label={PLACES.find((p) => p.id === geo)?.label ?? geo} onClear={() => setParam('geo', null)} />}
-              {sector && <Chip label={counts.sectors.find((s) => s.id === sector)?.label ?? sector} onClear={() => setParam('sector', null)} />}
+          <div className="flex flex-wrap items-center justify-between gap-x-10 gap-y-3 border-t border-border/60 pt-3">
+            {summary}
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+              <FilterRow icon={Globe2} label="Place">
+                {PLACES.map((p) => (
+                  <Pill
+                    key={p.id}
+                    active={geo === p.id}
+                    n={counts.places[p.id] ?? 0}
+                    onClick={() => setParam('geo', p.id)}
+                  >
+                    {p.label}
+                  </Pill>
+                ))}
+              </FilterRow>
+
+              {counts.sectors.length > 0 && (
+                <FilterRow icon={Layers} label="Sector">
+                  {counts.sectors.slice(0, 5).map((s) => (
+                    <Pill
+                      key={s.id}
+                      active={sector === s.id}
+                      n={s.n}
+                      onClick={() => setParam('sector', s.id)}
+                    >
+                      {s.label}
+                    </Pill>
+                  ))}
+                </FilterRow>
+              )}
+
               {place && <Chip label={place} onClear={() => setParam('place', null)} />}
-            </span>
-          ) : (
-            <span className="text-xs text-muted-foreground/60">everywhere · every sector</span>
-          )}
-        </div>
-
-        {/* Open: the controls themselves, on one row. */}
-        <div
-          className={cn(
-            'flex flex-wrap items-center gap-x-6 gap-y-2 overflow-hidden transition-all duration-200',
-            open ? 'h-auto py-2.5 opacity-100' : 'h-0 py-0 opacity-0',
-          )}
-          aria-hidden={!open}
-        >
-          <FilterRow icon={Globe2} label="Place">
-            {PLACES.map((p) => (
-              <Pill
-                key={p.id}
-                active={geo === p.id}
-                n={counts.places[p.id] ?? 0}
-                onClick={() => setParam('geo', p.id)}
-              >
-                {p.label}
-              </Pill>
-            ))}
-          </FilterRow>
-
-          {counts.sectors.length > 0 && (
-            <FilterRow icon={Layers} label="Sector">
-              {counts.sectors.map((s) => (
-                <Pill
-                  key={s.id}
-                  active={sector === s.id}
-                  n={s.n}
-                  onClick={() => setParam('sector', s.id)}
-                >
-                  {s.label}
-                </Pill>
-              ))}
-            </FilterRow>
-          )}
-
-          {place && (
-            <div className="ml-auto flex items-center gap-1">
-              <Chip label={place} onClear={() => setParam('place', null)} />
             </div>
-          )}
+          </div>
         </div>
+
+        {/*
+          * Shrunk, the filters leave one line behind. A narrowed page with no
+          * visible cause reads as a quiet week, so what is ON stays legible
+          * even when the controls are away.
+          */}
+        {!open && anyFilter && (
+          <div className="flex items-center gap-2 pb-2.5">
+            {geo && <Chip label={PLACES.find((p) => p.id === geo)?.label ?? geo} onClear={() => setParam('geo', null)} />}
+            {sector && <Chip label={counts.sectors.find((s) => s.id === sector)?.label ?? sector} onClear={() => setParam('sector', null)} />}
+            {place && <Chip label={place} onClear={() => setParam('place', null)} />}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -226,10 +219,12 @@ function FilterRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2">
-      <Icon className="size-3.5 shrink-0 text-muted-foreground/70" aria-hidden />
+    <div className="flex items-center gap-1.5">
+      <Icon className="size-3 shrink-0 text-muted-foreground/50" aria-hidden />
       <span className="sr-only">{label}</span>
-      <div className="flex flex-wrap items-center gap-1">{children}</div>
+      {/* Hairline-separated rather than spaced: the pills are one control, and
+          a gap alone let them read as three unrelated buttons. */}
+      <div className="flex flex-wrap items-center">{children}</div>
     </div>
   );
 }
@@ -251,7 +246,7 @@ function Pill({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        'cursor-pointer rounded-full px-2.5 py-1 text-xs transition-colors',
+        'cursor-pointer rounded-sm px-2 py-0.5 text-xs transition-colors',
         active
           ? 'bg-primary/[0.1] font-medium text-foreground'
           : 'text-muted-foreground hover:bg-muted hover:text-foreground',

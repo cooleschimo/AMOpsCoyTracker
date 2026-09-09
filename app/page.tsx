@@ -129,14 +129,14 @@ export default async function Dashboard({
       <ControlBar
         counts={sidebarCounts}
         masthead={
-          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-            <h1 className="flex items-center gap-2.5 font-display text-3xl font-semibold tracking-tight">
-              {/* A sun, drawn rather than an icon-font glyph: a bare circle with
-                  eight rays, at the weight of the text beside it. */}
+          <>
+            {/* Sized for a bar, not for a page title. At 3xl this was taller
+                than the row it sits in and forced the week onto its own line. */}
+            <h1 className="flex items-baseline gap-2 font-display text-xl font-semibold tracking-tight">
               Good AM
               <svg
                 viewBox="0 0 24 24"
-                className="size-7 shrink-0 text-primary"
+                className="size-4 shrink-0 translate-y-0.5 text-primary"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.5"
@@ -147,52 +147,34 @@ export default async function Dashboard({
                 <path d="M12 2.5v2.25M12 19.25v2.25M21.5 12h-2.25M4.75 12H2.5M18.72 5.28l-1.6 1.6M6.88 17.12l-1.6 1.6M18.72 18.72l-1.6-1.6M6.88 6.88l-1.6-1.6" />
               </svg>
             </h1>
-            <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-              <span>
-                {isArchive ? 'Looking back at ' : 'Here\u2019s what happened this week, '}
-                {d.weekLabel}.
-              </span>
+            <span className="flex items-baseline gap-x-2 text-sm text-muted-foreground">
+              <span className="text-border">/</span>
+              {isArchive ? 'looking back at ' : ''}
+              {d.weekLabel}
               <WeekPicker weeks={weeks} current={currentWeek} />
-            </p>
-          </div>
+            </span>
+          </>
         }
         summary={
-          <div className="space-y-1">
-          {place && (
-            <p className="pt-1 text-sm">
-              <span className="text-muted-foreground">Showing only</span>{' '}
-              <span className="font-medium">{place}</span>
-              {' · '}
-              <Link href="/" className="text-muted-foreground link-underline hover:text-foreground">
-                show everywhere
-              </Link>
-            </p>
-          )}
-          <dl className="flex flex-wrap items-baseline gap-x-8 gap-y-2 pt-5">
+          <dl className="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
+            {/* Numbers first, label after, on one baseline. The icons that led
+                each stat were three more shapes competing with the filter pills
+                on the same row for a reader's attention. */}
             {[
-              { n: d.coverageStats.readThisWeek, label: "articles read", Icon: Radio },
-              { n: d.coverageStats.scoredThisWeek, label: "companies scored", Icon: Building2 },
-              { n: d.coverageStats.surfaced, label: "surfaced", Icon: Sparkles },
-            ].map(({ n, label, Icon }) => (
-              <div key={label} className="flex items-center gap-2">
-                <Icon className="size-4 shrink-0 text-primary/70" strokeWidth={1.5} aria-hidden />
+              { n: d.coverageStats.readThisWeek, label: 'articles read' },
+              { n: d.coverageStats.scoredThisWeek, label: 'companies scored' },
+              { n: d.coverageStats.surfaced, label: 'surfaced' },
+            ].map(({ n, label }) => (
+              <div key={label} className="flex items-baseline gap-1.5">
                 <dt className="sr-only">{label} this week</dt>
-                <dd className="flex items-baseline gap-1.5">
-                  <span className="num text-lg font-semibold leading-none">
-                    {n.toLocaleString()}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{label}</span>
-                </dd>
+                <dd className="num font-semibold">{n.toLocaleString()}</dd>
+                <span className="text-xs text-muted-foreground">{label}</span>
               </div>
             ))}
+            <span className="text-2xs text-muted-foreground/60">
+              of <span className="num">{d.coverageStats.monitored.toLocaleString()}</span> tracked
+            </span>
           </dl>
-          <p className="mt-3 border-t border-border pt-2.5 text-2xs text-muted-foreground/70">
-            <span className="num">{d.coverageStats.monitored.toLocaleString()}</span> companies tracked
-            {' · '}
-            <span className="num">{d.coverageStats.processed.toLocaleString()}</span> articles filtered
-            {' '}all time
-          </p>
-          </div>
         }
       />
 
