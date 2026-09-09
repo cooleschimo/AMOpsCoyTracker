@@ -17,6 +17,7 @@
  * that is safe to prefetch because it only opens a page.
  */
 import { DETAIL_BUDGET, detailFor } from './placement';
+import { weekRangeLabel } from './week';
 import { EXPORT_CONTROLLED } from './subsectors';
 import type { DigestPlan, Placed, Section } from './placement';
 
@@ -329,7 +330,7 @@ export function renderHtml(input: RenderInput): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FDI signals — week of ${esc(input.weekOf)}</title>
+<title>FDI signals — last week, ${esc(weekRangeLabel(input.weekOf))}</title>
 </head>
 <body style="margin:0; padding:0; background-color:#F0EFEC;">
   <!-- 640px table layout. Outlook renders through Word: no flexbox, no grid. -->
@@ -344,7 +345,7 @@ export function renderHtml(input: RenderInput): string {
                   FDI signals
                 </td></tr>
                 <tr><td style="${FONT} font-size:13px; line-height:19px; color:#6E6E68; padding:3px 0 0 0;">
-                  Week of ${esc(input.weekOf)}
+                  Last week &mdash; ${esc(weekRangeLabel(input.weekOf))}
                 </td></tr>
                 <tr><td style="${FONT} font-size:13px; line-height:19px; color:#93938C; padding:9px 0 0 0;">
                   ${esc(input.coverage)}
@@ -380,7 +381,7 @@ export function renderHtml(input: RenderInput): string {
 export function renderText(input: RenderInput): string {
   const { plan, rows, appBaseUrl } = input;
   const out: string[] = [
-    `FDI SIGNALS — week of ${input.weekOf}`,
+    `FDI SIGNALS — LAST WEEK, ${weekRangeLabel(input.weekOf).toUpperCase()}`,
     input.coverage,
     '',
   ];
