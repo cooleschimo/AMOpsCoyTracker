@@ -285,9 +285,21 @@
      card's internal sizing. */
 }
 
-/* The card keeps its wide-version arrangement; only the scale changes. */
-.dense-cards .fact-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+/* The card keeps its wide-version arrangement; only the scale changes.
+
+   The column count follows the CARD's width rather than the window's. Four
+   labels — TOTAL RAISED, VALUATION, HEADCOUNT, LAST ROUND — need roughly 240px
+   between them; below that they overlap into each other, which is what a
+   viewport breakpoint could not see, since a wide window says nothing about a
+   card sitting in a narrow column. */
+.company-card {
+  container-type: inline-size;
+}
+
+@container (min-width: 260px) {
+  .fact-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .dense-cards .fact-grid {

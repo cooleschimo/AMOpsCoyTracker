@@ -70,7 +70,9 @@ export default async function MonitoringPage() {
                     </span>
                   }
                 />
-                <Masonry className="dense-cards">
+                {/* Half the page: the sectors sit two abreast, so the cards
+                    inside one of them have half the room a dashboard card has. */}
+                <Masonry className="dense-cards" width="half">
                   {inSector.map((c) => (
                     // The control sits under the card rather than inside it:
                     // stopping a watch belongs to this page, and CompanyCase is

@@ -327,7 +327,12 @@ export function FactGrid({
         // No cell borders. Four numbers do not need a table around them, and
         // the rules made a quiet reference row read as the loudest thing on
         // the card. Alignment carries the grouping instead.
-        "fact-grid grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4",
+        //
+        // Two columns is the floor; inside a card the container query in
+        // globals.css opens it to four once the card is wide enough to hold
+        // the labels. A viewport breakpoint cannot judge that — the window
+        // being wide says nothing about a card in a narrow column.
+        "fact-grid grid grid-cols-2 gap-x-4 gap-y-2",
         className,
       )}
     >

@@ -77,7 +77,7 @@ export function CompanyCase({
   }, [open]);
 
   return (
-    <article className="overflow-hidden rounded-md border border-border bg-card transition-colors">
+    <article className="company-card overflow-hidden rounded-md border border-border bg-card transition-colors">
       {/* Header zone. The badge sits top-right in flow rather than absolutely
           positioned — in the two-column layout a card is narrow enough that a
           pinned corner overlaps the company name. */}

@@ -36,11 +36,8 @@ export default async function AwaitingAssessmentPage() {
         <h1 className="font-display text-3xl font-semibold tracking-tight">
           Awaiting assessment
         </h1>
-        <p className="max-w-[62ch] pt-1 text-sm text-muted-foreground">
-          These cleared the same trigger bar as the companies on the dashboard, and
-          nobody has assessed them yet. That is a gap in the work rather than a
-          judgment about the company: any of them could turn out to be worth a
-          conversation once assessed.
+        <p className="pt-1 text-sm text-muted-foreground">
+          These cleared the same trigger bar as the dashboard companies and have not been assessed yet — a gap in the work, not a verdict on the company.
         </p>
       </header>
 

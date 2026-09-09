@@ -16,19 +16,32 @@
  * roughly 300px a card plus the gaps. `auto-fit` would do this without the
  * breakpoints, but a card whose content can be narrow would then collapse
  * further than the design allows.
+ *
+ * The breakpoints read the VIEWPORT, so they only describe the right number of
+ * columns for a grid that spans the page. Inside a half-width column they
+ * count the same three or four and hand each card half the room it needs;
+ * `width` states how much of the page this grid actually gets.
  */
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-export function Masonry({ children, className }: { children: ReactNode; className?: string }) {
+/** How much of the page width this grid spans, which sets the column counts. */
+const COLUMNS = {
+  full: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4',
+  half: 'grid-cols-1 2xl:grid-cols-2',
+} as const;
+
+export function Masonry({
+  children,
+  className,
+  width = 'full',
+}: {
+  children: ReactNode;
+  className?: string;
+  width?: keyof typeof COLUMNS;
+}) {
   return (
-    <div
-      className={cn(
-        'grid items-start gap-8',
-        'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4',
-        className,
-      )}
-    >
+    <div className={cn('grid items-start gap-8', COLUMNS[width], className)}>
       {children}
     </div>
   );
