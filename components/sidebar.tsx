@@ -22,9 +22,14 @@ import { cn } from '@/lib/utils';
  * view is then a link: it survives a refresh, it can be sent to someone, and
  * every section reads the same answer because there is only one.
  *
- * Collapsing is remembered per browser. A reader scanning cards wants the width
- * back; a reader narrowing wants the counts. Neither is the right permanent
- * default, so it is a choice rather than a breakpoint.
+ * Collapsing is remembered per browser. A reader scanning cards wants the
+ * counts out of the way; a reader narrowing wants them. Neither is the right
+ * permanent default, so it is a choice rather than a breakpoint.
+ *
+ * The rail is fixed and overlays the page rather than sitting in the flow.
+ * Displacing the grid meant opening the filters reflowed every card, and a
+ * card that moves as you reach for it is worse than one briefly covered. The
+ * page reserves only the collapsed width, so its layout never changes.
  */
 
 const PLACES = [
@@ -82,7 +87,7 @@ export function Sidebar({ counts }: { counts: SidebarCounts }) {
 
   if (collapsed) {
     return (
-      <nav className="sticky top-0 flex h-dvh w-12 shrink-0 flex-col items-center gap-1 border-r border-border bg-card/40 py-4">
+      <nav className="fixed left-0 top-0 z-30 flex h-dvh w-12 flex-col items-center gap-1 border-r border-border bg-card/80 py-4 backdrop-blur">
         <IconButton onClick={toggle} title="Show filters" Icon={PanelLeftOpen} />
         <div className="my-1 h-px w-6 bg-border" />
         {/* The filters that are ON stay visible while collapsed, because a
@@ -99,7 +104,7 @@ export function Sidebar({ counts }: { counts: SidebarCounts }) {
   }
 
   return (
-    <nav className="sticky top-0 flex h-dvh w-52 shrink-0 flex-col gap-5 overflow-y-auto border-r border-border bg-card/40 px-3 py-4">
+    <nav className="fixed left-0 top-0 z-30 flex h-dvh w-52 flex-col gap-5 overflow-y-auto border-r border-border bg-card/95 px-3 py-4 shadow-lg backdrop-blur">
       <div className="flex items-center justify-between">
         <span className="text-2xs uppercase tracking-[0.14em] text-muted-foreground">This week</span>
         <IconButton onClick={toggle} title="Hide filters" Icon={PanelLeftClose} />

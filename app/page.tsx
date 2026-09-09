@@ -120,9 +120,13 @@ export default async function Dashboard({
   };
 
   return (
-    <div className="flex">
+    <>
+      {/* The rail overlays rather than displaces: opening it must not reflow
+          the grid underneath, because a card moving as you reach for it is
+          worse than a card partly covered. The page keeps its full width in
+          both states. */}
       <Sidebar counts={sidebarCounts} />
-      <main className="mx-auto min-w-0 max-w-[1400px] flex-1 px-6 py-10 sm:px-12 sm:py-14 lg:px-16">
+      <main className="mx-auto max-w-[1400px] px-6 py-10 pl-16 sm:px-12 sm:py-14 sm:pl-20 lg:px-16 lg:pl-24">
       <header className="mb-12 space-y-1">
         <h1 className="flex items-center gap-2.5 font-display text-3xl font-semibold tracking-tight">
           {/* A sun, drawn rather than an icon-font glyph: a bare circle with
@@ -255,6 +259,6 @@ export default async function Dashboard({
 
       </div>
       </main>
-    </div>
+    </>
   );
 }

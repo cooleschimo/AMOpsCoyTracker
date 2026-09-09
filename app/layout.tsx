@@ -42,7 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body>
         <header className="border-b border-border bg-card/70 backdrop-blur">
-          <div className="mx-auto flex max-w-[1400px] flex-wrap items-baseline gap-x-6 gap-y-2 px-6 py-4 sm:px-12 lg:px-16">
+          <div className="mx-auto flex max-w-[1400px] flex-wrap items-baseline gap-x-6 gap-y-2 px-6 py-4 pl-16 sm:px-12 sm:pl-20 lg:px-16 lg:pl-24">
             <Link href="/" className="text-lg font-semibold tracking-tight text-primary">
               AM News
             </Link>
