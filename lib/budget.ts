@@ -41,6 +41,17 @@ export const PROVIDER_LIMITS: Record<string, ProviderLimit> = {
   ...numberedLimits('groq', { tpd: LIMITS.tpdSoftStop, rpd: LIMITS.rpd }),
   // GenerateRequestsPerDayPerProjectPerModel-FreeTier = 20.
   ...numberedLimits('gemini', { rpd: 20 }),
+  /*
+   * OpenRouter's free tier is 50 requests a day per account, which its 429
+   * names outright: `openrouter_free_tier_daily`. Each key here is on its own
+   * account, so each carries its own fifty — five keys, 250 a day.
+   *
+   * Recorded rather than left unmetered so a spent key is skipped instead of
+   * being rediscovered by a 429 on every call. $10 of credit on an account
+   * raises that account to 1,000 a day, which is the cheapest capacity
+   * available to this pipeline by some distance.
+   */
+  ...numberedLimits('openrouter', { rpd: 50 }),
 };
 
 type Spend = { tokensIn: number; tokensOut: number; requests: number; exhausted: string | null };
