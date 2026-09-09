@@ -20,6 +20,7 @@
  */
 import { sql } from 'drizzle-orm';
 import { getSql } from './db';
+import { ENGAGED } from './familiarity';
 
 export type PathKind = 'person_role' | 'fund_portfolio' | 'company_edge' | 'event';
 
@@ -138,7 +139,7 @@ export async function companiesWithPaths(ids: number[]): Promise<Set<number>> {
         join investments i2 on i2.org_id = o.id and i2.company_id <> i1.company_id
         join companies c2 on c2.id = i2.company_id
         where i1.company_id = ids.id
-          and (c2.familiarity = 'account' or o.sg_presence = true
+          and (c2.familiarity = any(${ENGAGED}) or o.sg_presence = true
                or exists (select 1 from sg_links s
                           where s.subject_type = 'company' and s.subject_id = i2.company_id))
       )
@@ -215,7 +216,7 @@ export async function findWarmPaths(
     join investments i2 on i2.org_id = o.id and i2.company_id <> i1.company_id
     join companies c2 on c2.id = i2.company_id
     where i1.company_id = ${companyId}
-      and (c2.familiarity = 'account' or o.sg_presence = true
+      and (c2.familiarity = any(${ENGAGED}) or o.sg_presence = true
            or exists(select 1 from sg_links s where s.subject_type='company' and s.subject_id = i2.company_id))
     limit 400`;
 
@@ -262,14 +263,17 @@ export async function findWarmPaths(
     where ce.from_company_id = ${companyId} or ce.to_company_id = ${companyId}`;
 
   for (const r of edgeRows) {
+    // 'known' or 'in_conversation' — the two values that mean somebody has
+    // actually engaged, which is what makes the other end of an edge reachable.
+    const otherEngaged = ENGAGED.includes(r.other_status as never);
     paths.push({
       kind: 'company_edge',
-      description: `${edgeSentence(subject, String(r.relation), String(r.other_name), Boolean(r.subject_is_from))}${r.other_status === 'account' ? ' EDB already holds them as an account.' : ''}`,
+      description: `${edgeSentence(subject, String(r.relation), String(r.other_name), Boolean(r.subject_is_from))}${otherEngaged ? ' EDB already knows them.' : ''}`,
       viaPersonId: null, viaPersonName: null, viaOrgId: null, viaOrgName: null,
       targetCompanyId: Number(r.other_id), targetCompanyName: String(r.other_name),
       evidence: `Company relationship: ${r.relation}.`,
       sourceUrl: r.source_url as string | null,
-      score: r.other_status === 'account' ? 0.9 : 0.5,
+      score: otherEngaged ? 0.9 : 0.5,
       degree: null, reviewStatus: 'unreviewed', internalOwner: null, doNotUse: false,
     });
   }
