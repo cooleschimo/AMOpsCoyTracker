@@ -12,7 +12,7 @@
 import { getSql } from '../../../lib/db';
 import { sectorLabel } from '../../../lib/subsectors';
 import { hasDashboard } from '../../../lib/auth';
-import { FAMILIARITY_LABELS, type Familiarity } from '../../../lib/familiarity';
+import { ENGAGED, FAMILIARITY_LABELS, type Familiarity } from '../../../lib/familiarity';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +37,7 @@ const H2 = 'mb-2.5 mt-6 text-xs font-bold uppercase tracking-[0.08em] text-prima
  */
 const TAG_COLOURS: Record<string, string> = {
   unknown: 'bg-muted text-muted-foreground',
-  existing_account: 'bg-confirmed/15 text-confirmed',
+  known: 'bg-confirmed/15 text-confirmed',
   in_conversation: 'bg-primary/10 text-primary',
   not_an_account: 'bg-muted text-muted-foreground',
   not_pursuing: 'bg-muted/60 text-muted-foreground/70',
@@ -110,8 +110,10 @@ export default async function OrgPage(
 
   const t = sp.token ?? '';
   const surfaced = portfolio.filter((c: any) => (c.recent_signal ?? 0) >= 2);
-  const accounts = portfolio.filter((c: any) =>
-    c.familiarity === 'existing_account' || c.familiarity === 'in_conversation');
+  // ENGAGED is the pair that means EDB already knows the company: 'known' and
+  // 'in_conversation'. This filtered on 'existing_account', which is not one of
+  // the four values, so the count only ever saw companies in conversation.
+  const accounts = portfolio.filter((c: any) => ENGAGED.includes(c.familiarity));
   const sgCompanies = portfolio.filter((c: any) => c.has_sg);
   // The rows worth reading: everything else is a name in a long list.
   const notable = portfolio.filter((c: any) =>
@@ -140,7 +142,7 @@ export default async function OrgPage(
       <div className="mb-2 rounded-md border border-border bg-card px-3.5 py-3">
         <p className={`${BODY} mb-1.5`}>
           <b>{sgCompanies.length}</b> portfolio companies with a Singapore entity ·{' '}
-          <b>{accounts.length}</b> EDB already holds or is talking to ·{' '}
+          <b>{accounts.length}</b> known or in conversation ·{' '}
           <b>{surfaced.length}</b> surfaced in the last month
         </p>
         {sectorMix.length ? (

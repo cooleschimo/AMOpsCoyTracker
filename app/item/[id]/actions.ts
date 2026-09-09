@@ -60,7 +60,9 @@ export async function recordDisposition(formData: FormData) {
   // history. Record it with its provenance rather than inferring it.
   if (companyId && reasons.includes('already_tracked')) {
     await withRetry(() => db.update(companies).set({
-      familiarity: 'existing_account',
+      // 'known' is the value the vocabulary actually carries; the enum has no
+      // 'existing_account', so writing one put a value here nothing reads.
+      familiarity: 'known',
       familiaritySource: 'rd_review',
       familiarityReviewedAt: new Date(),
     }).where(eq(companies.id, companyId)));
