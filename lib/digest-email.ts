@@ -212,7 +212,7 @@ function fullCard(c: DashboardCompany, appBaseUrl: string): string {
                   ${c.offer ? `
                   <tr>
                     <td style="padding:12px 0 0 0;">
-                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${C.ground}; border:1px solid ${C.hairline};">
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${C.card}; border:1px solid ${C.hairline};">
                         <tr><td style="padding:13px 15px;">
                           <div style="${MONO} font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:${C.weak}; padding-bottom:5px;">Singapore could offer</div>
                           <div style="${SANS} font-size:14px; line-height:21px; color:${C.ink}; font-weight:600;">${esc(c.offer.title)}</div>
@@ -300,20 +300,32 @@ function briefCard(c: DashboardCompany, appBaseUrl: string, withWhy: boolean): s
  * explaining what the tool can and cannot argue is the tool talking about
  * itself.
  */
+/**
+ * How many companies an email section shows at all.
+ *
+ * The dashboard caps a section at 25 because scrolling a page is cheap, but the
+ * same 25 in an inbox is a document — the last send ran to 2,600 words. Eight
+ * is a section somebody reads to the end, and the count in the heading still
+ * says how many cleared the bar, with the rest one link away.
+ */
+const EMAIL_SECTION_CAP = 8;
+
 function sectionBlock(
   title: string, list: DashboardCompany[], appBaseUrl: string,
 ): string {
   if (!list.length) return '';
+  const total = list.length;
+  list = list.slice(0, EMAIL_SECTION_CAP);
   const cards = list.map((c, i) => {
     const d = detailFor(i);
     return d === 'full' ? fullCard(c, appBaseUrl) : briefCard(c, appBaseUrl, d === 'brief');
   }).join('');
 
-  const more = list.length > DETAIL_BUDGET.full ? `
+  const more = total > list.length ? `
       <tr>
         <td style="${SANS} font-size:13px; line-height:20px; color:${C.weak}; padding:12px 0 4px 0;">
-          The first ${DETAIL_BUDGET.full} carry the full case. The rest cleared the same bar &mdash;
-          <a href="${esc(appBaseUrl)}" style="color:${C.primary};">open the dashboard</a> for the argument on any of them.
+          ${total - list.length} more cleared the same bar &mdash;
+          <a href="${esc(appBaseUrl)}" style="color:${C.primary}; text-decoration:underline;">open the dashboard</a>.
         </td>
       </tr>` : '';
 
@@ -322,7 +334,7 @@ function sectionBlock(
         <td style="padding:34px 0 14px 0;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
             <tr><td style="${SERIF} font-size:20px; line-height:26px; color:${C.ink};">${esc(title)}
-              <span style="${MONO} font-size:12px; color:${C.weak};">&nbsp;${list.length}</span>
+              <span style="${MONO} font-size:12px; color:${C.weak};">&nbsp;${total}</span>
             </td></tr>
           </table>
         </td>
@@ -357,16 +369,16 @@ export function renderDigestEmail(d: WeeklyDigest, appBaseUrl: string): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FDI signals — ${esc(d.weekLabel)}</title>
 </head>
-<body style="margin:0; padding:0; background-color:${C.page};">
-  <!-- 900px table layout. Outlook renders through Word: no flexbox, no grid.
-       680 was the old newsletter default and wastes most of a desktop window —
-       this is a working list read at a desk, and the extra width lets a
-       company's facts sit on one line rather than wrapping to three. Mobile
-       clients scale the table down, so the cost is nothing. -->
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${C.page};">
+<body style="margin:0; padding:0; background-color:${C.card};">
+  <!-- 780px table layout. Outlook renders through Word: no flexbox, no grid.
+       680 wasted a desktop window and 900 ran wider than a line stays readable;
+       this sits between, wide enough that a company's facts hold one line.
+       White throughout, because a tinted ground reads as a marketing mailer in
+       an inbox where every other message is on white. -->
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${C.card};">
     <tr>
       <td align="center" style="padding:26px 12px 40px 12px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="900" style="width:900px; max-width:900px; background-color:${C.ground};">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="780" style="width:780px; max-width:780px; background-color:${C.card};">
           <tr>
             <td style="padding:32px 30px 0 30px;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
