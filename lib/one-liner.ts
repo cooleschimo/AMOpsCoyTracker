@@ -26,7 +26,7 @@ RULES
 2. At most ${ONE_LINER_MAX} characters. Aim for 40-60.
 3. No marketing language. Not "leading", "innovative", "world-class", "revolutionary", "trusted by". If the evidence is all marketing, extract the underlying product and drop the adjectives.
 4. No company name, no "The company", no full stop at the end. Write the predicate only.
-5. Lower case except for proper nouns and acronyms.
+5. Sentence case: capitalise the first letter, then proper nouns and acronyms only.
 
 ABSTAIN WHEN THE EVIDENCE IS NOT ABOUT THIS COMPANY
 
@@ -43,16 +43,36 @@ Returning null is the correct answer in those cases and costs nothing. A
 confident description of the wrong company is a serious error — the reader
 cannot tell it is wrong.
 
+WELL-KNOWN COMPANIES
+
+Some names are large and unambiguous enough that you already know what the
+company does — UPS, Hyundai, Teva, NEC. For those you may write the line from
+your own knowledge even when the evidence is thin.
+
+Two conditions, both required:
+
+  - The name identifies ONE company unambiguously. "Reservoir", "Temple",
+    "Muse", "Circular" and "Emergence" are ordinary words before they are
+    companies; a name like that is never well-known enough to use, however
+    plausible a description sounds.
+  - Nothing in the evidence CONTRADICTS what you know. A .edu website, a
+    headline about a university or a local news story means the row is not the
+    company you are thinking of. Return null.
+
+If you would be reasoning from what the name sounds like, that is a guess, not
+knowledge. Abstain.
+
 GOOD
-  "clinical-stage cell therapy for blood and immune disease"
-  "video-understanding AI models"
-  "buy now, pay later instalments at point of sale"
-  "autonomous home robots"
+  "Clinical-stage cell therapy for blood and immune disease"
+  "Video-understanding AI models"
+  "Buy now, pay later instalments at point of sale"
+  "Autonomous home robots"
 
 BAD
   "Orca Bio is a leading clinical-stage biotechnology company." (name, marketing, full stop)
-  "chauffeur-driven car hire in Greenwich, CT" (wrong entity — should be null)
-  "raised $5.3M to expand its platform" (an event, not what it does)
+  "Chauffeur-driven car hire in Greenwich, CT" (wrong entity — should be null)
+  "Raised $5.3M to expand its platform" (an event, not what it does)
+  "AI-driven Automation Robots For Industrial Plants" (title case — sentence case only)
 
 Return JSON: {"lines":[{"name":"<exact name given>","line":"<text or null>"}]}`;
 
@@ -131,6 +151,18 @@ export function cleanOneLiner(raw: unknown): string | null {
 
   if (!s) return null;
   if (NON_ANSWERS.includes(s.toLowerCase())) return null;
+
+  /*
+   * Sentence case, enforced rather than requested. The prompt asks for it, but
+   * a model that returns "ai-driven automation robots" is not wrong enough to
+   * discard a good line over, and one bad capital under a company name is
+   * visible on a card set in a serif face.
+   *
+   * Only the first character is touched. Anything further in is the model's
+   * judgment about a proper noun or an acronym — MRAM, HIV, Qualcomm — and this
+   * cannot tell those from ordinary words without knowing the domain.
+   */
+  s = s.charAt(0).toUpperCase() + s.slice(1);
   // Over the limit means the model ignored the brief rather than that the line
   // needs cutting: truncating mid-word would show a fragment as though it were
   // the answer, so it is dropped and the company simply has no line.

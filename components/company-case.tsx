@@ -64,7 +64,7 @@ export function CompanyHeading({ company, note }: { company: Company; note?: str
 function OneLiner({ text }: { text: string }) {
   if (!text.trim()) return null;
   return (
-    <p className="measure mt-1 text-sm leading-snug text-muted-foreground">{text}</p>
+    <p className="measure mt-1 text-xs italic leading-snug text-muted-foreground">{text}</p>
   );
 }
 
