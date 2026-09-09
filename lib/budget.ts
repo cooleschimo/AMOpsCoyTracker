@@ -53,13 +53,20 @@ export const PROVIDER_LIMITS: Record<string, ProviderLimit> = {
    */
   ...numberedLimits('openrouter', { rpd: 50 }),
   /*
-   * The first OpenRouter account carries credit, which takes it off the free
-   * tier: 1,000 free-model requests a day rather than 50, and its key endpoint
-   * reports is_free_tier false. Listed after the numbered defaults so it
-   * overrides the 50 they set.
+   * The first OpenRouter account carries $10 of credit, which takes it off the
+   * free tier: 1,000 free-model requests a day rather than 50, and its key
+   * endpoint reports is_free_tier false. Listed after the numbered defaults so
+   * it overrides the 50 they set.
    *
-   * If another account is topped up, add it here. The cap is a property of the
-   * ACCOUNT, so a key inherits whatever its account has.
+   * THIS DEPENDS ON THE BALANCE STAYING ABOVE THE THRESHOLD. Calls to a :free
+   * model should not draw it down — that is what free means, and the credit is
+   * a threshold rather than a prepayment — but it has not been watched over a
+   * real run yet. `npx tsx scripts/dev/openrouter-credit.ts` reads the balance
+   * and the tier; if total_usage is climbing, free calls are being billed and
+   * this number goes back to 50 when the balance is gone.
+   *
+   * The cap belongs to the ACCOUNT, so a key inherits whatever its account has.
+   * Topping up another account means adding it here too.
    */
   openrouter: { rpd: 1000 },
 };
