@@ -386,34 +386,66 @@ type ScoreOut = {
     }
 
     const budget = new Budget();
-    console.log(`Scoring ${interleaved.length} cluster heads in batches of ${batchSize}...\n`);
+    /*
+     * How many batches are in flight at once.
+     *
+     * The rate limit is a property of each KEY, and there are fifteen of them —
+     * five Groq, five Gemini, five OpenRouter — so scoring one batch at a time
+     * left fourteen idle and made a 968-batch backlog a four-hour job. The
+     * chain is already interleaved by vendor, so concurrent calls land on
+     * different vendors rather than stacking on one.
+     *
+     * Six rather than fifteen: the ceiling is the rate limit per key, not the
+     * number of keys, and a request that arrives while its provider is busy
+     * waits on the throttle anyway. Six keeps several vendors working without
+     * turning a transient fault into six simultaneous retries.
+     */
+    const concurrency = Number(arg('concurrency', '6'));
+    console.log(`Scoring ${interleaved.length} cluster heads in batches of ${batchSize}, ${concurrency} at a time...\n`);
 
+    /*
+     * The batches, cut once. Only the model call runs concurrently — every
+     * write below stays sequential and in order, so the counters and the insert
+     * path are unchanged from when this was one batch at a time.
+     */
+    const allBatches: typeof interleaved[] = [];
     for (let i = 0; i < interleaved.length; i += batchSize) {
+      allBatches.push(interleaved.slice(i, i + batchSize));
+    }
+
+    for (let g = 0; g < allBatches.length; g += concurrency) {
       if (budget.halted) {
         console.warn(`\nBudget halted: ${budget.haltReason}`);
         console.warn('Remaining heads keep status \'kept\' and will be scored on the next run.');
         break;
       }
-      const batch = interleaved.slice(i, i + batchSize);
-      const forScoring: ItemForScoring[] = batch.map((b, k) => ({
-        n: k + 1,
-        title: b.title,
-        snippet: b.snippet,
-        source: b.source,
-        sourceType: b.sourceType,
-        companyName: b.companyId !== null ? nameById.get(b.companyId) ?? null : null,
-        companySectors: b.companyId !== null ? sectorsById.get(b.companyId) ?? [] : [],
-        publishedAt: b.publishedAt,
+
+      const group = allBatches.slice(g, g + concurrency);
+      const answers = await Promise.all(group.map((batch) => {
+        const forScoring: ItemForScoring[] = batch.map((b, k) => ({
+          n: k + 1,
+          title: b.title,
+          snippet: b.snippet,
+          source: b.source,
+          sourceType: b.sourceType,
+          companyName: b.companyId !== null ? nameById.get(b.companyId) ?? null : null,
+          companySectors: b.companyId !== null ? sectorsById.get(b.companyId) ?? [] : [],
+          publishedAt: b.publishedAt,
+        }));
+        return callJson<{ scores: ScoreOut[] }>({
+          system: ITEM_RUBRIC_SYSTEM,
+          user: buildScoringPrompt(forScoring),
+          model: env.groqModelScoring(),
+          budget,
+          temperature: 0.1,
+        });
       }));
 
+      for (let k = 0; k < group.length; k++) {
+      const batch = group[k]!;
+      const res = answers[k]!;
+
       counts.batches++;
-      const res = await callJson<{ scores: ScoreOut[] }>({
-        system: ITEM_RUBRIC_SYSTEM,
-        user: buildScoringPrompt(forScoring),
-        model: env.groqModelScoring(),
-        budget,
-        temperature: 0.1,
-      });
 
       if (!res.ok || !res.data?.scores) {
         // A malformed response costs one batch, not the run (brief §3).
@@ -472,6 +504,7 @@ type ScoreOut = {
           .onConflictDoNothing({ target: [scores.itemId, scores.rubricVersion] }));
       }
       console.log(`  batch ${counts.batches}: ${rows.length} scored (${counts.scored}/${interleaved.length})`);
+      }
     }
 
     Object.assign(counts, { tokens_in: budget.tokensIn, tokens_out: budget.tokensOut });

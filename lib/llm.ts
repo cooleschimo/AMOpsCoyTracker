@@ -26,18 +26,29 @@ export type LlmResult<T> = {
   model: string;
 };
 
-let lastCallTimes: number[] = [];
+const lastCallTimes = new Map<string, number[]>();
 
-/** RPM throttle: at most LIMITS.rpm calls in any rolling 60s. */
-async function throttle() {
+/**
+ * RPM throttle, PER KEY.
+ *
+ * The limit is a property of the key, not of this process: Groq allows 30 a
+ * minute per key, so five Groq keys are 150 a minute. One shared counter
+ * squeezed all fifteen keys through a single 30 RPM gate and left most of the
+ * chain idle — the throttle, not the providers, was the ceiling.
+ *
+ * Keyed on the label ('groq3'), which is what identifies the key, rather than
+ * on the vendor name.
+ */
+async function throttle(who: string) {
   const now = Date.now();
-  lastCallTimes = lastCallTimes.filter((t) => now - t < 60_000);
-  if (lastCallTimes.length >= LIMITS.rpm) {
-    const waitMs = 60_000 - (now - lastCallTimes[0]) + 250;
-    console.warn(`[llm] RPM throttle: waiting ${Math.round(waitMs / 1000)}s`);
+  const times = (lastCallTimes.get(who) ?? []).filter((t) => now - t < 60_000);
+  if (times.length >= LIMITS.rpm) {
+    const waitMs = 60_000 - (now - times[0]) + 250;
+    console.warn(`[llm] ${who} RPM throttle: waiting ${Math.round(waitMs / 1000)}s`);
     await new Promise((r) => setTimeout(r, waitMs));
   }
-  lastCallTimes.push(Date.now());
+  times.push(Date.now());
+  lastCallTimes.set(who, times);
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -119,7 +130,7 @@ async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider)
   if (opts.reasoningEffort && /gpt-oss/i.test(model)) body.reasoning_effort = opts.reasoningEffort;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    await throttle();
+    await throttle(provider.label ?? provider.name);
     try {
       const res = await fetch(url, {
         method: 'POST',
