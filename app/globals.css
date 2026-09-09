@@ -181,9 +181,9 @@
   --sector-defence: oklch(0.75 0.06 45);
   --sector-ai: oklch(0.74 0.07 300);
 
-  --axis-siting: oklch(0.74 0.06 250);
-  --axis-opening: oklch(0.74 0.06 218);
-  --axis-pace: oklch(0.74 0.06 186);
+  --axis-siting: oklch(0.72 0.14 250);
+  --axis-opening: oklch(0.74 0.13 218);
+  --axis-pace: oklch(0.76 0.12 186);
 
 }
 

@@ -234,7 +234,9 @@ function parseHq(hq: string | null | undefined) {
         sectors: [],
         roundStage: c.round,
         roundAmountMusd: c.amountUsd ? Math.round(c.amountUsd / 1e6) : null,
-        valuationEst: c.valuationUsd ? String(c.valuationUsd) : null,
+        // Millions, like the line above and like every other writer of this
+        // column. The headline parser yields dollars.
+        valuationEst: c.valuationUsd ? String(Math.round(c.valuationUsd / 1e6)) : null,
         valuationSource: c.valuationUsd ? `${c.source}, ${c.title}`.slice(0, 300) : null,
         ...parseHq(c.hq),
         discoveredVia: 'news',

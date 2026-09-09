@@ -264,7 +264,7 @@ export async function researchCompany(companyName: string): Promise<CompanyResea
   // "Spectrum Effect" matches After Effects tutorials and stock-photo pages,
   // because the words appear verbatim. Corroboration is required — either a host
   // that resembles the name, or business language near the mention.
-  const BUSINESS_HINT = /\b(compan(y|ies)|startup|founded|headquarter|raise[ds]?|funding|round|seed|series [a-h]|investor|customers?|platform|technolog|inc\.|corp\.|llc)\b/i;
+  const BUSINESS_HINT = /\b(compan(y|ies)|startup|founded|headquarter|raise[ds]?|funding|round|seed|series [a-l]|investor|customers?|platform|technolog|inc\.|corp\.|llc)\b/i;
   const corroborated = onTopic.filter((h) => {
     const hostCompact = h.host.replace(/\.[a-z.]+$/, '').replace(/[^a-z0-9]/g, '');
     return hostCompact.includes(compact) || BUSINESS_HINT.test(`${h.title} ${h.description}`);

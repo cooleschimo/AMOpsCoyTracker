@@ -438,7 +438,40 @@ export const AXIS_SCALE = {
 
 export type AxisKey = keyof typeof AXIS_SCALE;
 
-function AxisDots({ value }: { value: number }) {
+/**
+ * The three axes, always siting then opening then pace, so a position means the
+ * same thing on every card and in every hover row.
+ *
+ * One hue each, from a single 60-degree band — the axes are one measurement in
+ * three parts, not three taxonomies, and a wheel's worth of hue here would
+ * compete with the sector tags, which are the one place colour means category.
+ */
+const AXIS_ORDER = ["expansion", "partnership", "momentum"] as const;
+const AXIS_HUE = ["bg-axis-siting", "bg-axis-opening", "bg-axis-pace"] as const;
+
+/**
+ * How strongly one axis reads, as ink rather than as a number.
+ *
+ * A 3 is the bar the section is built on, so it sits at full strength; a 2 is
+ * real but not decisive and steps back; a 1 is barely there. 0 is drawn rather
+ * than dropped, because an empty square is what makes a two-axis company look
+ * different from a three-axis one at a glance.
+ *
+ * The squares and the hover dots share this ramp, which is what lets the third
+ * dot at a 3 be the same ink as the square it explains.
+ */
+const AXIS_INK = ["opacity-[0.12]", "opacity-35", "opacity-65", "opacity-100"] as const;
+
+/**
+ * The dots for one axis, in that axis's own colour.
+ *
+ * Each filled dot steps up the same ramp the squares use, so the third dot at a
+ * 3 is exactly the square the card shows — the hover card is then a reading of
+ * the mark rather than a second notation to learn. Unfilled dots stay a faint
+ * track so the scale is visible at any score.
+ */
+function AxisDots({ value, axis }: { value: number; axis?: AxisKey }) {
+  const hue = axis ? AXIS_HUE[AXIS_ORDER.indexOf(axis)] : "bg-current";
   return (
     <span className="flex gap-0.5" aria-hidden>
       {[1, 2, 3].map((i) => (
@@ -446,7 +479,28 @@ function AxisDots({ value }: { value: number }) {
           key={i}
           className={cn(
             "h-1.5 w-1.5 rounded-full",
-            i <= value ? "bg-current" : "bg-current opacity-25",
+            hue,
+            i <= value ? AXIS_INK[i] : "opacity-[0.12]",
+          )}
+        />
+      ))}
+    </span>
+  );
+}
+
+function AxisMeter({
+  expansion, partnership, momentum,
+}: { expansion: number; partnership: number; momentum: number }) {
+  const byAxis: Record<AxisKey, number> = { expansion, partnership, momentum };
+  return (
+    <span className="flex gap-[3px]" aria-hidden>
+      {AXIS_ORDER.map((key, i) => (
+        <span
+          key={key}
+          className={cn(
+            "size-2 rounded-[2px]",
+            AXIS_HUE[i],
+            AXIS_INK[Math.max(0, Math.min(3, byAxis[key]))],
           )}
         />
       ))}
@@ -477,31 +531,16 @@ export function SignalBadge({
   companyName: string;
   className?: string;
 }) {
-  const axes: Array<{ key: AxisKey; value: number }> = [
-    { key: "expansion", value: expansion },
-    { key: "partnership", value: partnership },
-    { key: "momentum", value: momentum },
-  ];
-  // Named for whichever opening is stronger: that is the approach an RD would
-  // actually make, and it is what the placement rule keyed on.
-  const lead: AxisKey = partnership > expansion ? "partnership" : "expansion";
-  // Both openings strong reads as one label and one set of dots, the same as a
-  // company with only one — and it now ranks above such a company, so the badge
-  // has to say why. Naming the second axis doubled the pill's width for a word
-  // the hover card already gives, so it is a mark rather than a label: the
-  // reader learns it once, and the dots and the lead label keep their room.
-  const bothOpen = Math.min(expansion, partnership) >= 2;
-
-  // Deliberately hueless. The sector tags own the colour wheel, and a badge
-  // beside a deeptech tag in the same blue read as one label in two halves.
-  const strength = Math.max(expansion, partnership);
-  const tone =
-    strength >= 3
-      ? "bg-foreground text-background ring-transparent"
-      : strength === 2
-        ? "bg-foreground/[0.08] text-foreground ring-foreground/15"
-        : "bg-transparent text-muted-foreground ring-border";
-
+  // Derived from AXIS_ORDER rather than restated, so the hover rows cannot fall
+  // out of step with the squares they explain.
+  const values: Record<AxisKey, number> = { expansion, partnership, momentum };
+  const axes = AXIS_ORDER.map((key) => ({ key, value: values[key] }));
+  /*
+   * No container. The squares are the mark: a ring and a fill around them added
+   * a second shape saying the same thing the squares already say, and put a
+   * heavy pill next to the sector tags it should sit quietly beside. The hit
+   * area comes from padding, which stays invisible.
+   */
   return (
     <HoverCard openDelay={120} closeDelay={80}>
       <HoverCardTrigger asChild>
@@ -509,16 +548,11 @@ export function SignalBadge({
           type="button"
           aria-label={`Siting ${expansion} of 3, opening ${partnership} of 3, pace ${momentum} of 3`}
           className={cn(
-            "inline-flex cursor-help items-center gap-1.5 rounded-full px-2.5 py-1 ring-1 ring-inset transition-opacity hover:opacity-80",
-            tone,
+            "inline-flex cursor-help items-center -m-1 p-1 transition-opacity hover:opacity-70",
             className,
           )}
         >
-          <AxisDots value={Math.max(expansion, partnership)} />
-          <span className="text-2xs font-medium uppercase tracking-[0.1em]">
-            {AXIS_SCALE[lead].label}
-            {bothOpen && <span className="ml-0.5 opacity-60">+1</span>}
-          </span>
+          <AxisMeter expansion={expansion} partnership={partnership} momentum={momentum} />
         </button>
       </HoverCardTrigger>
       <HoverCardContent align="end" className="w-80">
@@ -526,7 +560,7 @@ export function SignalBadge({
           {axes.map(({ key, value }) => (
             <div key={key}>
               <dt className="flex items-center gap-2">
-                <AxisDots value={value} />
+                <AxisDots value={value} axis={key} />
                 <span className="text-2xs uppercase tracking-[0.12em] text-muted-foreground">
                   {AXIS_SCALE[key].label}
                 </span>
@@ -538,14 +572,6 @@ export function SignalBadge({
           ))}
         </dl>
         <p className="mt-3 border-t border-border pt-2 text-2xs leading-relaxed text-muted-foreground">
-          {bothOpen && (
-            // What the +1 on the pill counts. The mark is short enough to need
-            // saying once, and this is where a reader checks.
-            <span className="text-foreground">
-              Both siting and opening are live here, which ranks {companyName} above a
-              company open on one.{" "}
-            </span>
-          )}
           What is happening at {companyName} right now. Whether it is a company worth pursuing is a
           separate judgment, shown below.
         </p>

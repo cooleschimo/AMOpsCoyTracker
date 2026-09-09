@@ -30,10 +30,19 @@ export type HqRegion = (typeof HQ_REGIONS)[number];
  */
 export const ROUND_STAGES = [
   'seed', 'launch',
+  /*
+   * Through L, because the largest private companies now raise that far and a
+   * vocabulary stopping at H drops the stage silently — the loader writes null
+   * rather than rejecting the row, so the gap reads as "no round known" for
+   * exactly the companies whose rounds are best documented. Databricks is at
+   * Series L.
+   */
   'series_a', 'series_b', 'series_c', 'series_d',
   'series_e', 'series_f', 'series_g', 'series_h',
+  'series_i', 'series_j', 'series_k', 'series_l',
   'series_a_ext', 'series_b_ext', 'series_c_ext', 'series_d_ext',
   'series_e_ext', 'series_f_ext', 'series_g_ext', 'series_h_ext',
+  'series_i_ext', 'series_j_ext', 'series_k_ext', 'series_l_ext',
   // A listing is a financing event with no lettered round. lib/placement.ts
   // already counts it as late-stage; it belongs in the vocabulary too.
   'ipo',

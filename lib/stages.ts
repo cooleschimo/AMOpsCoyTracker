@@ -89,7 +89,25 @@ export const STAGES: Stage[] = [
     why: 'the sector every later judgment reads, and the website check corroborates against' },
   { name: 'websites', script: 'enrich-websites.ts', args: ['--limit', '150'], timeoutMin: 45, phase: 'enrich', cost: 'llm',
     why: 'a website is what the assessment reads, and what people scraping needs' },
-  { name: 'people', script: 'ingest-people.ts', timeoutMin: 25, phase: 'enrich', cost: 'fetch',
+  /*
+   * Two stages, because ingest-people.ts has two modes and running it with no
+   * flag does only the funds — which is why company team pages went unscraped
+   * while the fund half succeeded daily.
+   *
+   * Funds first, for the reason the script's own header gives: a Form D
+   * director proves a board seat, not a fund affiliation, and the fund team
+   * page is the independent second edge that turns an association into a
+   * checkable path.
+   *
+   * Companies is the slow half. Each one probes five URL paths before falling
+   * back to a search, measured at about a company a minute, so the cap is what
+   * bounds a run and the backlog is picked up over successive runs, strongest
+   * signal first. 60 companies is an hour, which is the most this can take
+   * without crowding the stages after it.
+   */
+  { name: 'people_funds', script: 'ingest-people.ts', args: ['--funds'], timeoutMin: 25, phase: 'enrich', cost: 'fetch',
+    why: 'the fund-side edge a warm path is checked against' },
+  { name: 'people_companies', script: 'ingest-people.ts', args: ['--companies', '--limit', '60'], timeoutMin: 70, phase: 'enrich', cost: 'fetch',
     why: 'the named people §8 builds warm paths from' },
   // After ingest-people, which finds the names this puts a title and bio on.
   // Already scoped to people at companies carrying a live signal, so it is a

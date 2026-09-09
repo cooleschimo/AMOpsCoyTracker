@@ -119,6 +119,23 @@ export function looksLikeCompanyName(raw: string): boolean {
   // Two capitalised full names side by side ("Qasar Younis Peter Ludwig") is a
   // people list from a card, not a company.
   if (/^([A-Z][a-z]+\s){3,}[A-Z][a-z]+$/.test(s)) return false;
+  /*
+   * The link's own text, not a name. A portfolio card whose anchor shows the
+   * URL leaves "browser-use.com/" as the visible text, and a screen-reader
+   * label rides along with it — "sourcegraph.com/ (opens in new tab)". Both
+   * arrive as company names and then duplicate a row that already exists under
+   * the real name.
+   */
+  if (/\(opens in (a )?new (tab|window)\)/i.test(s)) return false;
+  /*
+   * A bare domain, but not a name that merely contains a dot: "X.AI" and
+   * "Sierra.ai" are how those companies write themselves. What marks the link
+   * text is a trailing slash, a scheme, or a label long enough that no company
+   * styles itself that way ("sourcegraph.com", "yourcounterpart.com").
+   */
+  if (/^https?:\/\//i.test(s)) return false;
+  if (/^([a-z0-9-]+\.)+[a-z]{2,}\/$/i.test(s)) return false;
+  if (/^[a-z0-9-]{6,}\.(com|io|ai|co|dev|net|org|health|xyz|bio|tech|app)$/i.test(s)) return false;
   // Must contain a letter.
   return /[a-z]/i.test(s);
 }

@@ -30,6 +30,10 @@
  */
 const COMMON_WORD_NAMES = new Set([
   'air', 'anchor', 'apex', 'atlas', 'beacon', 'clay', 'compass', 'echo',
+  // 'electra' is not a common word but behaves like one: the bare query returns
+  // Carmen Electra, Electra Mining Africa and two unrelated battery companies,
+  // and none of them is Electra Therapeutics.
+  'electra',
   'element', 'figure', 'flow', 'forge', 'fusion', 'harvey', 'instinct',
   'linear', 'motion', 'notion', 'orbit', 'origin', 'owner', 'prism', 'pulse',
   'ring', 'scale', 'sierra', 'signal', 'spark', 'summit', 'temple', 'vertex',

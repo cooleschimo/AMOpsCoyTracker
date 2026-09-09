@@ -51,12 +51,24 @@ export const companies = pgTable('companies', {
    */
   oneLiner: text('one_liner'),
   sgApac: text('sg_apac'),
+  /**
+   * USD MILLIONS, like round_amount_musd below it — not dollars, despite the
+   * name carrying no suffix. Every writer divides before storing: load-manual,
+   * load-funding (whose CSV columns are amount_usd and valuation_usd) and
+   * discover-news (whose headline parser yields dollars).
+   *
+   * Worth stating, because the column held both scales at once: a raw
+   * 60000000000 and a 2500 sat side by side, and nothing in a numeric column
+   * says which one a figure is on. lib/dashboard-data.ts scales back up for
+   * money(), which formats dollars.
+   */
   totalRaised: numeric('total_raised'),
   roundStage: text('round_stage'),
   roundAmountMusd: integer('round_amount_musd'),
   roundValMusd: integer('round_val_musd'),
   roundDate: text('round_date'),
   seedFlags: text('seed_flags').array().default([]),
+  /** USD millions. See total_raised above. */
   valuationEst: numeric('valuation_est'),
   valuationSource: text('valuation_source'),
   /**

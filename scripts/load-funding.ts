@@ -180,9 +180,17 @@ const NOT_A_ROUND = /^(acquired|merger|ipo|spac|shelf|reverse merger|bankruptcy)
       if (!co) { counts.funding_company_unmatched++; continue; }
 
       if (!dry) {
+        /*
+         * The CSV carries dollars — amount_usd, valuation_usd — and the columns
+         * hold millions, the unit scripts/load-manual.ts writes and the one
+         * round_amount_musd beside them already uses. Writing the raw figure
+         * put 60000000000 and 2500 in the same column, so a reader could not
+         * tell a $60B valuation from a $2,500 one without guessing at scale.
+         */
+        const toMusd = (v: number) => String(Math.round(v / 1e6));
         await withRetry(() => db.update(companies).set({
-          totalRaised: agg.total > 0 ? String(agg.total) : undefined,
-          valuationEst: agg.latestVal ? String(agg.latestVal) : undefined,
+          totalRaised: agg.total > 0 ? toMusd(agg.total) : undefined,
+          valuationEst: agg.latestVal ? toMusd(agg.latestVal) : undefined,
           // §15: a valuation is only usable with its source attached.
           valuationSource: agg.latestVal
             ? `CB Insights${agg.latestDate ? `, ${agg.latestDate}` : ''}${agg.latestRound ? ` (${agg.latestRound})` : ''}`

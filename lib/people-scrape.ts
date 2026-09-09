@@ -89,6 +89,13 @@ export function looksLikePersonName(raw: string): boolean {
   if (/\d|@|https?:|&|\||,/.test(s)) return false;
   // Company suffixes mean it is an entity, not a person.
   if (/\b(inc|llc|ltd|corp|corporation|company|capital|ventures|partners|fund|group|labs|technologies|holdings)\b/i.test(s)) return false;
+  /*
+   * Institutions, which a leadership page names constantly: a director's bio
+   * says where they trained and where else they sit. "Harvard Medical School"
+   * and "Stanford University" are two to four capitalised words carrying no
+   * corporate suffix, so they clear every test above and arrive as people.
+   */
+  if (/\b(university|universit[eé]|college|school|institute|institut|academy|hospital|foundation|society|association|council|committee|board|boards|ministry|department|agency|bureau)\b/i.test(s)) return false;
   const words = s.split(' ');
   if (words.length < 2 || words.length > 4) return false;
   // A single title word disqualifies a 2-word candidate ("Our Advisors",
@@ -104,7 +111,10 @@ export function looksLikePersonName(raw: string): boolean {
   return words.every((w, i) => {
     if (particle.test(w) && i > 0) return true;
     if (/^[A-Z]\.?$/.test(w)) return true;                 // initial
-    return /^[A-ZÀ-Þ][a-zà-ÿ'’-]+$/.test(w);
+    // A hyphenated given name capitalises both halves — Jean-Luc, Anne-Marie —
+    // so the segment after the hyphen is matched rather than treated as a
+    // lowercase continuation.
+    return /^[A-ZÀ-Þ][a-zà-ÿ'’]*(-[A-ZÀ-Þa-zà-ÿ'’]+)*$/.test(w);
   });
 }
 
@@ -243,6 +253,15 @@ export async function findTeamPageUrl(
         try { return new URL(h.url).hostname.replace(/^www\./, '').endsWith(domain); }
         catch { return false; }
       })
+      /*
+       * A job posting is not a team page, and it is what a large employer
+       * returns for this query: careers.geaerospace.com and jobs.boeing.com
+       * both outrank the real leadership page, then parse into "people" like
+       * "Veteran Talent Community" and "Online Info Sessions". Ranking alone
+       * did not help — with nothing better on the site, a careers URL still
+       * won by default, so it is excluded rather than merely scored lower.
+       */
+      .filter((h) => !/\b(careers?|jobs?)\b|\/job\/|jobs?\./i.test(h.url))
       .sort((a, b) => score(b) - score(a));
     return ranked[0]?.url ?? null;
   } catch {
