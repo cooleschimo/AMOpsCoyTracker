@@ -45,7 +45,8 @@ import { parseFundraise } from './fundraise';
  * trending rather than getting a block of its own.
  */
 export const SECTIONS = [
-  'worth_a_conversation', 'new_on_the_radar', 'familiar_territory',
+  'worth_a_conversation', 'new_on_the_radar', 'who_we_know',
+  'awaiting_assessment',
   'monitoring', 'exploration', 'to_watch', 'omitted',
 ] as const;
 export type Section = (typeof SECTIONS)[number];
@@ -99,7 +100,11 @@ export function detailFor(indexInSection: number): Detail {
 export const SECTION_CAPS: Partial<Record<Section, number>> = {
   worth_a_conversation: 25,
   new_on_the_radar: 25,
-  familiar_territory: 15,
+  who_we_know: 15,
+  // No cap: this section is the assessment backlog, and hiding part of a
+  // backlog behind a cap is how it stops being visible work. It has its own
+  // page, so length costs the dashboard nothing.
+  awaiting_assessment: Number.MAX_SAFE_INTEGER,
   exploration: 1,
 };
 
@@ -132,8 +137,14 @@ export const EARLY_STAGE = {
   /** Rounds that qualify outright. */
   core: ['series_a', 'series_b', 'series_a_ext', 'series_b_ext'],
   /** Admitted on evidence rather than by right. */
-  conditional: ['seed', 'launch', 'series_c', 'series_c_ext'],
-  /** Past this, a company is known whatever its round is called. */
+  conditional: ['seed', 'launch'],
+  /**
+   * Past this, a company is known whatever its round is called. It only ever
+   * DISQUALIFIES: a valuation under it is not evidence of a find, since a
+   * company can be worth three billion with no round on record — Sila
+   * Nanotechnologies is — and calling that early stage because it sat under a
+   * five-billion ceiling is the guess this section exists to avoid.
+   */
   maxValuationUsd: 5e9,
   /**
    * And past this in a single round. Most headlines name an amount without
@@ -150,6 +161,9 @@ export const EARLY_STAGE = {
 } as const;
 
 const LATE_ROUNDS = [
+  // Series C is late here: the bar is Series B and below, because by C a
+  // company is usually established enough that an RD has heard of it.
+  'series_c', 'series_c_ext',
   'series_d', 'series_e', 'series_f', 'series_g', 'series_h',
   'series_d_ext', 'series_e_ext', 'series_f_ext',
   'growth', 'late', 'ipo', 'strategic', 'multiple',
@@ -177,18 +191,26 @@ export function isEarlyStageFind(it: PlacementInput): boolean {
   if (it.familiarity === 'known') return false;
 
   const news = it.title ? parseFundraise(it.title, it.snippet ?? null) : null;
-  const valuation = news?.valuationUsd ?? it.valuationUsd ?? null;
-  if (valuation !== null) return valuation <= EARLY_STAGE.maxValuationUsd;
 
+  /*
+   * The ROUND is read before the valuation, because it is the more specific
+   * fact. Checking valuation first put SiFive — a Series F at $3.65bn — on the
+   * radar as a find, simply because its valuation sat under the cap and the
+   * round label was never reached. A named late round settles the question on
+   * its own; the valuation is what decides when no round is stated.
+   */
   const stage = (news?.round ?? it.roundStage ?? '').toLowerCase();
   if (LATE_ROUNDS.includes(stage as never)) return false;
+
+  const valuation = news?.valuationUsd ?? it.valuationUsd ?? null;
+  if (valuation !== null && valuation > EARLY_STAGE.maxValuationUsd) return false;
+
   if (EARLY_STAGE.core.includes(stage as never)) return true;
   if (stage === 'seed' || stage === 'launch') {
     // A seed round is a plan rather than a business, so it needs the market to
     // have noticed before it is worth an RD's attention.
     return it.clusterSize >= EARLY_STAGE.seedMinOutlets;
   }
-  if (stage === 'series_c' || stage === 'series_c_ext') return true;
 
   // No round named. The amount raised says as much, and is far more often
   // present: a company raising at or under the cap is early stage.
@@ -240,7 +262,7 @@ const daysOld = (d: Date) => Math.floor((Date.now() - d.getTime()) / 86400_000);
  * Familiarity values that disqualify a company from discovery.
  *
  * A company EDB already knows, or is already talking to, is not a find — it
- * belongs under familiar territory instead. 'not_known' is deliberately absent:
+ * belongs under Who we know instead. 'not_known' is deliberately absent:
  * a company someone checked and does not know is precisely what discovery is
  * for, and 'no_status' means nobody has said, which is no reason to exclude it.
  */
@@ -249,19 +271,53 @@ const NOT_DISCOVERABLE: Familiarity[] = ['known', 'in_conversation'];
 /**
  * Which discovery section, or null if not a discovery candidate at all.
  *
- * The dividing line is whether the tool can make an ARGUMENT. A company with an
- * assessed priority and a real trigger earns the full opportunity structure;
- * one with a strong trigger the tool cannot yet argue for is a find worth
- * showing but not worth arguing.
+ * The dividing line is the ASSESSMENT, and an unassessed company is not a
+ * verdict — it is work not yet done. Those two were one section, so a judgment
+ * of 'low' and nobody having looked sat under the same heading, and the tool
+ * could not say which it meant.
+ *
+ *  - high / medium -> worth_a_conversation, the full opportunity structure.
+ *  - low           -> new_on_the_radar: assessed, argued down, still worth
+ *                     seeing, because a low band is a judgment a reader may
+ *                     disagree with and the section is where they can.
+ *  - unassessed    -> awaiting_assessment, a backlog rather than a finding.
  *
  * Company SIZE deliberately does not decide the section. A Micron fab decision
  * and a Series A both belong wherever the argument puts them — an RD reads for
  * what EDB could do about a company, not for how famous it is, and splitting on
  * size separated companies the same conversation would cover.
  */
-export function discoveryTier(it: PlacementInput): 'worth_a_conversation' | 'new_on_the_radar' | null {
+export function discoveryTier(
+  it: PlacementInput,
+): 'worth_a_conversation' | 'new_on_the_radar' | 'awaiting_assessment' | null {
   if (!isDiscovery(it)) return null;
-  return priorityScore(it.targetPriority) >= 2 ? 'worth_a_conversation' : 'new_on_the_radar';
+  if (!isAssessed(it)) return 'awaiting_assessment';
+  /*
+   * The split is SIZE, not how well the tool rated the company.
+   *
+   * It used to be priority: a low-priority company went on the radar, which
+   * made "new on the radar" a list of things the tool thought less of. That is
+   * not what an RD wants from it. Read as a pair of section names, the useful
+   * question is how big the company already is — a Series B is a find, and a
+   * company with a multi-billion valuation is a call to schedule — so that is
+   * what decides.
+   *
+   * A company whose size cannot be established goes to worth_a_conversation.
+   * Not knowing is not evidence of smallness, and the cost of the two mistakes
+   * is different: a large company shown as a find reads as an error, where a
+   * small one among the larger names is merely a lighter entry.
+   */
+  return isEarlyStageFind(it) ? 'new_on_the_radar' : 'worth_a_conversation';
+}
+
+/**
+ * Whether anyone has actually judged this company.
+ *
+ * 'unknown' is what the assessor writes when it ran but reached no verdict, and
+ * null is no row at all; neither is a judgment, so both are a backlog.
+ */
+export function isAssessed(it: PlacementInput): boolean {
+  return it.targetPriority !== null && it.targetPriority !== 'unknown';
 }
 
 /**
@@ -301,7 +357,7 @@ export function isDiscovery(it: PlacementInput): boolean {
 }
 
 /**
- * Familiar territory: companies someone has marked known or in conversation.
+ * Who we know: companies someone has marked known or in conversation.
  * Ranked on momentum, because what matters at a company already in hand is what
  * just moved — a growth event is where a joint project becomes possible.
  *
@@ -309,7 +365,7 @@ export function isDiscovery(it: PlacementInput): boolean {
  * surface instead. Without it, marking a company known would hide it entirely,
  * and the week it did something interesting would pass unseen.
  */
-export function isFamiliarTerritory(it: PlacementInput): boolean {
+export function isWhoWeKnow(it: PlacementInput): boolean {
   if (!it.familiarity) return false;
   if (!ENGAGED.includes(it.familiarity)) return false;
   return it.momentum >= 2 || Math.max(it.expansion, it.partnership) >= 2;
@@ -402,7 +458,9 @@ export type DigestPlan = {
     scored: number;
     placed: number;
     discovery_candidates: number;
-    familiar_territory_candidates: number;
+    who_we_know_candidates: number;
+    /** Discovery candidates nobody has assessed yet — the backlog. */
+    awaiting_assessment: number;
     early_stage_candidates: number;
     /** Entries carrying a full argument, in either section. */
     worth_a_conversation: number;
@@ -420,7 +478,8 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
     scored: input.length,
     placed: 0,
     discovery_candidates: 0,
-    familiar_territory_candidates: 0,
+    who_we_know_candidates: 0,
+    awaiting_assessment: 0,
     early_stage_candidates: 0,
     worth_a_conversation: 0,
     excluded_existing_account: 0,
@@ -434,13 +493,14 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
   ).length;
 
   /*
-   * Discovery, split on company size. `isWorthAConversation` marks the entries
-   * carrying a full argument, in either section — that is emphasis inside a
-   * section, not a section of its own.
+   * Discovery, split on what the assessment says. `isWorthAConversation` marks
+   * the entries carrying a full argument, in either section — that is emphasis
+   * inside a section, not a section of its own.
    */
+  type Tier = Exclude<ReturnType<typeof discoveryTier>, null>;
   const discoveryPool = input
     .map((it) => ({ it, tier: discoveryTier(it) }))
-    .filter((x): x is { it: PlacementInput; tier: 'worth_a_conversation' | 'new_on_the_radar' } => x.tier !== null)
+    .filter((x): x is { it: PlacementInput; tier: Tier } => x.tier !== null)
     .map(({ it, tier }) => ({ ...it, section: tier as Section, rank: discoveryRank(it) }))
     .sort((a, b) => b.rank - a.rank);
   counts.discovery_candidates = discoveryPool.length;
@@ -448,18 +508,22 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
   const discovery = dedupeByCompany(discoveryPool);
   counts.company_deduped += discovery.dropped.length;
 
-  // ---- Familiar territory: companies already known or in conversation -----
-  const inPlayPool = input.filter(isFamiliarTerritory)
-    .map((it) => ({ ...it, section: 'familiar_territory' as Section, rank: trendingRank(it) }))
+  // ---- Who we know: companies already known or in conversation -----
+  const inPlayPool = input.filter(isWhoWeKnow)
+    .map((it) => ({ ...it, section: 'who_we_know' as Section, rank: trendingRank(it) }))
     .sort((a, b) => b.rank - a.rank);
-  counts.familiar_territory_candidates = inPlayPool.length;
+  counts.who_we_know_candidates = inPlayPool.length;
   const inPlay = dedupeByCompany(inPlayPool);
   counts.company_deduped += inPlay.dropped.length;
+  counts.awaiting_assessment = discovery.kept.filter(
+    (d) => d.section === 'awaiting_assessment',
+  ).length;
 
   const buckets: Array<[Section, Placed[]]> = [
     ['worth_a_conversation', discovery.kept.filter((d) => d.section === 'worth_a_conversation')],
     ['new_on_the_radar', discovery.kept.filter((d) => d.section === 'new_on_the_radar')],
-    ['familiar_territory', inPlay.kept],
+    ['who_we_know', inPlay.kept],
+    ['awaiting_assessment', discovery.kept.filter((d) => d.section === 'awaiting_assessment')],
   ];
   for (const [name, list] of buckets) {
     const cap = SECTION_CAPS[name]!;
@@ -483,7 +547,8 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
    * placement, so these are held back rather than featured.
    */
   const placedIds = new Set(
-    [...sections.worth_a_conversation, ...sections.new_on_the_radar, ...sections.familiar_territory]
+    [...sections.worth_a_conversation, ...sections.new_on_the_radar, ...sections.who_we_know,
+     ...sections.awaiting_assessment]
       .map((i) => i.itemId),
   );
   for (const it of input) {
@@ -494,7 +559,7 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
   }
 
   const represented = new Set(
-    [...sections.worth_a_conversation, ...sections.new_on_the_radar, ...sections.familiar_territory]
+    [...sections.worth_a_conversation, ...sections.new_on_the_radar, ...sections.who_we_know]
       .map((i) => i.signalType),
   );
   const cutPool = input.filter((i) => !placedIds.has(i.itemId));
@@ -504,7 +569,7 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
     : null;
 
   counts.placed = sections.worth_a_conversation.length + sections.new_on_the_radar.length
-    + sections.familiar_territory.length + (exploration ? 1 : 0);
+    + sections.who_we_know.length + (exploration ? 1 : 0);
   return { sections, exploration, counts };
 }
 

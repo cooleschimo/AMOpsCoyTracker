@@ -150,6 +150,10 @@ export default async function Dashboard({
       </header>
 
       <div className="space-y-14">
+        {/* The two sections split on company SIZE, not on how the tool rated
+            them: an established company is someone to call, an early-stage one
+            is a find. A company whose size cannot be established sits with the
+            larger names, since not knowing is not evidence of smallness. */}
         <GeographySection
           title="Worth a conversation"
           companies={inPlace(d.worthAConversation)}
@@ -158,7 +162,7 @@ export default async function Dashboard({
         <GeographySection
           title="New on the radar"
           companies={inPlace(d.newOnTheRadar)}
-          empty="No new finds this week."
+          empty="No early-stage finds this week."
         />
         <Section
           title="Who we know"
