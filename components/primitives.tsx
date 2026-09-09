@@ -485,6 +485,12 @@ export function SignalBadge({
   // Named for whichever opening is stronger: that is the approach an RD would
   // actually make, and it is what the placement rule keyed on.
   const lead: AxisKey = partnership > expansion ? "partnership" : "expansion";
+  // Both openings strong reads as one label and one set of dots, the same as a
+  // company with only one — and it now ranks above such a company, so the badge
+  // has to say why. The dots stay on the lead axis; this only adds that the
+  // other one is there too.
+  const bothOpen = Math.min(expansion, partnership) >= 2;
+  const other: AxisKey = lead === "expansion" ? "partnership" : "expansion";
 
   // Deliberately hueless. The sector tags own the colour wheel, and a badge
   // beside a deeptech tag in the same blue read as one label in two halves.
@@ -511,6 +517,7 @@ export function SignalBadge({
           <AxisDots value={Math.max(expansion, partnership)} />
           <span className="text-2xs font-medium uppercase tracking-[0.1em]">
             {AXIS_SCALE[lead].label}
+            {bothOpen && <span className="opacity-60"> + {AXIS_SCALE[other].label}</span>}
           </span>
         </button>
       </HoverCardTrigger>

@@ -412,6 +412,13 @@ export function discoveryRank(it: PlacementInput): number {
     // Whichever kind of opening is stronger: a company deciding where to put
     // something and one ready for a joint project are both actionable now.
     Math.max(it.expansion, it.partnership) * 10_000 +
+    // Both openings strong is a better week than one, and the max above cannot
+    // say so — a company siting AND ready to partner scores the same there as
+    // one only siting. Worth less than a whole step of the lead axis, so it
+    // orders companies that tie on it rather than promoting a weaker opening,
+    // and more than cluster size can reach, so the second signal outranks how
+    // widely the first was reported.
+    (Math.min(it.expansion, it.partnership) >= 2 ? 5_000 : 0) +
     // A live conversation is slightly below a cold company here: the point of
     // this section is finding what EDB does not already have in hand.
     (it.familiarity === 'in_conversation' ? -5_000 : 0) +
