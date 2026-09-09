@@ -23,13 +23,20 @@ import {
 import { FamiliarityControl, DispositionControls } from "./company-controls";
 
 export function CompanyHeading({ company, note }: { company: Company; note?: string | undefined }) {
+  const newToday = company.whyNow.filter((p) => p.isNew).length;
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-      <Link href={`/company/${company.id}`}
-        className="font-serif text-2xl tracking-tight hover:link-underline"
-      >
-        {company.name}
-      </Link>
+      <span className="inline-flex items-start gap-1.5">
+        <Link href={`/company/${company.id}`}
+          className="font-serif text-2xl tracking-tight hover:link-underline"
+        >
+          {company.name}
+        </Link>
+        {/* A company holds its place all week, so the name alone cannot say
+            whether anything moved. The bubble sits against the name because
+            that is where a reader scanning a grid is already looking. */}
+        {newToday > 0 ? <NewTodayTag count={newToday} /> : null}
+      </span>
       {/* The sector is already tagged above the name; repeating it here spends
           a line on something the reader has just read. */}
       <LocationEdit companyId={Number(company.companyId)} hq={company.hq} source={company.hqSource} />
@@ -81,11 +88,6 @@ export function CompanyCase({
         <div className="flex items-start justify-between gap-x-3">
           <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1">
             <SectorTag sector={company.sector} />
-            {/* A company keeps its place all week, so the card alone cannot say
-                whether anything moved. This repeats at the top what the why-now
-                list marks per point, because that is the question a reader has
-                when scanning rather than reading. */}
-            {company.whyNow.some((p) => p.isNew) ? <NewTodayTag /> : null}
             <SignalTypeSet points={company.whyNow} />
             <span className="num font-mono text-2xs text-muted-foreground">
               {company.trigger.source.date}
