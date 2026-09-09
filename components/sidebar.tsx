@@ -59,6 +59,35 @@ export function Sidebar({ counts }: { counts: SidebarCounts }) {
    */
   const [collapsed, setCollapsed] = useState(false);
 
+  /*
+   * Which section the page is parked on.
+   *
+   * These are jump links, but the browser leaves the hash in the URL after one,
+   * so a row stayed lit with no way to put it out — the sidebar looked like a
+   * filter that had latched. Tracking the hash makes the highlight true, and
+   * clicking the lit row clears it.
+   */
+  const [here, setHere] = useState('');
+  useEffect(() => {
+    const read = () => setHere(window.location.hash.slice(1));
+    read();
+    window.addEventListener('hashchange', read);
+    return () => window.removeEventListener('hashchange', read);
+  }, []);
+
+  const jumpTo = (id: string) => {
+    if (here === id) {
+      // Already there: clear the mark and leave the page where it is. Putting
+      // the reader back at the top would undo the scroll they just made.
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+      setHere('');
+      return;
+    }
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    history.replaceState(null, '', `#${id}`);
+    setHere(id);
+  };
+
   useEffect(() => {
     try {
       if (localStorage.getItem(STORAGE_KEY) === '1') setCollapsed(true);
@@ -114,10 +143,15 @@ export function Sidebar({ counts }: { counts: SidebarCounts }) {
           on the page, and this says how much is in each before scrolling. */}
       <Group>
         {counts.sections.map((s) => (
-          <a key={s.id} href={`#${s.id}`} className={rowClass(false)}>
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => jumpTo(s.id)}
+            className={rowClass(here === s.id)}
+          >
             <span className="truncate">{s.label}</span>
             <Count n={s.n} />
-          </a>
+          </button>
         ))}
       </Group>
 

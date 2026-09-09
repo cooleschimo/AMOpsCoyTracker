@@ -32,13 +32,16 @@ function Section({
   title,
   companies,
   empty,
+  id,
 }: {
   title: string;
   companies: DashboardCompany[];
   empty: string;
+  /** Scroll target for the sidebar's jump links. */
+  id?: string;
 }) {
   return (
-    <section className="space-y-4">
+    <section id={id} className="scroll-mt-6 space-y-4">
       <SectionHeading
         title={title}
         right={
@@ -216,6 +219,7 @@ export default async function Dashboard({
           empty="No early-stage finds this week."
         />
         <Section
+          id="known"
           title="Who we know"
           companies={inPlace(d.whoWeKnow)}
           empty="No companies marked as known yet."
