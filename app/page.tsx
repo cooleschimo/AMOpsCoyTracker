@@ -14,9 +14,11 @@ import { CompanyCase } from '@/components/company-case';
 import { GeographySection } from '@/components/geography-tabs';
 import { Building2, Radio, Sparkles } from 'lucide-react';
 import { Masonry } from '@/components/masonry';
-import { SectionHeading } from '@/components/primitives';
+import { CollapsedSection, SectionHeading } from '@/components/primitives';
 import { availableWeeks, getWeeklyDigest, type DashboardCompany } from '@/lib/dashboard-data';
 import { WeekPicker } from '@/components/week-picker';
+import { Sidebar } from '@/components/sidebar';
+import { isBroadSector, sectorShort } from '@/lib/subsectors';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,9 +63,9 @@ function Section({
 export default async function Dashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ place?: string; week?: string }>;
+  searchParams: Promise<{ place?: string; week?: string; geo?: string; sector?: string }>;
 }) {
-  const { place, week } = await searchParams;
+  const { place, week, geo, sector } = await searchParams;
   const [d, weeks] = await Promise.all([getWeeklyDigest(undefined, week), availableWeeks()]);
   const currentWeek = weeks.find((w) => w.label === d.weekLabel)?.weekOf ?? weeks[0]?.weekOf ?? '';
   const isArchive = Boolean(week) && week !== weeks[0]?.weekOf;
@@ -73,11 +75,54 @@ export default async function Dashboard({
    * card asks a question about the whole week, not about the section that card
    * happened to be in.
    */
-  const inPlace = (list: DashboardCompany[]) =>
+  /*
+   * Every filter narrows every section, because each asks a question about the
+   * week rather than about the section a card happened to land in. They compose:
+   * geography AND sector AND a named place all hold at once.
+   */
+  const inPlace = (list: DashboardCompany[]) => list.filter((c) =>
+    (!place || c.hq === place)
+    && (!geo || c.geography === geo)
+    && (!sector || (c.sectors ?? []).includes(sector)));
+
+  /*
+   * Counts for the sidebar, taken BEFORE the geography and sector filters so a
+   * reader can see what selecting one would give them. Counting after would
+   * show every option as zero except the one already chosen.
+   */
+  const forCounts = (list: DashboardCompany[]) =>
     place ? list.filter((c) => c.hq === place) : list;
+  const discovery = [...forCounts(d.worthAConversation), ...forCounts(d.newOnTheRadar)];
+  const sectorCounts = new Map<string, number>();
+  for (const c of discovery) {
+    for (const sub of c.sectors ?? []) {
+      if (isBroadSector(sub)) continue;
+      sectorCounts.set(sub, (sectorCounts.get(sub) ?? 0) + 1);
+    }
+  }
+  const sidebarCounts = {
+    sections: [
+      { id: 'worth', label: 'Worth a conversation', n: inPlace(d.worthAConversation).length },
+      { id: 'radar', label: 'New on the radar', n: inPlace(d.newOnTheRadar).length },
+      { id: 'known', label: 'Who we know', n: inPlace(d.whoWeKnow).length },
+    ],
+    places: {
+      west_coast: discovery.filter((c) => c.geography === 'west_coast').length,
+      other_us: discovery.filter((c) => c.geography === 'other_us').length,
+      non_us: discovery.filter((c) => c.geography === 'non_us').length,
+    },
+    sectors: [...sectorCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([id, n]) => ({ id, label: sectorShort(id), n })),
+    monitoring: d.monitoring.length,
+    awaiting: d.lowFit.length,
+  };
 
   return (
-    <main className="mx-auto max-w-[1400px] px-6 py-10 sm:px-12 sm:py-14 lg:px-16">
+    <div className="flex">
+      <Sidebar counts={sidebarCounts} />
+      <main className="mx-auto min-w-0 max-w-[1400px] flex-1 px-6 py-10 sm:px-12 sm:py-14 lg:px-16">
       <header className="mb-12 space-y-1">
         <h1 className="flex items-center gap-2.5 font-display text-3xl font-semibold tracking-tight">
           {/* A sun, drawn rather than an icon-font glyph: a bare circle with
@@ -155,11 +200,13 @@ export default async function Dashboard({
             is a find. A company whose size cannot be established sits with the
             larger names, since not knowing is not evidence of smallness. */}
         <GeographySection
+          id="worth"
           title="Worth a conversation"
           companies={inPlace(d.worthAConversation)}
           empty="Nothing cleared the bar this week."
         />
         <GeographySection
+          id="radar"
           title="New on the radar"
           companies={inPlace(d.newOnTheRadar)}
           empty="No early-stage finds this week."
@@ -175,39 +222,39 @@ export default async function Dashboard({
           empty="Nothing monitored yet."
         />
 
-        {/* The backlog gets a line rather than a section: it is work outstanding,
-            not part of the week's read, and its length varies with how far the
-            last assessment run got before its budget ran out. */}
-        {d.lowFit.length > 0 && (
-          <p className="border-t border-border pt-6 text-sm text-muted-foreground">
-            <span className="num">{d.lowFit.length}</span>{' '}
-            {d.lowFit.length === 1 ? 'company' : 'companies'} assessed as a weak fit
-            for Singapore this week.{' '}
-            <Link
-              href="/low-fit"
-              className="text-primary link-underline hover:text-foreground"
-            >
-              See the reasoning
-            </Link>
-            .
-          </p>
-        )}
+        {/*
+          * Both of these are complete lists rather than a week's read, and both
+          * answer a question an RD only sometimes has — what the tool judged
+          * weak, and what it has not judged yet. Collapsed, they sit as sections
+          * on the page instead of as footnotes bolted underneath it, and neither
+          * pushes the sections carrying a live argument off screen.
+          */}
+        <CollapsedSection
+          title="Assessed as a weak fit"
+          count={d.lowFit.length}
+          blurb="Cleared the same trigger bar, then rated low on priority or on Singapore fit. Each card carries the reasoning — if one looks wrong, that is the part worth correcting."
+        >
+          <Masonry className="dense-cards">
+            {inPlace(d.lowFit).map((c) => (
+              <CompanyCase key={c.id} company={c} />
+            ))}
+          </Masonry>
+        </CollapsedSection>
 
-        {d.awaitingAssessment.length > 0 && (
-          <p className="border-t border-border pt-6 text-sm text-muted-foreground">
-            <span className="num">{d.awaitingAssessment.length}</span>{' '}
-            {d.awaitingAssessment.length === 1 ? 'company' : 'companies'} surfaced this
-            week without an assessment.{' '}
-            <Link
-              href="/awaiting-assessment"
-              className="text-primary link-underline hover:text-foreground"
-            >
-              Review them
-            </Link>
-            .
-          </p>
-        )}
+        <CollapsedSection
+          title="Awaiting assessment"
+          count={d.awaitingAssessment.length}
+          blurb="Surfaced this week with nobody having assessed them yet. A gap in the work rather than a judgment — any of these could turn out to be worth a conversation."
+        >
+          <Masonry className="dense-cards">
+            {inPlace(d.awaitingAssessment).map((c) => (
+              <CompanyCase key={c.id} company={c} />
+            ))}
+          </Masonry>
+        </CollapsedSection>
+
       </div>
-    </main>
+      </main>
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, TriangleAlert } from "lucide-react";
+import { ArrowUpRight, ChevronRight, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -830,6 +830,70 @@ export function QuietButton({
       )}
       {...props}
     />
+  );
+}
+
+/**
+ * A section held closed until it is asked for.
+ *
+ * Some sections are answers to questions an RD only sometimes has — what the
+ * tool judged weak, what it has not judged yet. They belong on the week's page,
+ * because a judgment nobody can see is one nobody can correct, but open they
+ * would push the sections carrying a live argument off the screen.
+ *
+ * So the heading is the whole control: the same rule and count as every other
+ * section, plus what it is for, and it opens in place. That reads as part of
+ * the page rather than as a footnote bolted to the bottom of it, which two
+ * stacked link paragraphs did not.
+ */
+export function CollapsedSection({
+  title,
+  blurb,
+  count,
+  children,
+}: {
+  title: string;
+  blurb: string;
+  count: number;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  if (count === 0) return null;
+
+  return (
+    <section className="space-y-4">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="group w-full cursor-pointer border-b border-border pb-3 text-left transition-colors hover:border-primary"
+      >
+        <span className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+          <span className="flex items-baseline gap-2">
+            <ChevronRight
+              className={cn(
+                "size-3.5 shrink-0 translate-y-0.5 text-muted-foreground transition-transform",
+                open && "rotate-90",
+              )}
+              strokeWidth={2}
+              aria-hidden
+            />
+            <span className="font-display text-lg tracking-tight text-muted-foreground transition-colors group-hover:text-foreground">
+              {title}
+            </span>
+            <span className="num text-2xs text-muted-foreground">{count}</span>
+          </span>
+          <span className="text-2xs text-muted-foreground">
+            {open ? 'hide' : 'show'}
+          </span>
+        </span>
+        <span className="mt-1 block max-w-[68ch] pl-[1.4rem] text-sm text-muted-foreground">
+          {blurb}
+        </span>
+      </button>
+
+      {open && <div className="pt-2">{children}</div>}
+    </section>
   );
 }
 
