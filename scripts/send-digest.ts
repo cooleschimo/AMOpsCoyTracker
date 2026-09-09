@@ -54,7 +54,7 @@ async function renderFor(weekOf: string) {
     html: renderDigestEmail(digest, base),
     text: renderDigestText(digest, base),
     counts: digest.worthAConversation.length + digest.newOnTheRadar.length
-      + digest.familiarTerritory.length + digest.monitoring.length,
+      + digest.whoWeKnow.length + digest.monitoring.length,
   };
 }
 

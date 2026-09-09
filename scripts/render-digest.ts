@@ -172,7 +172,7 @@ function weekOfMonday(): string {
   // render rows are keyed by item, so the last write would win. Trending is
   // stamped first and discovery second: the discovery tiers carry the fuller
   // treatment, so an item in both should render as the one that says more.
-  for (const sec of ['familiar_territory', 'new_on_the_radar', 'worth_a_conversation'] as const) {
+  for (const sec of ['who_we_know', 'new_on_the_radar', 'worth_a_conversation'] as const) {
     for (const p of plan.sections[sec]) {
       const r = renderRows.get(p.itemId);
       if (r) r.section = sec;
@@ -183,7 +183,7 @@ function weekOfMonday(): string {
     if (r) r.section = 'exploration';
   }
 
-  for (const sec of ['worth_a_conversation', 'new_on_the_radar', 'familiar_territory'] as const) {
+  for (const sec of ['worth_a_conversation', 'new_on_the_radar', 'who_we_know'] as const) {
     for (const p of plan.sections[sec]) {
       const r = renderRows.get(p.itemId);
       if (!r || p.companyId === null) continue;
@@ -202,7 +202,7 @@ function weekOfMonday(): string {
   // Singapore's proposition, for the featured tier ONLY. One call per item,
   // at most four, so this costs a handful of requests rather than a run.
   const budget = new Budget();
-  for (const p of [...plan.sections.worth_a_conversation, ...plan.sections.new_on_the_radar, ...plan.sections.familiar_territory]) {
+  for (const p of [...plan.sections.worth_a_conversation, ...plan.sections.new_on_the_radar, ...plan.sections.who_we_know]) {
     const r = renderRows.get(p.itemId);
     if (!r) continue;
     // What Singapore has already done in this space, from the public record.
@@ -256,7 +256,7 @@ function weekOfMonday(): string {
   console.log(`\nTEST MODE: ${env.appBaseUrl() ? 'app base ' + env.appBaseUrl() : ''} — nothing is sent by this script.`);
 
   if (save) {
-    const featured = (['worth_a_conversation', 'new_on_the_radar', 'familiar_territory'] as const)
+    const featured = (['worth_a_conversation', 'new_on_the_radar', 'who_we_know'] as const)
       .flatMap((s2) => plan.sections[s2]).map((i) => i.itemId);
     const ids = plan.exploration ? [...featured, plan.exploration.itemId] : featured;
     const [run] = await db.insert(runs).values({ stage: 'render_digest' }).returning();

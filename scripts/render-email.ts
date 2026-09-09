@@ -23,7 +23,7 @@ const arg = (n: string, d: string) => {
 
   const d = await getWeeklyDigest();
   const total = d.worthAConversation.length + d.newOnTheRadar.length
-    + d.newOnTheRadar.length + d.familiarTerritory.length + d.monitoring.length;
+    + d.newOnTheRadar.length + d.whoWeKnow.length + d.monitoring.length;
   if (!total) {
     console.log('Nothing placed this week. Run the weekly first.');
     return;
@@ -40,7 +40,7 @@ const arg = (n: string, d: string) => {
   console.log(`  worth a conversation  ${d.worthAConversation.length}`);
   
   console.log(`  early-stage finds     ${d.newOnTheRadar.length}`);
-  console.log(`  familiar territory    ${d.familiarTerritory.length}`);
+  console.log(`  who we know           ${d.whoWeKnow.length}`);
   console.log(`  monitoring            ${d.monitoring.length}`);
   console.log(`\nwrote ${html}`);
   console.log(`wrote ${text}`);

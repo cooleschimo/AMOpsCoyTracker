@@ -65,16 +65,16 @@ export type RenderInput = {
 const SECTION_TITLES: Partial<Record<Section, string>> = {
   worth_a_conversation: 'WORTH A CONVERSATION',
   new_on_the_radar: 'NEW ON THE RADAR',
-  familiar_territory: 'FAMILIAR TERRITORY',
+  who_we_know: 'WHO WE KNOW',
 };
 
 const SECTION_NOTES: Partial<Record<Section, string>> = {
   worth_a_conversation: 'Companies we can argue for, with something happening now.',
-  new_on_the_radar: 'Genuine finds we cannot yet argue for — the model\u2019s reasoning is shown so you can correct it.',
-  familiar_territory: 'Companies you already know, where something moved this week.',
+  new_on_the_radar: 'Assessed and argued down — shown with the reasoning so you can disagree with it.',
+  who_we_know: 'Companies you already know, where something moved this week.',
 };
 
-const ORDER: Section[] = ['worth_a_conversation', 'new_on_the_radar', 'familiar_territory'];
+const ORDER: Section[] = ['worth_a_conversation', 'new_on_the_radar', 'who_we_know'];
 
 /**
  * Google News RSS links are redirect wrappers ~400 characters long whose target
@@ -397,7 +397,7 @@ export function renderText(input: RenderInput): string {
       out.push(`    Why now: ${r.why}`);
     }
 
-    if (r.section === 'familiar_territory') {
+    if (r.section === 'who_we_know') {
     }
 
     // The full opportunity structure belongs only to the tier the tool can

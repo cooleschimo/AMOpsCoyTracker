@@ -329,7 +329,7 @@ export function renderDigestEmail(d: WeeklyDigest, appBaseUrl: string): string {
     sectionBlock('Worth a conversation', d.worthAConversation, appBaseUrl)
     + sectionBlock('New on the radar', d.newOnTheRadar, appBaseUrl)
     + sectionBlock('Early-stage finds', d.newOnTheRadar, appBaseUrl)
-    + sectionBlock('Familiar territory', d.familiarTerritory, appBaseUrl)
+    + sectionBlock('Who we know', d.whoWeKnow, appBaseUrl)
     + sectionBlock('Monitoring', d.monitoring, appBaseUrl);
 
   return `<!doctype html>
@@ -431,7 +431,7 @@ export function renderDigestText(d: WeeklyDigest, appBaseUrl: string): string {
   section('Worth a conversation', d.worthAConversation);
   section('New on the radar', d.newOnTheRadar);
   section('Early-stage finds', d.newOnTheRadar);
-  section('Familiar territory', d.familiarTerritory);
+  section('Who we know', d.whoWeKnow);
   section('Monitoring', d.monitoring);
 
   out.push('', 'Bands and scores are the tool’s judgment, not a measurement.');
