@@ -294,6 +294,13 @@ export const items = pgTable('items', {
 }, (t) => [
   index('items_status_idx').on(t.status),
   index('items_company_idx').on(t.companyId),
+  /*
+   * The dashboard counts a cluster's members once per row it shows. Without
+   * this that count scanned the whole items table each time — 363 rows became
+   * 363 scans of ninety thousand, and the page took ten seconds to answer a
+   * filter click that now takes under two.
+   */
+  index('items_cluster_id_idx').on(t.clusterId),
 ]);
 
 /**

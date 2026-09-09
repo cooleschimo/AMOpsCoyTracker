@@ -537,19 +537,21 @@ async function whyNowContext(
     }
   }
 
-  const others: any = await sql`
+  /*
+   * Both read items for the same companies and neither reads the other, so they
+   * are issued together. Awaited in turn they doubled this function's share of
+   * the page's load for nothing.
+   */
+  const [others, scored]: any = await Promise.all([
+    sql`
     select cs.company_id, cs.why, i.id as item_id, i.source, i.url,
            i.source_type, i.published_at,
            ${sql.unsafe(arrivedRecently('i'))} as fetched_today
     from company_signals cs
     join items i on i.id = cs.representative_item_id
     where cs.signal_version = ${signalVersion}
-      and cs.company_id = any(${companyIds})`;
-
-  // The representative item's own source, plus every other scored item for the
-  // same company — hiring aggregates especially, which is where co-occurrence
-  // becomes visible (§7).
-  const scored: any = await sql`
+      and cs.company_id = any(${companyIds})`,
+    sql`
     select ic.company_id, s.why, i.id as item_id, i.source, i.url,
            i.source_type, i.published_at,
            ${sql.unsafe(arrivedRecently('i'))} as fetched_today
@@ -558,7 +560,9 @@ async function whyNowContext(
     join item_companies ic on ic.item_id = i.id
     where ic.company_id = any(${companyIds}) and i.status = 'kept'
     order by i.published_at desc nulls last
-    limit 2000`;
+    limit 2000`,
+  ]);
+
 
   for (const row of [...(others as Row[]), ...(scored as Row[])]) {
     const itemId = Number(row.item_id);
@@ -783,48 +787,64 @@ export async function getWeeklyDigest(
   // Companies actually watched, not every row in the table. Portfolio scraping
   // fills the graph with thousands of names that are never fetched for news or
   // scored, and counting those would claim coverage the tool does not have.
-  // Everything else counts, whatever route found it — naming origins here made
-  // the figure drift every time ingestion grew.
-  const [{ companies = 0 } = {}]: any = await sql`
-    select count(*)::int as companies from companies c
-    where coalesce(c.discovered_via, '') <> 'portfolio'
-      and coalesce(c.scope_status, 'unknown') <> 'out_of_scope'`;
   /*
-   * Distinct companies ever surfaced, not a sum of weekly counts. A company
-   * that qualifies three weeks running is one company an RD could have been
-   * told about, and adding the weeks up would claim three.
+   * The counts and the monitoring list, together rather than one after another.
    *
-   * The bar is QUALIFY, the same threshold that admits a company to a discovery
-   * section. Replaying the full placement over history is not possible — it
-   * reads assessments as they stand now, not as they stood then — but the
-   * trigger bar is what decides whether a company reached the page at all.
+   * None of them reads another's result, but each was awaited in turn, so the
+   * page paid the sum of six round trips to a database in another region — ten
+   * seconds before a filter click showed anything, on queries that are a few
+   * hundred milliseconds each. Issued together they cost about the slowest one.
    */
-  const [{ ever_surfaced: everSurfaced = 0 } = {}]: any = await sql`
-    select count(distinct company_id)::int as ever_surfaced
-    from company_signals
-    where greatest(expansion, partnership) >= ${QUALIFY.minTopAxis}
-      and momentum >= ${QUALIFY.minMomentum}`;
-
-  const [{ signals = 0 } = {}]: any =
-    await sql`select count(*)::int as signals from items where status <> 'fetched'`;
-  /*
-   * The same reading, for this week alone.
-   *
-   * The three figures used to mix spans without saying so: two counted
-   * everything since the tool started and one counted the current week, which
-   * read as one sentence and measured three different things. Both are worth
-   * knowing — what the week produced, and how much stands behind it — so both
-   * are carried and the UI separates them.
-   */
-  const [{ read = 0 } = {}]: any = await sql`
-    select count(*)::int as read from items
-    where status <> 'fetched'
-      and coalesce(published_at, fetched_at) > now() - interval '7 days'`;
-  const [{ scored = 0 } = {}]: any = await sql`
-    select count(distinct company_id)::int as scored from company_signals
-    where signal_version = ${signalVersion}
-      and week_of = coalesce(${weekOf ?? null}::date,
-        (select max(week_of) from company_signals where signal_version = ${signalVersion}))`;
+  const [
+    [{ companies = 0 } = {}],
+    [{ ever_surfaced: everSurfaced = 0 } = {}],
+    [{ signals = 0 } = {}],
+    [{ read = 0 } = {}],
+    [{ scored = 0 } = {}],
+    monitoring,
+  ]: any = await Promise.all([
+    // Everything except portfolio counts, whatever route found it — naming
+    // origins here made the figure drift every time ingestion grew.
+    sql`
+      select count(*)::int as companies from companies c
+      where coalesce(c.discovered_via, '') <> 'portfolio'
+        and coalesce(c.scope_status, 'unknown') <> 'out_of_scope'`,
+    /*
+     * Distinct companies ever surfaced, not a sum of weekly counts. A company
+     * that qualifies three weeks running is one company an RD could have been
+     * told about, and adding the weeks up would claim three.
+     *
+     * The bar is QUALIFY, the same threshold that admits a company to a
+     * discovery section. Replaying the full placement over history is not
+     * possible — it reads assessments as they stand now, not as they stood then
+     * — but the trigger bar is what decides whether a company reached the page.
+     */
+    sql`
+      select count(distinct company_id)::int as ever_surfaced
+      from company_signals
+      where greatest(expansion, partnership) >= ${QUALIFY.minTopAxis}
+        and momentum >= ${QUALIFY.minMomentum}`,
+    sql`select count(*)::int as signals from items where status <> 'fetched'`,
+    /*
+     * The same reading, for this week alone.
+     *
+     * The three figures used to mix spans without saying so: two counted
+     * everything since the tool started and one counted the current week, which
+     * read as one sentence and measured three different things. Both are worth
+     * knowing — what the week produced, and how much stands behind it — so both
+     * are carried and the UI separates them.
+     */
+    sql`
+      select count(*)::int as read from items
+      where status <> 'fetched'
+        and coalesce(published_at, fetched_at) > now() - interval '7 days'`,
+    sql`
+      select count(distinct company_id)::int as scored from company_signals
+      where signal_version = ${signalVersion}
+        and week_of = coalesce(${weekOf ?? null}::date,
+          (select max(week_of) from company_signals where signal_version = ${signalVersion}))`,
+    getMonitoredCompanies(signalVersion),
+  ]);
 
   const worthAConversation = pick(plan.sections.worth_a_conversation);
   const newOnTheRadar = pick(plan.sections.new_on_the_radar);
@@ -835,7 +855,6 @@ export async function getWeeklyDigest(
   // and given its own page rather than a slot in the weekly read.
   const awaitingAssessment = pick(plan.sections.awaiting_assessment);
   const lowFit = pick(plan.sections.low_fit);
-  const monitoring = await getMonitoredCompanies(signalVersion);
 
   return {
     weekLabel: weekLabel(rows[0]?.week_of as string | undefined),
