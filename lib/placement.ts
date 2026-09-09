@@ -421,11 +421,14 @@ export function discoveryRank(it: PlacementInput): number {
     // Whichever kind of opening is stronger: a company deciding where to put
     // something and one ready for a joint project are both actionable now.
     Math.max(it.expansion, it.partnership) * 10_000 +
-    // Both openings strong is a better week than one, and the max above cannot
-    // say so — a company siting AND ready to partner scores the same there as
-    // one only siting. Worth less than a whole step of the lead axis, so it
-    // orders companies that tie on it rather than promoting a weaker opening.
-    (Math.min(it.expansion, it.partnership) >= 2 ? 5_000 : 0) +
+    // How much is open in total, not just the strongest and whether a second
+    // cleared a bar. Both terms above saturate: a company at 2/3 and one at 3/3
+    // score the same on the max AND both pass the second-opening test, so
+    // nothing distinguished them and the ordering fell through to how many
+    // outlets ran the story. The sum runs 0-6 and is weighted so a full step of
+    // it stays below a step of the lead axis, which keeps the strongest single
+    // opening the first thing that matters.
+    (it.expansion + it.partnership) * 1_500 +
     // A live conversation is slightly below a cold company here: the point of
     // this section is finding what EDB does not already have in hand.
     (it.familiarity === 'in_conversation' ? -5_000 : 0) +
@@ -433,10 +436,12 @@ export function discoveryRank(it: PlacementInput): number {
     // fast with nowhere to propose into — so it separates companies that tie on
     // what is open rather than deciding what opens.
     it.momentum * 1_000 +
-    // Corroboration, last. Every term above is something the company did; this
-    // is how many outlets noticed, so it decides only what they cannot. Capped
-    // at 9 so a syndicated wire release cannot climb a full step of pace.
-    Math.min(it.clusterSize, 9) * 100 +
+    // Corroboration, last and deliberately coarse. Every term above is something
+    // the company did; this is only how many outlets repeated it, and a widely
+    // syndicated announcement is not a better opening than a quiet one. Three
+    // bands rather than a count, so it separates "the market noticed" from "one
+    // outlet ran it" without letting a wire pickup outrank the signals.
+    (it.clusterSize >= 10 ? 200 : it.clusterSize >= 3 ? 100 : 0) +
     (it.publishedAt ? Math.max(0, 30 - daysOld(it.publishedAt)) : 10)
   );
 }
