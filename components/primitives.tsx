@@ -904,15 +904,29 @@ export function CollapsedSection({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  if (count === 0) return null;
+  /*
+   * An empty section stays on the page and says so.
+   *
+   * It used to return null at zero, so "assessed as a weak fit" simply
+   * vanished whenever the current filter emptied it — and a section that
+   * disappears is harder to read than one that admits it has nothing: the
+   * reader cannot tell whether the tool found nothing or the page is broken.
+   * Every other section on the dashboard renders an empty line for the same
+   * reason.
+   */
+  const isEmpty = count === 0;
 
   return (
     <section className="space-y-4">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="group w-full cursor-pointer border-b border-border pb-3 text-left transition-colors hover:border-primary"
+        onClick={() => !isEmpty && setOpen((v) => !v)}
+        aria-expanded={isEmpty ? undefined : open}
+        aria-disabled={isEmpty || undefined}
+        className={cn(
+          'group w-full border-b border-border pb-3 text-left transition-colors',
+          isEmpty ? 'cursor-default' : 'cursor-pointer hover:border-primary',
+        )}
       >
         <span className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
           <span className="flex items-baseline gap-2">
@@ -930,7 +944,7 @@ export function CollapsedSection({
             <span className="num text-2xs text-muted-foreground">{count}</span>
           </span>
           <span className="text-2xs text-muted-foreground">
-            {open ? 'hide' : 'show'}
+            {isEmpty ? 'none' : open ? 'hide' : 'show'}
           </span>
         </span>
         <span className="mt-1 block pl-[1.4rem] text-sm text-muted-foreground">
@@ -938,7 +952,7 @@ export function CollapsedSection({
         </span>
       </button>
 
-      {open && <div className="pt-2">{children}</div>}
+      {open && !isEmpty && <div className="pt-2">{children}</div>}
     </section>
   );
 }
