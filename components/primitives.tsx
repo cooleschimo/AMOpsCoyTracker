@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowUpRight, TriangleAlert } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
 import { broadSectorLabel, sectorBroadSector, sectorLabel, sectorShort } from "@/lib/subsectors";
@@ -638,14 +638,65 @@ export function SignalTypeSet({ points }: { points: EvidencePoint[] }) {
  * reads as another category rather than as news. This is the notification dot
  * the shape is borrowed from everywhere else, with the count in the title.
  */
-export function NewTodayTag({ count }: { count?: number }) {
+export function NewTodayTag({ count, items }: { count?: number; items?: EvidencePoint[] }) {
+  const [shown, setShown] = useState(false);
   const label = count && count > 1 ? `${count} new items today` : 'New item today';
+  const list = items?.filter((p) => p.isNew) ?? [];
+
+  /*
+   * The reveal closes itself. This is a glance — what arrived — not a panel to
+   * work in, and a reader who clicked it is still scanning the grid rather than
+   * reading one card. Any click anywhere closes it early.
+   */
+  useEffect(() => {
+    if (!shown) return;
+    const t = setTimeout(() => setShown(false), 6000);
+    const close = () => setShown(false);
+    window.addEventListener('click', close);
+    return () => { clearTimeout(t); window.removeEventListener('click', close); };
+  }, [shown]);
+
   return (
-    <span
-      title={label}
-      aria-label={label}
-      className="inline-flex size-2 shrink-0 rounded-full bg-fresh ring-2 ring-fresh/20"
-    />
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        title={label}
+        aria-label={label}
+        aria-expanded={shown}
+        onClick={(e) => { e.stopPropagation(); setShown((v) => !v); }}
+        className={cn(
+          "cursor-pointer font-mono text-[0.65rem] font-semibold lowercase tracking-[0.1em] text-fresh",
+          // The glow is the whole signal: it says look here without spending the
+          // space a badge would, and it separates a fact that just arrived from
+          // the judgments the rest of the card carries.
+          "transition-[text-shadow,opacity] duration-200",
+          "[text-shadow:0_0_6px_var(--fresh),0_0_12px_var(--fresh)]",
+          "hover:opacity-80 hover:[text-shadow:0_0_8px_var(--fresh),0_0_18px_var(--fresh)]",
+        )}
+      >
+        new{count && count > 1 ? ` ${count}` : ''}
+      </button>
+
+      {shown && list.length > 0 && (
+        <span
+          role="dialog"
+          onClick={(e) => e.stopPropagation()}
+          className="absolute left-0 top-full z-30 mt-1.5 w-80 rounded-md border border-fresh/30 bg-popover p-3 shadow-lg"
+        >
+          <span className="mb-1.5 block font-mono text-2xs uppercase tracking-[0.1em] text-fresh">
+            arrived today
+          </span>
+          <span className="block space-y-1.5">
+            {list.map((p) => (
+              <span key={p.id} className="block text-2xs leading-snug text-popover-foreground">
+                {p.text}
+                <span className="ml-1.5 text-muted-foreground">{p.source.name}</span>
+              </span>
+            ))}
+          </span>
+        </span>
+      )}
+    </span>
   );
 }
 

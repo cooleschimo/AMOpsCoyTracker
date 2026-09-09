@@ -35,7 +35,7 @@ export function CompanyHeading({ company, note }: { company: Company; note?: str
         {/* A company holds its place all week, so the name alone cannot say
             whether anything moved. The bubble sits against the name because
             that is where a reader scanning a grid is already looking. */}
-        {newToday > 0 ? <NewTodayTag count={newToday} /> : null}
+        {newToday > 0 ? <NewTodayTag count={newToday} items={company.whyNow} /> : null}
       </span>
       {/* The sector is already tagged above the name; repeating it here spends
           a line on something the reader has just read. */}
