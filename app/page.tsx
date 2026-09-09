@@ -128,7 +128,11 @@ export default async function Dashboard({
           not there. Expanding the sidebar overlays rather than reflows, by
           design: a card that moves as you reach for it is worse than one
           briefly covered. */}
-      <main className="mx-auto max-w-[1400px] px-6 py-10 sm:px-12 sm:py-14 lg:px-16">
+      {/* No top padding: the control bar is the first thing in here and sticks
+          to the viewport top, so padding above it both pushed the masthead down
+          the page and stopped the bar sitting flush when scrolled. The bar
+          carries its own spacing; the page keeps its padding at the bottom. */}
+      <main className="mx-auto max-w-[1400px] px-6 pb-10 sm:px-12 sm:pb-14 lg:px-16">
       <ControlBar
         counts={sidebarCounts}
         masthead={
