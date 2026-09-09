@@ -63,6 +63,9 @@ jobs:
       OPENROUTER_API_KEY_4: ${{ secrets.OPENROUTER_API_KEY_4 }}
       OPENROUTER_API_KEY_5: ${{ secrets.OPENROUTER_API_KEY_5 }}
       OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'openrouter/free' }}
+      # The one funded key uses a paid model; see lib/env.ts for why the free
+      # alias left its balance untouched.
+      OPENROUTER_MODEL_PAID: ${{ vars.OPENROUTER_MODEL_PAID || 'mistralai/mistral-nemo' }}
       SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       DIGEST_TEST_RECIPIENT: ${{ secrets.DIGEST_TEST_RECIPIENT }}

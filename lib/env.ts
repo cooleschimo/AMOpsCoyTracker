@@ -154,7 +154,22 @@ export function llmProviders(): LlmProvider[] {
       // ':free' variants cost nothing. Which models carry that suffix changes
       // without notice, so treat this as a value to update rather than a fixed
       // choice — the OpenAI-compatible shape means only the string changes.
-      model: optional('OPENROUTER_MODEL', 'openrouter/free'),
+      /*
+       * A key with credit gets a PAID model; the free keys keep the free alias.
+       *
+       * `openrouter/free` routes to free models, which carry their own daily
+       * cap — 1,000 requests on a funded account, `free-models-per-day-high-
+       * balance` — and spend none of the balance. So the one key that could
+       * have kept working was capped alongside the seven that could not, and
+       * the credit sat untouched.
+       *
+       * mistral-nemo at $0.019/$0.030 per million is the cheapest model that
+       * returned valid JSON for an assessment batch, and the fastest of the
+       * candidates at that. OPENROUTER_MODEL_PAID overrides it.
+       */
+      model: label === 'openrouter' && !optional('OPENROUTER_FREE_ONLY')
+        ? optional('OPENROUTER_MODEL_PAID', 'mistralai/mistral-nemo')
+        : optional('OPENROUTER_MODEL', 'openrouter/free'),
       label,
     })),
     {
