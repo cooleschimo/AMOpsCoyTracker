@@ -26,6 +26,7 @@ import { companies, runs } from '../lib/schema';
 import { Budget } from '../lib/budget';
 import { callJson } from '../lib/llm';
 import { refineCaRegion, regionForState } from '../lib/edgar';
+import { isUsState } from '../lib/scope';
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -112,8 +113,7 @@ type Out = { results?: Array<{ id?: number; hq?: string | null; evidence?: strin
         const [city, tail] = hq.split(',').map((p) => p.trim());
         if (!city) { counts.no_evidence++; continue; }
 
-        const isUsState = /^[A-Z]{2}$/.test(tail ?? '');
-        const region = isUsState
+        const region = isUsState(tail)
           ? (tail === 'CA' ? refineCaRegion(city) : regionForState(tail!))
           : null;
 
@@ -129,7 +129,7 @@ type Out = { results?: Array<{ id?: number; hq?: string | null; evidence?: strin
         if (!dry) {
           await withRetry(() => db.update(companies).set({
             hqCity: city,
-            hqState: isUsState ? tail : (tail || null),
+            hqState: isUsState(tail) ? tail : (tail || null),
             hqRegion: region,
             hqSource: 'news_search',
           }).where(eq(companies.id, c.id)));

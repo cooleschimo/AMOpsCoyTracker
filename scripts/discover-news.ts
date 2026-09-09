@@ -33,6 +33,7 @@ import {
 } from '../lib/discover-news';
 import { normalizeCompanyName } from '../lib/normalize';
 import { regionForState, refineCaRegion } from '../lib/edgar';
+import { isUsState } from '../lib/scope';
 import { callJson } from '../lib/llm';
 import { Budget } from '../lib/budget';
 
@@ -52,7 +53,7 @@ function parseHq(hq: string | null | undefined) {
   if (!hq) return {};
   const [city, tail] = hq.split(',').map((p) => p.trim());
   if (!city) return {};
-  if (tail && /^[A-Z]{2}$/.test(tail)) {
+  if (isUsState(tail)) {
     // California spans three of the regions, so the city decides which.
     const region = tail === 'CA' ? refineCaRegion(city) : regionForState(tail);
     return { hqCity: city, hqState: tail, hqRegion: region };

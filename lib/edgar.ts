@@ -24,6 +24,7 @@
  * throttles to 8/s.
  */
 import { env } from './env';
+import { isUsState } from './scope';
 
 const SEC_BASE = 'https://www.sec.gov';
 const MIN_INTERVAL_MS = 125; // 8 req/s, under the documented 10/s ceiling
@@ -250,6 +251,9 @@ export const TARGET_STATES = new Set(['CA', 'WA', 'OR', 'NV', 'AZ', 'CO', 'UT', 
 
 export function regionForState(st: string | null): string | null {
   if (!st) return null;
+  // 'UK' is two capitals and is not a state; without this the fallthrough
+  // below stamped London companies 'other_us'.
+  if (!isUsState(st)) return null;
   if (st === 'WA') return 'seattle';
   if (st === 'CA') return 'bay_area'; // refined by city below
   if (['OR', 'NV', 'AZ', 'UT', 'ID', 'NM', 'CO'].includes(st)) return 'other_west';
