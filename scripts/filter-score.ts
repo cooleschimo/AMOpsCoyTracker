@@ -73,6 +73,45 @@ type Row = {
   companyId: number | null; status: string;
 };
 
+/**
+ * The shape the scorer must return, given to the provider rather than only
+ * described in the prompt.
+ *
+ * Without it the call asked for free-form text and left extractJson guessing,
+ * which is what a run of "malformed JSON after stricter retry" actually is —
+ * 3 of 10 batches on the last pass, and the same failure lib/llm.ts records as
+ * having emptied an assessment run.
+ *
+ * Every property is listed in `required` because Groq's JSON mode rejects a
+ * schema that does not. `momentum` is therefore required and nullable rather
+ * than optional, which is the only way to say "may be absent" here.
+ */
+const SCORE_SCHEMA = {
+  type: 'object',
+  properties: {
+    scores: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          n: { type: 'number' },
+          score: { type: 'number' },
+          momentum: { type: ['number', 'null'] },
+          signal_type: { type: 'string' },
+          sectors: { type: 'array', items: { type: 'string' } },
+          region: { type: 'string' },
+          expansion_language: { type: 'boolean' },
+          why: { type: ['string', 'array'], items: { type: 'string' } },
+        },
+        required: ['n', 'score', 'momentum', 'signal_type', 'sectors', 'region', 'expansion_language', 'why'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['scores'],
+  additionalProperties: false,
+} as const;
+
 type ScoreOut = {
   n: number; score: number; momentum?: number; signal_type: string; sectors: string[];
   region: string; expansion_language: boolean; why: string | string[];
@@ -413,15 +452,24 @@ type ScoreOut = {
       allBatches.push(interleaved.slice(i, i + batchSize));
     }
 
-    for (let g = 0; g < allBatches.length; g += concurrency) {
-      if (budget.halted) {
-        console.warn(`\nBudget halted: ${budget.haltReason}`);
-        console.warn('Remaining heads keep status \'kept\' and will be scored on the next run.');
-        break;
-      }
+    /*
+     * A worker pool, not fixed groups.
+     *
+     * Waiting for all six of a group before starting the next six means five
+     * keys idle whenever one call is slow — and one call IS slow whenever it
+     * hits a 429 and backs off, which on these free tiers is often. Each worker
+     * instead takes the next batch the moment its own finishes, so a slow call
+     * costs only its own slot.
+     */
+    let cursor = 0;
+    const results = new Array<Awaited<ReturnType<typeof callJson<{ scores: ScoreOut[] }>>> | null>(allBatches.length).fill(null);
 
-      const group = allBatches.slice(g, g + concurrency);
-      const answers = await Promise.all(group.map((batch) => {
+    const worker = async () => {
+      for (;;) {
+        if (budget.halted) return;
+        const mine = cursor++;
+        if (mine >= allBatches.length) return;
+        const batch = allBatches[mine]!;
         const forScoring: ItemForScoring[] = batch.map((b, k) => ({
           n: k + 1,
           title: b.title,
@@ -432,18 +480,30 @@ type ScoreOut = {
           companySectors: b.companyId !== null ? sectorsById.get(b.companyId) ?? [] : [],
           publishedAt: b.publishedAt,
         }));
-        return callJson<{ scores: ScoreOut[] }>({
+        results[mine] = await callJson<{ scores: ScoreOut[] }>({
           system: ITEM_RUBRIC_SYSTEM,
           user: buildScoringPrompt(forScoring),
           model: env.groqModelScoring(),
           budget,
           temperature: 0.1,
+          schema: SCORE_SCHEMA,
         });
-      }));
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(concurrency, allBatches.length) }, worker));
 
-      for (let k = 0; k < group.length; k++) {
-      const batch = group[k]!;
-      const res = answers[k]!;
+    if (budget.halted) {
+      console.warn(`\nBudget halted: ${budget.haltReason}`);
+      console.warn('Remaining heads keep status \'kept\' and will be scored on the next run.');
+    }
+
+    // Writes run afterwards, in order, exactly as they did when this was one
+    // batch at a time.
+    for (let idx = 0; idx < allBatches.length; idx++) {
+      const batch = allBatches[idx]!;
+      const res = results[idx];
+      // A halted budget leaves the rest unanswered; those heads stay 'kept'.
+      if (!res) continue;
 
       counts.batches++;
 
@@ -504,7 +564,6 @@ type ScoreOut = {
           .onConflictDoNothing({ target: [scores.itemId, scores.rubricVersion] }));
       }
       console.log(`  batch ${counts.batches}: ${rows.length} scored (${counts.scored}/${interleaved.length})`);
-      }
     }
 
     Object.assign(counts, { tokens_in: budget.tokensIn, tokens_out: budget.tokensOut });
