@@ -131,7 +131,13 @@ function fact(name: string, value: string): string {
  * The full entry: the dashboard card, flattened into rows Word will not
  * collapse. Zones are separated by a hairline, in the card's own order.
  */
-function fullCard(c: DashboardCompany, appBaseUrl: string): string {
+/**
+ * `rank` is the company's position in its section, and it decides how much
+ * evidence the card carries. The first three in each section are what an RD
+ * reads properly, so they get everything the scorer found; the rest get enough
+ * to recognise and a link to the page.
+ */
+function fullCard(c: DashboardCompany, appBaseUrl: string, rank = 0): string {
   const a = c.assessment;
   const headlineHref = c.trigger.source.url;
 
@@ -142,7 +148,7 @@ function fullCard(c: DashboardCompany, appBaseUrl: string): string {
     ['Founded', c.founded ? String(c.founded) : 'Unknown'],
   ].filter(([, v]) => v && v !== 'Unknown' && v !== 'unknown');
 
-  const why = c.whyNow.slice(0, 4);
+  const why = c.whyNow.slice(0, rank < 3 ? 6 : 3);
 
   return `
       <tr>
@@ -166,12 +172,16 @@ function fullCard(c: DashboardCompany, appBaseUrl: string): string {
                     </td>
                   </tr>
                   <!--
-                    No trigger headline here. It said the same thing as the
-                    first why-now point directly beneath it, in the publication's
-                    words rather than the tool's — two lines for one fact. The
-                    source and date stay, since they are what makes the point
-                    checkable, and the headline is still one click away.
+                    The headline sits with the name, because together they are
+                    the whole of what a reader needs to decide whether to keep
+                    going: who, and what just happened. The why-now points below
+                    then add what the headline does not say.
                   -->
+                  <tr>
+                    <td colspan="2" style="${SERIF} font-style:italic; font-size:16px; line-height:23px; padding:6px 0 0 0;">
+                      <a href="${esc(headlineHref)}" style="color:${C.primary}; text-decoration:underline; text-underline-offset:2px;">${esc(c.trigger.headline)}</a>
+                    </td>
+                  </tr>
                   <tr>
                     <td colspan="2" style="${SANS} font-size:12px; line-height:17px; color:${C.weak}; padding:5px 0 0 0;">
                       <a href="${esc(headlineHref)}" style="color:${C.primary}; text-decoration:underline;">${esc(c.trigger.source.name)}</a>${c.trigger.source.date ? ` · ${esc(c.trigger.source.date)}` : ''}${c.clusterSize > 1 ? ` · ${c.clusterSize} outlets` : ''}
@@ -211,15 +221,18 @@ function fullCard(c: DashboardCompany, appBaseUrl: string): string {
             <tr>
               <td style="padding:15px 20px 16px 20px;">
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                  ${why.length ? `
-                  <tr><td style="${MONO} font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:${C.weak}; padding:0 0 5px 0;">Why now</td></tr>
+                  ${why.length > 1 ? `
+                  <tr><td style="${MONO} font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:${C.weak}; padding:0 0 5px 0;">Also this week</td></tr>
                   <!--
-                    One point, not four. The rest restate the same week from
-                    different angles — a raise, then the hiring the raise paid
-                    for, then the product it funded — and the strongest one is
-                    already first. The others are on the page.
+                    From the SECOND point on. The first is the headline in the
+                    tool's own words — "Locked in $15B credit line" under a
+                    headline that already says Anthropic locked in a $15 billion
+                    credit line — so printing it beneath the headline says the
+                    same thing twice. What follows is what the headline does not
+                    carry: the compute deals, the walked-away acquisition, the
+                    hiring.
                   -->
-                  ${why.slice(0, 1).map((w) => `
+                  ${why.slice(1).map((w) => `
                   <tr>
                     <td style="${SANS} font-size:14px; line-height:21px; color:${C.ink}; padding:0 0 5px 12px;">
                       ${esc(w.text)}
@@ -338,7 +351,7 @@ function sectionBlock(
   const total = list.length;
   const cards = list.map((c, i) => {
     const d = detailFor(i);
-    return d === 'full' ? fullCard(c, appBaseUrl) : briefCard(c, appBaseUrl, d === 'brief');
+    return d === 'full' ? fullCard(c, appBaseUrl, i) : briefCard(c, appBaseUrl, d === 'brief');
   }).join('');
 
   const more = '';
@@ -446,7 +459,7 @@ export function renderDigestText(d: WeeklyDigest, appBaseUrl: string): string {
         const a = c.assessment;
         out.push(`    Priority ${a.priority} · SG fit ${a.sgFit} · Value ${c.potentialValue.band} · Confidence ${c.potentialValue.confidence}`);
         if (c.whyNow.length) {
-          out.push(`    Why now: ${c.whyNow[0]!.text}`);
+          for (const w of c.whyNow.slice(1)) out.push(`      - ${w.text}`);
         }
         // The offer is on the page, not here — see the note in the html card.
         if (c.possiblePathSummary) {
