@@ -52,6 +52,16 @@ export const PROVIDER_LIMITS: Record<string, ProviderLimit> = {
    * available to this pipeline by some distance.
    */
   ...numberedLimits('openrouter', { rpd: 50 }),
+  /*
+   * The first OpenRouter account carries credit, which takes it off the free
+   * tier: 1,000 free-model requests a day rather than 50, and its key endpoint
+   * reports is_free_tier false. Listed after the numbered defaults so it
+   * overrides the 50 they set.
+   *
+   * If another account is topped up, add it here. The cap is a property of the
+   * ACCOUNT, so a key inherits whatever its account has.
+   */
+  openrouter: { rpd: 1000 },
 };
 
 type Spend = { tokensIn: number; tokensOut: number; requests: number; exhausted: string | null };
