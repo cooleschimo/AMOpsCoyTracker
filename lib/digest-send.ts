@@ -227,10 +227,23 @@ export async function sendDigest(opts: {
 }
 
 /** "FDI signals — week of 31 August 2026". The week is what a reader scans for. */
+/**
+ * The subject line.
+ *
+ * "Last week" rather than a date, because that is how the reader thinks about
+ * what they are opening on a Monday morning — the date is in the mail itself,
+ * and a subject that leads with one reads as an archive rather than as this
+ * week's post. The span is kept alongside it so a mail found in March still
+ * says which week it covered.
+ */
 export function digestSubject(weekOf: string, testMode: boolean): string {
   const d = new Date(`${weekOf}T00:00:00Z`);
-  const label = Number.isNaN(d.getTime())
-    ? weekOf
-    : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
-  return `${testMode ? '[TEST] ' : ''}FDI signals — week of ${label}`;
+  if (Number.isNaN(d.getTime())) return `${testMode ? '[TEST] ' : ''}FDI signals — ${weekOf}`;
+  const end = new Date(d.getTime() + 6 * 86400_000);
+  const fmt = (x: Date, o: Intl.DateTimeFormatOptions) =>
+    x.toLocaleDateString('en-GB', { timeZone: 'UTC', ...o });
+  const sameMonth = d.getUTCMonth() === end.getUTCMonth();
+  const from = sameMonth ? fmt(d, { day: 'numeric' }) : fmt(d, { day: 'numeric', month: 'short' });
+  const span = `${from}–${fmt(end, { day: 'numeric', month: 'short' })}`;
+  return `${testMode ? '[TEST] ' : ''}FDI signals — last week (${span})`;
 }

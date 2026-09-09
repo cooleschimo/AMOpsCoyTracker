@@ -158,12 +158,12 @@ function fullCard(c: DashboardCompany, appBaseUrl: string): string {
                   </tr>
                   <tr>
                     <td colspan="2" style="${SERIF} font-size:22px; line-height:28px; color:${C.ink}; padding:8px 0 0 0;">
-                      <a href="${esc(appBaseUrl)}/company/${c.companyId}" style="color:${C.ink}; text-decoration:none;">${esc(c.name)}</a>
+                      <a href="${esc(appBaseUrl)}/company/${c.companyId}" style="color:${C.ink}; text-decoration:underline; text-decoration-color:${C.primary}; text-underline-offset:3px;">${esc(c.name)}</a>
                     </td>
                   </tr>
                   <tr>
                     <td colspan="2" style="${SERIF} font-style:italic; font-size:16px; line-height:23px; padding:5px 0 0 0;">
-                      <a href="${esc(headlineHref)}" style="color:${C.ink}; text-decoration:none;">${esc(c.trigger.headline)}</a>
+                      <a href="${esc(headlineHref)}" style="color:${C.primary}; text-decoration:underline; text-underline-offset:2px;">${esc(c.trigger.headline)}</a>
                     </td>
                   </tr>
                   <tr>
@@ -277,11 +277,11 @@ function briefCard(c: DashboardCompany, appBaseUrl: string, withWhy: boolean): s
             <tr>
               <td style="padding:11px 2px 11px 0;">
                 <div>
-                  <a href="${esc(appBaseUrl)}/company/${c.companyId}" style="${SERIF} font-size:17px; color:${C.ink}; text-decoration:none;">${esc(c.name)}</a>
+                  <a href="${esc(appBaseUrl)}/company/${c.companyId}" style="${SERIF} font-size:17px; color:${C.ink}; text-decoration:underline; text-decoration-color:${C.primary}; text-underline-offset:3px;">${esc(c.name)}</a>
                   &nbsp;${badge(c.trigger.score)}
                 </div>
                 <div style="${SANS} font-size:14px; line-height:20px; padding-top:3px;">
-                  <a href="${esc(c.trigger.source.url)}" style="color:${C.ink}; text-decoration:none;">${esc(c.trigger.headline)}</a>
+                  <a href="${esc(c.trigger.source.url)}" style="color:${C.primary}; text-decoration:underline; text-underline-offset:2px;">${esc(c.trigger.headline)}</a>
                 </div>
                 ${withWhy && why ? `<div style="${SANS} font-size:13px; line-height:19px; color:${C.muted}; padding-top:2px;">${esc(why)}</div>` : ''}
                 <div style="${SANS} font-size:12px; line-height:17px; color:${C.weak}; padding-top:3px;">
@@ -358,11 +358,15 @@ export function renderDigestEmail(d: WeeklyDigest, appBaseUrl: string): string {
 <title>FDI signals — ${esc(d.weekLabel)}</title>
 </head>
 <body style="margin:0; padding:0; background-color:${C.page};">
-  <!-- 680px table layout. Outlook renders through Word: no flexbox, no grid. -->
+  <!-- 900px table layout. Outlook renders through Word: no flexbox, no grid.
+       680 was the old newsletter default and wastes most of a desktop window —
+       this is a working list read at a desk, and the extra width lets a
+       company's facts sit on one line rather than wrapping to three. Mobile
+       clients scale the table down, so the cost is nothing. -->
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${C.page};">
     <tr>
       <td align="center" style="padding:26px 12px 40px 12px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="680" style="width:680px; max-width:680px; background-color:${C.ground};">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="900" style="width:900px; max-width:900px; background-color:${C.ground};">
           <tr>
             <td style="padding:32px 30px 0 30px;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
