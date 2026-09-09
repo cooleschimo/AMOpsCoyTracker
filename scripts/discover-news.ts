@@ -35,7 +35,7 @@ import { normalizeCompanyName } from '../lib/normalize';
 import { regionForState, refineCaRegion } from '../lib/edgar';
 import { isUsState } from '../lib/scope';
 import { callJson } from '../lib/llm';
-import { Budget } from '../lib/budget';
+import { openBudget } from '../lib/budget-store';
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -118,7 +118,7 @@ function parseHq(hq: string | null | undefined) {
   console.log(`${found.length} are fundraises naming a company we do not have`);
 
   const [run] = await db.insert(runs).values({ stage: 'discover_news' }).returning();
-  const budget = new Budget();
+  const budget = await openBudget();
   const counts = {
     items_read: rows.length, candidates: found.length,
     event_headlines: 0, event_batches: 0, event_named: 0, event_rejected: 0,
@@ -270,6 +270,8 @@ function parseHq(hq: string | null | undefined) {
       .join('\n') + '\n');
     console.log(`\nwrote ${csvOut}`);
   }
+
+  await budget.done();
 
   await db.update(runs).set({
     finishedAt: new Date(), counts,

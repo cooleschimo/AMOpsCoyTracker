@@ -21,7 +21,7 @@ import { getDb, getSql, withRetry } from '../lib/db';
 import { companies, runs } from '../lib/schema';
 import { eq } from 'drizzle-orm';
 import { callJson } from '../lib/llm';
-import { Budget } from '../lib/budget';
+import { openBudget } from '../lib/budget-store';
 import { env } from '../lib/env';
 import {
   ONE_LINER_SYSTEM, buildOneLinerPrompt, cleanOneLiner, type OneLinerInput,
@@ -121,7 +121,7 @@ const LINES_SCHEMA = {
   if (!targets.length) return;
 
   const [run] = await db.insert(runs).values({ stage: 'one_liners' }).returning();
-  const budget = new Budget();
+  const budget = await openBudget();
   const counts = { batches: 0, batches_failed: 0, written: 0, abstained: 0, unmatched: 0 };
 
   for (let i = 0; i < targets.length; i += batchSize) {
@@ -189,6 +189,7 @@ const LINES_SCHEMA = {
   }
 
   if (!dry) {
+    await budget.done();
     await db.update(runs)
       .set({ finishedAt: new Date(), counts, tokensIn: budget.tokensIn, tokensOut: budget.tokensOut })
       .where(eq(runs.id, run.id));

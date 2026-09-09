@@ -15,7 +15,8 @@ import { companies, runs } from '../lib/schema';
 import { trackedCompanies } from '../lib/scope';
 import { resolveWebsite, tryDomain, SAME_NAME_SYSTEM, buildSameNamePrompt } from '../lib/enrich';
 import { callJson } from '../lib/llm';
-import { Budget } from '../lib/budget';
+import type { Budget } from '../lib/budget';
+import { openBudget } from '../lib/budget-store';
 import { researchCompany, findCompanyWebsiteWithContext } from '../lib/websearch';
 
 const arg = (n: string, d?: string) => {
@@ -86,7 +87,7 @@ async function isSameCompany(
   if (!list.length) return;
 
   const [run] = await db.insert(runs).values({ stage: 'enrich_web' }).returning();
-  const budget = new Budget();
+  const budget = await openBudget();
   const counts = { attempted: 0, resolved: 0, unresolved: 0, via_domain_guess: 0, via_search: 0, search_ambiguous: 0, search_rejected: 0, same_name_rejected: 0, via_context_search: 0 };
 
   for (const c of list) {
@@ -217,6 +218,7 @@ async function isSameCompany(
     }
   }
 
+  await budget.done();
   if (!dry) await db.update(runs).set({ finishedAt: new Date(), counts }).where(eq(runs.id, run.id));
   console.log('');
   console.table(counts);

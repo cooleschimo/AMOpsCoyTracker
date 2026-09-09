@@ -17,7 +17,7 @@ import '../lib/loadenv';
 import { eq, inArray } from 'drizzle-orm';
 import { getDb, getSql, withRetry } from '../lib/db';
 import { items, runs } from '../lib/schema';
-import { Budget } from '../lib/budget';
+import { openBudget } from '../lib/budget-store';
 import { EXPANSION_RE, adjudicate, type MismatchCandidate } from '../lib/mismatch';
 
 const arg = (n: string, d?: string) => {
@@ -61,7 +61,7 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
   if (!list.length) return;
 
   const [run] = await db.insert(runs).values({ stage: 'rescue_mismatch' }).returning();
-  const budget = new Budget();
+  const budget = await openBudget();
   const counts = {
     considered: list.length, batches: 0, verdicts: 0,
     restored: 0, confirmed_drop: 0, failed_batches: 0,
@@ -104,6 +104,7 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
       }
     }
   } finally {
+    await budget.done();
     await db.update(runs).set({
       finishedAt: new Date(), counts,
       tokensIn: budget.tokensIn, tokensOut: budget.tokensOut,

@@ -18,6 +18,9 @@
  *   round_stage       see lib/scope.ts ROUND_STAGES
  *   round_date        YYYY or YYYY-MM
  *   headcount         integer
+ *   founded_year      integer, four digits
+ *   hq_city           city only; written with hq_source 'researched'
+ *   website           bare domain
  *   investors         pipe-separated org names -> investments rows
  *   notes             free text for humans; NEVER parsed
  *   source            where the human read it, e.g. "CB Insights" — REQUIRED
@@ -62,7 +65,8 @@ import { isRoundStage } from '../lib/scope';
     }
 
     const norm = normalizeCompanyName(name);
-    const found = await withRetry(() => db.select({ id: companies.id }).from(companies)
+    const found = await withRetry(() => db
+      .select({ id: companies.id, hqSource: companies.hqSource }).from(companies)
       .where(eq(companies.normalizedName, norm)).limit(1));
     if (!found.length) {
       counts.unmatched++;
@@ -83,6 +87,26 @@ import { isRoundStage } from '../lib/scope';
     if (head !== null) patch.headcountEst = head;
     if (stage) patch.roundStage = stage;
     if (validRoundDate(r.round_date)) patch.roundDate = validRoundDate(r.round_date);
+
+    const founded = parseMusd(r.founded_year);
+    if (founded !== null && founded > 1600 && founded <= new Date().getFullYear()) {
+      patch.foundedYear = founded;
+    }
+    const site = r.website?.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (site) patch.website = site;
+
+    /*
+     * 'researched' rather than 'manual': the figure was read out of a vendor's
+     * profile, not corrected by someone who knows the company. That keeps
+     * hq_source honest and leaves 'manual' meaning what the schema says it
+     * means. enrich-location.ts already treats 'researched' as settled, so a
+     * later news-derived guess will not overwrite this.
+     */
+    const city = r.hq_city?.trim();
+    if (city && found[0].hqSource !== 'manual') {
+      patch.hqCity = city;
+      patch.hqSource = 'researched';
+    }
 
     if (Object.keys(patch).length && !dry) {
       await withRetry(() => db.update(companies).set(patch).where(eq(companies.id, companyId)));

@@ -23,7 +23,7 @@ import '../lib/loadenv';
 import { eq } from 'drizzle-orm';
 import { getDb, getSql, withRetry } from '../lib/db';
 import { companies, runs } from '../lib/schema';
-import { Budget } from '../lib/budget';
+import { openBudget } from '../lib/budget-store';
 import { callJson } from '../lib/llm';
 import { refineCaRegion, regionForState } from '../lib/edgar';
 import { isUsState } from '../lib/scope';
@@ -79,7 +79,7 @@ type Out = { results?: Array<{ id?: number; hq?: string | null; evidence?: strin
   if (!list.length) return;
 
   const [run] = await db.insert(runs).values({ stage: 'enrich_location' }).returning();
-  const budget = new Budget();
+  const budget = await openBudget();
   const counts = {
     considered: list.length, batches: 0, located: 0, unchanged: 0,
     no_evidence: 0, corrected: 0, failed_batches: 0,
@@ -138,6 +138,7 @@ type Out = { results?: Array<{ id?: number; hq?: string | null; evidence?: strin
       }
     }
   } finally {
+    await budget.done();
     await db.update(runs).set({
       finishedAt: new Date(), counts,
       tokensIn: budget.tokensIn, tokensOut: budget.tokensOut,

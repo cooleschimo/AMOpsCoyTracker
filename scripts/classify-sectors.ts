@@ -24,7 +24,7 @@ import { eq } from 'drizzle-orm';
 import { writeFileSync } from 'node:fs';
 import { getDb, getSql } from '../lib/db';
 import { runs } from '../lib/schema';
-import { Budget } from '../lib/budget';
+import { openBudget } from '../lib/budget-store';
 import { callJson } from '../lib/llm';
 import {
   isBroadSector, isSector, sectorBroadSector, sectorsForPrompt, SECTOR_DEFS,
@@ -135,7 +135,7 @@ ${batch.map((c) => `id ${c.id}: ${c.name}
   if (!list.length) return;
 
   const [run] = await db.insert(runs).values({ stage: 'classify_sectors' }).returning();
-  const budget = new Budget();
+  const budget = await openBudget();
   const counts = {
     considered: list.length, batches: 0, classified: 0,
     unknown_sector: 0, broad_mismatch: 0, failed_batches: 0, missing: 0,
@@ -190,6 +190,7 @@ ${batch.map((c) => `id ${c.id}: ${c.name}
       console.log(`  batch ${counts.batches}/${Math.ceil(list.length / batchSize)}: ${seen.size}/${batch.length} classified`);
     }
   } finally {
+    await budget.done();
     await db.update(runs).set({
       finishedAt: new Date(), counts,
       tokensIn: budget.tokensIn, tokensOut: budget.tokensOut,

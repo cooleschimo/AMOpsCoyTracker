@@ -33,7 +33,7 @@ import { companies, items, runs, scores } from '../lib/schema';
 import { blockedDomain, blockedSourceName, junkPattern } from '../lib/blocklist';
 import { clusterItems, type Clusterable } from '../lib/cluster';
 import { callJson } from '../lib/llm';
-import { Budget } from '../lib/budget';
+import { openBudget } from '../lib/budget-store';
 import { env } from '../lib/env';
 import {
   ITEM_RUBRIC_SYSTEM, RUBRIC_VERSION, buildScoringPrompt, isSignalType,
@@ -424,7 +424,7 @@ type ScoreOut = {
       }
     }
 
-    const budget = new Budget();
+    const budget = await openBudget();
     /*
      * How many batches are in flight at once.
      *
@@ -434,12 +434,18 @@ type ScoreOut = {
      * chain is already interleaved by vendor, so concurrent calls land on
      * different vendors rather than stacking on one.
      *
-     * Six rather than fifteen: the ceiling is the rate limit per key, not the
-     * number of keys, and a request that arrives while its provider is busy
-     * waits on the throttle anyway. Six keeps several vendors working without
-     * turning a transient fault into six simultaneous retries.
+     * The ceiling is TOKENS a minute, not requests. Groq allows 8,000 TPM per
+     * key and a scoring batch costs about 3,000, so one key sustains roughly
+     * two and a half batches a minute and eight keys sustain twenty. Six
+     * workers left most of that idle — measured at 25 a minute against a
+     * capacity nearer 250.
+     *
+     * Fourteen rather than twenty: the rotation spreads calls across the whole
+     * chain, and Gemini and the free OpenRouter accounts are spent, so the work
+     * lands on eight Groq keys. Fourteen keeps them busy with room for a
+     * retry without stacking four calls on one key's minute.
      */
-    const concurrency = Number(arg('concurrency', '6'));
+    const concurrency = Number(arg('concurrency', '14'));
     console.log(`Scoring ${interleaved.length} cluster heads in batches of ${batchSize}, ${concurrency} at a time...\n`);
 
     /*
@@ -582,6 +588,7 @@ type ScoreOut = {
     }
 
     Object.assign(counts, { tokens_in: budget.tokensIn, tokens_out: budget.tokensOut });
+    await budget.done();
     await db.update(runs).set({
       finishedAt: new Date(), counts,
       tokensIn: budget.tokensIn, tokensOut: budget.tokensOut,

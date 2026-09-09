@@ -22,7 +22,7 @@ import { eq } from 'drizzle-orm';
 import { getDb, getSql, withRetry } from '../lib/db';
 import { companyReviews, runs } from '../lib/schema';
 import { callJson } from '../lib/llm';
-import { Budget } from '../lib/budget';
+import { openBudget } from '../lib/budget-store';
 import { getWeeklyDigest } from '../lib/dashboard-data';
 import {
   COMPANY_REVIEW_SYSTEM, COMPANY_REVIEW_VERSION, HIDING_VERDICTS,
@@ -82,7 +82,7 @@ type Out = {
                    where signal_version = 'signal-v8'`)[0]?.w;
 
   const [run] = await db.insert(runs).values({ stage: 'review_dashboard' }).returning();
-  const budget = new Budget();
+  const budget = await openBudget();
   const counts: Record<string, number> = {
     considered: placed.length, ok: 0, malformed_name: 0, duplicate: 0,
     weak_evidence: 0, not_a_company: 0, hidden: 0, unmatched: 0, failed: 0,
@@ -144,6 +144,7 @@ type Out = {
       }
     }
   } finally {
+    await budget.done();
     await db.update(runs).set({
       finishedAt: new Date(), counts,
       tokensIn: budget.tokensIn, tokensOut: budget.tokensOut,

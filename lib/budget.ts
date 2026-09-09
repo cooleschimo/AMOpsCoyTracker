@@ -78,7 +78,12 @@ export class Budget {
   halted = false;
   haltReason: string | null = null;
 
-  constructor(private priorTokensToday = 0) {}
+  constructor(private priorTokensToday = 0, spentToday: Iterable<[string, string]> = []) {
+    // Keys already known spent today, from a previous run. Without this every
+    // process starts blind and rediscovers each one with a wasted 429 — twelve
+    // of them, on every call, once a day's capacity is mostly gone.
+    for (const [name, reason] of spentToday) this.slot(name).exhausted = reason;
+  }
 
   private slot(name: string): Spend {
     let s = this.byProvider.get(name);
@@ -111,6 +116,13 @@ export class Budget {
   record(inTok: number, outTok: number, provider = 'groq') {
     const s = this.slot(provider);
     s.tokensIn += inTok; s.tokensOut += outTok; s.requests++;
+  }
+
+  /** Which providers this run found spent, for the next run to start from. */
+  spentProviders(): Array<[string, string]> {
+    return [...this.byProvider.entries()]
+      .filter(([, s]) => s.exhausted)
+      .map(([name, s]) => [name, s.exhausted as string]);
   }
 
   /** A provider is spent. The run continues on the rest of the chain. */

@@ -25,7 +25,7 @@ import { eq, sql, and, isNull, or } from 'drizzle-orm';
 import { getDb, getSql, withRetry } from '../lib/db';
 import { companies, companyAssessments, runs } from '../lib/schema';
 import { callJson } from '../lib/llm';
-import { Budget } from '../lib/budget';
+import { openBudget } from '../lib/budget-store';
 import { env } from '../lib/env';
 import {
   COMPANY_ASSESSMENT_SYSTEM, COMPANY_RUBRIC_VERSION, buildAssessmentPrompt, isBand,
@@ -183,7 +183,7 @@ type Assessment = {
   if (!targets.length) return;
 
   const [run] = await db.insert(runs).values({ stage: 'assess' }).returning();
-  const budget = new Budget();
+  const budget = await openBudget();
   const counts = { batches: 0, batches_failed: 0, assessed: 0, sector_assigned: 0, no_sector: 0, unmatched: 0 };
   const results: Array<Assessment & { id: number }> = [];
 
@@ -321,6 +321,7 @@ type Assessment = {
   }
 
   if (!dry) {
+    await budget.done();
     await db.update(runs).set({
       finishedAt: new Date(), counts,
       tokensIn: budget.tokensIn, tokensOut: budget.tokensOut,
