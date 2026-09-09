@@ -131,6 +131,10 @@ const STAGES: Stage[] = [
     why: 'job boards; the hiring snapshot score-companies reads' },
   { name: 'filter', script: 'filter-score.ts', timeoutMin: 45, phase: 'judge', cost: 'llm',
     why: 'canonicalise, drop, cluster, score the items' },
+  // After filter: it reads what the filter kept, and only the residue the
+  // ambiguity rules could not settle.
+  { name: 'ambiguous', script: 'adjudicate-ambiguous.ts', timeoutMin: 20, phase: 'judge', cost: 'llm',
+    why: 'headlines about the word, not the company, that no rule can separate' },
   { name: 'rescue', script: 'rescue-mismatch.ts', timeoutMin: 20, phase: 'judge', cost: 'llm',
     why: 'items the name filter dropped that are about the company after all' },
   { name: 'score', script: 'score-companies.ts', timeoutMin: 45, phase: 'judge', cost: 'llm',

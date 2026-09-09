@@ -23,7 +23,7 @@ on:
         required: true
         default: 'daily'
         type: choice
-        options: [daily, weekly, discover, score, assess, review, formd, portfolios, acra]
+        options: [daily, weekly, discover, score, assess, review, ambiguous, formd, portfolios, acra]
         # 'daily' is the pipeline; 'weekly' is the pipeline plus the digest.
 
 jobs:
@@ -144,6 +144,10 @@ jobs:
       - name: Dashboard review only
         if: ${{ github.event.inputs.mode == 'review' }}
         run: npx tsx scripts/review-dashboard.ts
+
+      - name: Ambiguous-name adjudication only
+        if: ${{ github.event.inputs.mode == 'ambiguous' }}
+        run: npx tsx scripts/adjudicate-ambiguous.ts
 
       # ---- graph building, after the pipeline --------------------------------
       #
