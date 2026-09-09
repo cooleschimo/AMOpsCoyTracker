@@ -41,6 +41,10 @@ export type WarmPath = {
   /** 'scraped' = degree is meaningful; 'incidental' = we simply lack data. */
   coverage?: 'scraped' | 'incidental';
   reviewStatus: string;
+  /** Who inside EDB can make the introduction, once somebody has said. */
+  internalOwner: string | null;
+  /** A conflict or a reason to stay away. Outranks the status wherever set. */
+  doNotUse: boolean;
 };
 
 /**
@@ -71,7 +75,18 @@ export function degreeCoverage(scrapedEdges: number, totalEdges: number): 'scrap
   return scrapedEdges >= Math.max(5, totalEdges * 0.5) ? 'scraped' : 'incidental';
 }
 
-export async function findWarmPaths(companyId: number): Promise<WarmPath[]> {
+/**
+ * @param opts.includeRejected keep the paths a review has ruled out.
+ *
+ * They are hidden by default, which is the point of ruling one out. But a
+ * rejection is a judgment somebody can change, and a hidden path cannot be
+ * changed back — so the page that offers the control asks for them and shows
+ * them apart, rather than making a mis-click permanent.
+ */
+export async function findWarmPaths(
+  companyId: number,
+  opts: { includeRejected?: boolean } = {},
+): Promise<WarmPath[]> {
   const q = getSql();
   const paths: WarmPath[] = [];
 
@@ -110,7 +125,7 @@ export async function findWarmPaths(companyId: number): Promise<WarmPath[]> {
       targetCompanyId: Number(r.other_company_id), targetCompanyName: String(r.other_company_name),
       evidence: `Both roles are filed records${r.last_seen_there ? `; last seen ${r.last_seen_there}` : ''}.`,
       sourceUrl: (r.source_there ?? r.source_here) as string | null,
-      score, degree, reviewStatus: 'unreviewed',
+      score, degree, reviewStatus: 'unreviewed', internalOwner: null, doNotUse: false,
     });
   }
 
@@ -158,7 +173,7 @@ export async function findWarmPaths(companyId: number): Promise<WarmPath[]> {
         ? `Shared investor. ${r.org_name} appears on ${degree} investment edges in this graph${degree > 50 ? ' — a hub node, so this is weak evidence' : ''}.`
         : `Shared investor. We have not scraped ${r.org_name}'s portfolio, so its ${degree} edge${degree === 1 ? '' : 's'} here understate its real breadth — treat the ranking as provisional.`,
       sourceUrl: r.source_url as string | null,
-      score, degree, coverage, reviewStatus: 'unreviewed',
+      score, degree, coverage, reviewStatus: 'unreviewed', internalOwner: null, doNotUse: false,
     });
   }
 
@@ -182,7 +197,7 @@ export async function findWarmPaths(companyId: number): Promise<WarmPath[]> {
       evidence: `Company relationship: ${r.relation}.`,
       sourceUrl: r.source_url as string | null,
       score: r.other_status === 'account' ? 0.9 : 0.5,
-      degree: null, reviewStatus: 'unreviewed',
+      degree: null, reviewStatus: 'unreviewed', internalOwner: null, doNotUse: false,
     });
   }
 
@@ -223,7 +238,7 @@ export async function findWarmPaths(companyId: number): Promise<WarmPath[]> {
       evidence: 'Public event listing.',
       sourceUrl: r.url as string | null,
       score: 0.75,
-      degree: null, reviewStatus: 'unreviewed',
+      degree: null, reviewStatus: 'unreviewed', internalOwner: null, doNotUse: false,
     });
   }
 
@@ -238,6 +253,8 @@ export async function findWarmPaths(companyId: number): Promise<WarmPath[]> {
       (r.via_org_id ?? null) === p.viaOrgId);
     if (rv) {
       p.reviewStatus = String(rv.status);
+      p.internalOwner = (rv.internal_owner as string) ?? null;
+      p.doNotUse = Boolean(rv.do_not_use);
       if (rv.do_not_use) p.score = -1;                      // conflict flag wins
       else if (rv.status === 'usable') p.score += 1.0;
       else if (rv.status === 'not_usable') p.score = -1;
@@ -245,6 +262,6 @@ export async function findWarmPaths(companyId: number): Promise<WarmPath[]> {
   }
 
   return paths
-    .filter((p) => p.score >= 0)
+    .filter((p) => opts.includeRejected || p.score >= 0)
     .sort((a, b) => b.score - a.score);
 }

@@ -19,6 +19,7 @@ import { refineCaRegion, regionForState } from '@/lib/edgar';
 import { companies, dispositions, monitoring, opportunities } from '../lib/schema';
 import { isFamiliarity, type Familiarity } from '../lib/familiarity';
 import { DISPOSITIONS, REASONS, type Disposition, type Reason } from '../lib/dispositions';
+import { PATH_KINDS, PATH_REVIEW_STATUSES, type PathKind, type PathReviewStatus } from '../lib/ui-types';
 
 const VOTER_COOKIE = 'voter_key';
 
@@ -224,6 +225,92 @@ export async function setLocation(
         .where(eq(companies.id, companyId)),
     );
     revalidatePath('/');
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/**
+ * Record a human judgment about a possible path. Brief §8, RATIONALE §9.
+ *
+ * THE HONESTY RULE CLOSES HERE. Everything `lib/paths.ts` returns is an
+ * association derived from public data — a shared investor, a shared board
+ * seat, two companies at one conference. Whether EDB can actually use it is
+ * internal knowledge that no source carries, so until somebody says otherwise
+ * a path stays `unreviewed` and the UI calls it a possibility. This is the only
+ * way it becomes anything else.
+ *
+ * The review keys on the CONNECTOR rather than the path, matching how
+ * `findWarmPaths` reads it back: a partner who links this company to four
+ * others is one relationship and one judgment, not four. `via_person_id` and
+ * `via_org_id` are both null for an event path, which is a legitimate key —
+ * an event has no connector beyond the company itself.
+ *
+ * `do_not_use` outranks the status wherever both are set, because a conflict is
+ * a reason to stop regardless of how promising the path looked.
+ */
+export async function reviewPath(input: {
+  companyId: number;
+  pathKind: PathKind;
+  viaPersonId?: number | null;
+  viaOrgId?: number | null;
+  status: PathReviewStatus;
+  internalOwner?: string | null;
+  note?: string | null;
+  doNotUse?: boolean;
+}): Promise<ActionResult> {
+  if (!PATH_KINDS.includes(input.pathKind)) return { ok: false, error: 'unknown path kind' };
+  if (!PATH_REVIEW_STATUSES.includes(input.status)) return { ok: false, error: 'unknown review status' };
+
+  const personId = input.viaPersonId ?? null;
+  const orgId = input.viaOrgId ?? null;
+  const note = (input.note ?? '').trim().slice(0, 500) || null;
+  const owner = (input.internalOwner ?? '').trim().slice(0, 120) || null;
+
+  try {
+    const sql = getSql();
+    /*
+     * Matched on the same tuple `findWarmPaths` reads back, nulls included.
+     * `is not distinct from` rather than `=`, since a null via_person_id never
+     * equals a null via_person_id and every event review would insert a new row
+     * on each click.
+     */
+    const existing: any = await sql`
+      select id from path_reviews
+      where company_id = ${input.companyId}
+        and path_kind = ${input.pathKind}
+        and via_person_id is not distinct from ${personId}
+        and via_org_id is not distinct from ${orgId}
+      limit 1`;
+
+    if (existing.length) {
+      await withRetry(() => sql`
+        update path_reviews set
+          status = ${input.status},
+          internal_owner = ${owner},
+          note = ${note},
+          do_not_use = ${input.doNotUse ?? false},
+          confirmed_by = 'rd_review',
+          confirmed_at = now()
+        where id = ${existing[0].id}`);
+    } else {
+      await withRetry(() => sql`
+        insert into path_reviews
+          (company_id, path_kind, via_person_id, via_org_id, status,
+           internal_owner, note, do_not_use, confirmed_by, confirmed_at)
+        values
+          (${input.companyId}, ${input.pathKind}, ${personId}, ${orgId}, ${input.status},
+           ${owner}, ${note}, ${input.doNotUse ?? false}, 'rd_review', now())`);
+    }
+
+    /*
+     * The write is what matters; refreshing the page's cache is housekeeping.
+     * revalidatePath throws outside a request context — a script calling this
+     * action directly, for instance — and letting that surface would report a
+     * successful save as a failure and roll the UI back over it.
+     */
+    try { revalidatePath(`/company/${input.companyId}`); } catch { /* not in a request */ }
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };

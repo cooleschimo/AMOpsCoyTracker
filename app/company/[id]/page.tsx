@@ -21,6 +21,8 @@ import { SectionHeading } from '@/components/primitives';
 import { sectorLabel } from '../../../lib/subsectors';
 import { hasDashboard } from '../../../lib/auth';
 import { findWarmPaths } from '../../../lib/paths';
+import { PathReview } from '../../../components/path-review';
+import { PATH_REVIEW_STATUSES, type PathReviewStatus } from '../../../lib/ui-types';
 
 export const dynamic = 'force-dynamic';
 
@@ -182,7 +184,7 @@ export default async function CompanyPage(
   const apacPostings = postings.filter((j: any) => j.is_apac);
   const restPostings = postings.filter((j: any) => !j.is_apac);
 
-  const rawPaths = await findWarmPaths(companyId);
+  const rawPaths = await findWarmPaths(companyId, { includeRejected: true });
 
   /**
    * One row per connector, not per connector-and-destination.
@@ -277,7 +279,9 @@ export default async function CompanyPage(
       ) : (
         <>
           <p className={META}>
-            Connections found in public data. Check the source before acting on one.
+            Connections found in public data — associations, not introductions. Mark one
+            usable when somebody can actually make it; that judgment ranks it up here and
+            is what the next person to open this page will see.
           </p>
           {/* A ranked list separated by hairlines, not a stack of bordered
               cards: twelve boxes down a page reads as twelve things competing,
@@ -294,12 +298,14 @@ export default async function CompanyPage(
                   <th className="w-[26%] hairline-b pb-1.5 pr-2.5 text-left text-2xs font-medium uppercase tracking-[0.1em] text-muted-foreground">Through</th>
                   <th className="w-[40%] hairline-b pb-1.5 pr-2.5 text-left text-2xs font-medium uppercase tracking-[0.1em] text-muted-foreground">Connects to</th>
                   <th className="w-[20%] hairline-b pb-1.5 pr-2.5 text-left text-2xs font-medium uppercase tracking-[0.1em] text-muted-foreground">How</th>
-                  <th className="w-[14%] hairline-b pb-1.5 pr-2.5 text-left text-2xs font-medium uppercase tracking-[0.1em] text-muted-foreground" />
+                  <th className="w-[14%] hairline-b pb-1.5 pr-2.5 text-left text-2xs font-medium uppercase tracking-[0.1em] text-muted-foreground">Can we use it</th>
                 </tr>
               </thead>
               <tbody>
+                {/* A path somebody ruled out stays listed so the ruling can be
+                    changed, but greyed, so it does not read as a live route. */}
                 {paths.slice(0, 12).map((p, i) => (
-                  <tr key={i}>
+                  <tr key={i} className={p.reviewStatus === 'not_usable' || p.doNotUse ? 'opacity-45' : undefined}>
                     <td className="hairline-t py-2 pr-2.5 align-top text-sm font-semibold [overflow-wrap:anywhere]">
                       {p.viaPersonName ?? p.viaOrgName ?? '—'}
                     </td>
@@ -327,15 +333,18 @@ export default async function CompanyPage(
                       ) : null}
                     </td>
                     <td className="hairline-t py-2 pr-2.5 align-top text-sm [overflow-wrap:anywhere]">
-                      <span
-                        className={
-                          p.reviewStatus === 'confirmed'
-                            ? 'cursor-help text-2xs uppercase tracking-[0.1em] text-confirmed'
-                            : 'cursor-help text-2xs uppercase tracking-[0.1em] text-muted-foreground'
-                        }
-                      >
-                        {p.reviewStatus === 'confirmed' ? 'confirmed' : 'unreviewed'}
-                      </span>
+                      <PathReview
+                        companyId={companyId}
+                        pathKind={p.kind}
+                        viaPersonId={p.viaPersonId}
+                        viaOrgId={p.viaOrgId}
+                        status={(PATH_REVIEW_STATUSES as readonly string[]).includes(p.reviewStatus)
+                          ? (p.reviewStatus as PathReviewStatus)
+                          : 'unreviewed'}
+                        internalOwner={p.internalOwner}
+                        doNotUse={p.doNotUse}
+                        routes={p.targets.length}
+                      />
                     </td>
                   </tr>
                 ))}

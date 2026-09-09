@@ -107,7 +107,11 @@ export const actions = {
     });
   },
 
-  /** Path reviews are session-local until path_reviews writes are wired. */
+  /**
+   * The dashboard's own optimistic copy. The durable write is
+   * `reviewPath` in app/actions.ts, which the company page calls directly —
+   * this keeps a card in step with a judgment made elsewhere in the session.
+   */
   reviewPath(pathId: string, status: PathReviewStatus) {
     state = {
       ...state,
