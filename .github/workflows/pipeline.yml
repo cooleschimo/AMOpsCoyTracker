@@ -66,7 +66,14 @@ jobs:
       SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       DIGEST_TEST_RECIPIENT: ${{ secrets.DIGEST_TEST_RECIPIENT }}
-      DIGEST_TEST_MODE: 'true'
+      # Where the digest goes, not whether it goes. 'true' confines every send
+      # to DIGEST_TEST_RECIPIENT; set the repo variable to 'false' once
+      # DIGEST_RECIPIENTS holds the real list.
+      DIGEST_TEST_MODE: ${{ vars.DIGEST_TEST_MODE || 'true' }}
+      DIGEST_RECIPIENTS: ${{ secrets.DIGEST_RECIPIENTS }}
+      # Resend's shared sender until a domain is verified; it can only deliver
+      # to the account owner, which is consistent with test mode.
+      DIGEST_FROM: ${{ vars.DIGEST_FROM || 'onboarding@resend.dev' }}
       APP_BASE_URL: ${{ vars.APP_BASE_URL || 'http://localhost:3111' }}
     steps:
       - uses: actions/checkout@v4
@@ -119,6 +126,22 @@ jobs:
           ${{ github.event.inputs.mode == 'weekly'
               || (github.event_name == 'schedule' && steps.dow.outputs.day == '1') }}
         run: npx tsx scripts/weekly.ts
+
+      # Approving and sending stay two commands here as they are by hand: the
+      # digest render above writes a draft, and nothing leaves until these run.
+      # Keeping them separate means a failed send does not lose the approval,
+      # and the digests row still records which items were placed.
+      #
+      # DIGEST_TEST_MODE governs where it goes, not whether it goes. While it is
+      # true the mail is confined to DIGEST_TEST_RECIPIENT, which is what makes
+      # turning this on safe before a real recipient list exists.
+      - name: Approve and send the weekly digest (Mondays)
+        if: >-
+          ${{ github.event.inputs.mode == 'weekly'
+              || (github.event_name == 'schedule' && steps.dow.outputs.day == '1') }}
+        run: |
+          npx tsx scripts/send-digest.ts --approve
+          npx tsx scripts/send-digest.ts --send
 
       - name: Pipeline, no digest
         if: >-

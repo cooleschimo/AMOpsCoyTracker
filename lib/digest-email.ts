@@ -35,8 +35,13 @@ const C = {
   weak: '#64635F',
   border: '#CFCECA',
   hairline: '#E4E3DF',
-  primary: '#0060DE',
-  accentBg: '#F3F8FF',
+  // The dashboard's --primary converted from oklch(0.56 0.075 195), not a blue
+  // chosen to look like it. It had drifted to #0060DE, which reads as a
+  // different product beside the page it links to.
+  primary: '#358282',
+  accentBg: '#EFF5F5',
+  /** --fresh: something arrived since the reader last looked. */
+  fresh: '#38853E',
   secondary: '#EDEDEA',
   caution: '#8B5500',
   cautionSoft: '#F8E9D2',
@@ -325,12 +330,25 @@ function sectionBlock(
 }
 
 export function renderDigestEmail(d: WeeklyDigest, appBaseUrl: string): string {
+  /*
+   * Two sections, not five.
+   *
+   * An inbox is read standing up, and the two that answer "what should I do
+   * this week" are the companies the tool can argue for and the early-stage
+   * finds. Who-we-know and monitoring are reference — worth having on the
+   * dashboard, but they lengthened the mail without changing what anyone did
+   * next, and RATIONALE §1 is that length is the failure mode here.
+   *
+   * Each section tapers by itself: the first few carry the full case, the next
+   * few a heading and a line, and the tail a single line. Both lists are ranked,
+   * so tapering spends the reader's attention where the evidence is strongest.
+   *
+   * 'Early-stage finds' rendered newOnTheRadar a second time under a different
+   * name, so every radar company appeared twice in the same mail.
+   */
   const body =
     sectionBlock('Worth a conversation', d.worthAConversation, appBaseUrl)
-    + sectionBlock('New on the radar', d.newOnTheRadar, appBaseUrl)
-    + sectionBlock('Early-stage finds', d.newOnTheRadar, appBaseUrl)
-    + sectionBlock('Who we know', d.whoWeKnow, appBaseUrl)
-    + sectionBlock('Monitoring', d.monitoring, appBaseUrl);
+    + sectionBlock('New on the radar', d.newOnTheRadar, appBaseUrl);
 
   return `<!doctype html>
 <html>
@@ -430,9 +448,6 @@ export function renderDigestText(d: WeeklyDigest, appBaseUrl: string): string {
 
   section('Worth a conversation', d.worthAConversation);
   section('New on the radar', d.newOnTheRadar);
-  section('Early-stage finds', d.newOnTheRadar);
-  section('Who we know', d.whoWeKnow);
-  section('Monitoring', d.monitoring);
 
   out.push('', 'Bands and scores are the tool’s judgment, not a measurement.');
   out.push(`Correct one on the dashboard: ${appBaseUrl}`);
