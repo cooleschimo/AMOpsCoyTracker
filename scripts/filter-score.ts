@@ -462,7 +462,6 @@ type ScoreOut = {
      * costs only its own slot.
      */
     let cursor = 0;
-    const results = new Array<Awaited<ReturnType<typeof callJson<{ scores: ScoreOut[] }>>> | null>(allBatches.length).fill(null);
 
     const worker = async () => {
       for (;;) {
@@ -480,7 +479,7 @@ type ScoreOut = {
           companySectors: b.companyId !== null ? sectorsById.get(b.companyId) ?? [] : [],
           publishedAt: b.publishedAt,
         }));
-        results[mine] = await callJson<{ scores: ScoreOut[] }>({
+        const res = await callJson<{ scores: ScoreOut[] }>({
           system: ITEM_RUBRIC_SYSTEM,
           user: buildScoringPrompt(forScoring),
           model: env.groqModelScoring(),
@@ -488,33 +487,40 @@ type ScoreOut = {
           temperature: 0.1,
           schema: SCORE_SCHEMA,
         });
+        await record(batch, res);
       }
     };
-    await Promise.all(Array.from({ length: Math.min(concurrency, allBatches.length) }, worker));
 
-    if (budget.halted) {
-      console.warn(`\nBudget halted: ${budget.haltReason}`);
-      console.warn('Remaining heads keep status \'kept\' and will be scored on the next run.');
-    }
+    /*
+     * Each worker writes its own batch as soon as its answer lands, rather than
+     * the run collecting every answer and writing at the end. On a backlog of
+     * nine hundred batches that difference is the whole run: a crash, a halted
+     * budget or an interrupt two hours in would otherwise throw away every
+     * answer already paid for, where now it costs one batch.
+     *
+     * Writes are serialised behind `writing` so concurrent workers cannot
+     * interleave their inserts or their counter updates.
+     */
+    let writing: Promise<void> = Promise.resolve();
+    const record = (batch: typeof allBatches[number], res: Awaited<ReturnType<typeof callJson<{ scores: ScoreOut[] }>>>) => {
+      writing = writing.then(() => writeBatch(batch, res));
+      return writing;
+    };
 
-    // Writes run afterwards, in order, exactly as they did when this was one
-    // batch at a time.
-    for (let idx = 0; idx < allBatches.length; idx++) {
-      const batch = allBatches[idx]!;
-      const res = results[idx];
-      // A halted budget leaves the rest unanswered; those heads stay 'kept'.
-      if (!res) continue;
-
+    async function writeBatch(
+      batch: typeof allBatches[number],
+      res: Awaited<ReturnType<typeof callJson<{ scores: ScoreOut[] }>>>,
+    ) {
       counts.batches++;
 
-      if (!res.ok || !res.data?.scores) {
+      const out = res.ok ? res.data?.scores : null;
+      if (!out) {
         // A malformed response costs one batch, not the run (brief §3).
         counts.batches_failed++;
         console.warn(`  batch ${counts.batches}: FAILED — ${res.error}`);
-        continue;
+        return;
       }
 
-      const out = res.data.scores;
       // Batch-anchoring canary: five or more items collapsing to a single
       // distinct score is the shape of the anchoring failure, so it gets logged
       // where it will be seen.
@@ -564,6 +570,15 @@ type ScoreOut = {
           .onConflictDoNothing({ target: [scores.itemId, scores.rubricVersion] }));
       }
       console.log(`  batch ${counts.batches}: ${rows.length} scored (${counts.scored}/${interleaved.length})`);
+    }
+
+    await Promise.all(Array.from({ length: Math.min(concurrency, allBatches.length) }, worker));
+    // Let the last writes drain before the run records its counts.
+    await writing;
+
+    if (budget.halted) {
+      console.warn(`\nBudget halted: ${budget.haltReason}`);
+      console.warn('Remaining heads keep status \'kept\' and will be scored on the next run.');
     }
 
     Object.assign(counts, { tokens_in: budget.tokensIn, tokens_out: budget.tokensOut });
