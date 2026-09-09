@@ -112,7 +112,7 @@ export function ControlBar({
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="sticky top-0 z-30 -mx-6 mb-10 border-b border-border bg-background/90 backdrop-blur sm:-mx-12 lg:-mx-16"
+      className="glass-bar sticky top-0 z-30 -mx-6 mb-10 border-b border-border sm:-mx-12 lg:-mx-16"
     >
       <div className="mx-auto max-w-[1400px] px-6 sm:px-12 lg:px-16">
         {/*
