@@ -14,8 +14,10 @@
  *   sg_links row. A '?' role suffix (investor?:GIC) means reported-but-unverified
  *   -> match_status='probable'; otherwise 'confirmed'. Both are still pending
  *   review either way.
- * - familiarity stays 'no_status' (tri-state): whether EDB holds the account is
- *   internal knowledge this tool cannot verify. No boolean, no silent FALSE.
+ * - familiarity defaults to 'no_status', and the seed CSV has no business
+ *   asserting otherwise: how well EDB knows a company is a judgment an RD makes,
+ *   not a fact a bootstrap file carries. A value it does supply is checked
+ *   against lib/familiarity.ts and flagged rather than silently trusted.
  *
  * The discovery guard lives in scripts/load-exclusions.ts, which runs on its
  * own: a permanent exclusion should not need an occasional import to take
@@ -38,6 +40,7 @@ import {
   normalizeCompanyName, normalizeOrgName, normalizeDomain, parsePipeList,
   parseMusd, validRoundDate,
 } from '../../lib/normalize';
+import { isFamiliarity } from '../../lib/familiarity';
 import {
   isSector, isHqRegion, isRoundStage, isSgApacRole,
 } from '../../lib/scope';
@@ -100,11 +103,15 @@ async function main() {
       // familiarity: how well EDB knows the company. The seed CSV has no
       // business asserting this, so anything other than the default is flagged
       // rather than silently trusted.
+      // One check, against lib/familiarity.ts. Written out by hand it was two
+      // lists that disagreed: the flag tested the real vocabulary while the
+      // assignment tested an older one, so 'known' passed unflagged and was then
+      // forced to 'no_status' — asserting nobody had said, where someone had.
       const acct = r.familiarity?.trim() || 'no_status';
-      if (!['no_status', 'known', 'in_conversation', 'not_known'].includes(acct)) {
+      if (!isFamiliarity(acct)) {
         issues.push({ row: rowNum, company: name, field: 'familiarity', value: acct, note: 'unrecognised value - forced to no_status' });
       }
-      const familiarity = ['no_status', 'account', 'not_account'].includes(acct) ? acct : 'no_status';
+      const familiarity = isFamiliarity(acct) ? acct : 'no_status';
 
       const values = {
         name,
