@@ -79,7 +79,7 @@ export const FUNDS: Fund[] = [
     portfolioUrl: 'https://shieldcap.com/portfolio/', scrape: true },
   { name: 'Razor\'s Edge Ventures', aliases: ['Razors Edge'], tier: 'specialist', sectors: ['defence_tech'],
     portfolioUrl: 'https://www.razorsedgeventures.com/portfolio', scrape: false,
-    notes: 'DNS/connection failure on both .com variants, so scrape:false - see BLOCKERS.md.' },
+    notes: 'DNS/connection failure on both .com variants, so scrape:false.' },
   { name: 'In-Q-Tel', aliases: ['IQT'], tier: 'specialist', sectors: ['defence_tech', 'deeptech'],
     portfolioUrl: 'https://www.iqt.org/portfolio/', scrape: true,
     notes: 'US intelligence-community strategic investor. An IQT edge is a strong ITAR/EAR flag: check export-control exposure before any outreach effort.' },
@@ -99,7 +99,7 @@ export const FUNDS: Fund[] = [
   // ── AI specialists ────────────────────────────────────────────────────────
   { name: 'Conviction', aliases: ['Conviction Partners'], tier: 'specialist', sectors: ['ai'],
     portfolioUrl: 'https://www.conviction.com/companies', scrape: false,
-    notes: '404, and no portfolio path found from the homepage. scrape:false until a working URL is confirmed - see BLOCKERS.md.' },
+    notes: '404, and no portfolio path found from the homepage. scrape:false until a working URL is confirmed.' },
   { name: 'Basis Set Ventures', aliases: ['Basis Set'], tier: 'specialist', sectors: ['ai'],
     portfolioUrl: 'https://www.basisset.com/portfolio', scrape: true },
   { name: 'Radical Ventures', aliases: ['Radical'], tier: 'specialist', sectors: ['ai'],
@@ -115,7 +115,7 @@ export const FUNDS: Fund[] = [
   // ── Singapore-linked (portfolio membership feeds sg_links directly) ───────
   { name: 'EDBI', aliases: [], tier: 'specialist', sectors: ['generalist', 'deeptech', 'biotech'],
     portfolioUrl: 'https://www.edbi.com/portfolio', sgLinked: true, scrape: false,
-    notes: 'EDB\'s own investment arm, and the warmest sg_link available: a US company in this portfolio already has a Singapore relationship. Populate first. All paths return 403 to automated requests, so scrape:false and it needs a manual quarterly snapshot - see BLOCKERS.md.' },
+    notes: 'EDB\'s own investment arm, and the warmest sg_link available: a US company in this portfolio already has a Singapore relationship. Populate first. All paths return 403 to automated requests, so scrape:false and it needs a manual quarterly snapshot.' },
   { name: 'Vertex Ventures US', aliases: ['Vertex US', 'Vertex Ventures'], tier: 'specialist',
     sectors: ['ai', 'deeptech'], portfolioUrl: 'https://vvus.com/portfolio/', sgLinked: true, scrape: true,
     notes: 'Temasek-anchored Vertex family. URL especially uncertain — verify.' },

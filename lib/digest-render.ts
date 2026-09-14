@@ -135,7 +135,7 @@ export function statusNote(status: string): string | null {
 }
 
 /**
- * The palette from design/LOVABLE_PROMPT.md, so the Monday email and the
+ * The dashboard's palette, so the Monday email and the
  * dashboard read as one tool. Colour carries meaning only — the accent marks
  * what is interactive, the warning tone marks a caveat, and nothing is coloured
  * for decoration.

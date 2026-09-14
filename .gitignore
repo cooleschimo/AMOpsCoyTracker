@@ -16,3 +16,15 @@ next-env.d.ts
 .env
 .env*.local
 .env*
+
+# Vendor-derived exports. CB Insights data is licensed to the account that
+# pulled it, so the CSVs stay local and each user generates their own.
+data/*_cbi.csv
+data/cbi_backfill_*.csv
+
+# Working notes, design material and tool-generated scratch files.
+design/
+PROGRESS.md
+BLOCKERS.md
+CLAUDE.md
+AGENTS.md

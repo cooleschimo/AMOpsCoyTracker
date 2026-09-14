@@ -8,7 +8,7 @@
  *                         www.businesswire.com/rss/... returns 403
  *   PR Newswire           20 items
  *   GlobeNewswire         connection failure on every URL tried — parked in
- *                         BLOCKERS.md, marked down in source health
+ *                         marked down in source health
  */
 
 import { disambiguatedQuery, type CompanyContext } from './ambiguous';
@@ -67,7 +67,7 @@ export const WIRE_SOURCES: NewsSource[] = [
     url: 'https://www.globenewswire.com/RssFeed/subjectcode/22-Technology/feedTitle/GlobeNewswire%20-%20Technology',
     sourceType: 'wire',
     // Connection failure on every URL variant tried, so this is disabled rather
-    // than left to fail quietly every run. See BLOCKERS.md.
+    // than left to fail quietly every run.
     enabled: false,
     note: 'connection failure 2026-08-24; needs a working feed URL',
   },

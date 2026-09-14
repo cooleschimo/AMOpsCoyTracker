@@ -222,7 +222,7 @@ async function insertItems(db: ReturnType<typeof getDb>, rows: PendingItem[]): P
       for (const src of WIRE_SOURCES) {
         if (!src.enabled) {
           // Disabled sources are marked down every run, so they stay visible.
-          console.log(`  ${src.name}: disabled — ${src.note ?? 'see BLOCKERS.md'}`);
+          console.log(`  ${src.name}: disabled — ${src.note ?? 'disabled in lib/news-sources.ts'}`);
           await markHealth(db, src.id, 'wire', 0, src.note ?? 'disabled');
           continue;
         }
