@@ -8,7 +8,7 @@
  *
  * A company reaches the digest only with a representative item: a specific
  * event, story or hiring signal an RD can lead with. A strong company with
- * nothing to point at stays in `to_watch`, since presence in the digest always
+ * nothing to point at does not appear, since presence in the digest always
  * requires a why-now (§7a).
  *
  * The window is a rolling 30 days, recomputed each run, so a raise stays
