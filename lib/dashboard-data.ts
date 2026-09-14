@@ -810,6 +810,14 @@ export type WeeklyDigest = {
   /** Assessed, and rated low on priority or Singapore fit. */
   lowFit: DashboardCompany[];
   monitoring: DashboardCompany[];
+  /**
+   * A company the tool rates highly with nothing to act on this week.
+   *
+   * Distinct from `monitoring`, which is a standing choice a person made and
+   * keeps until they undo it. This is derived fresh each run: the assessment
+   * says EDB should care, and the week produced no trigger worth leading with.
+   */
+  toWatch: DashboardCompany[];
 };
 
 /** This week's digest, placed by the same rules the email uses. */
@@ -929,6 +937,9 @@ export async function getWeeklyDigest(
   // and given its own page rather than a slot in the weekly read.
   const awaitingAssessment = pick(plan.sections.awaiting_assessment);
   const lowFit = pick(plan.sections.low_fit);
+  // Rated worth caring about, but nothing happened this week worth leading
+  // with. Kept visible so a quiet week reads as quiet rather than as absence.
+  const toWatch = pick(plan.sections.to_watch);
 
   return {
     weekLabel: weekLabel(rows[0]?.week_of as string | undefined),
@@ -947,6 +958,7 @@ export async function getWeeklyDigest(
     awaitingAssessment,
     lowFit,
     monitoring,
+    toWatch,
   };
 }
 

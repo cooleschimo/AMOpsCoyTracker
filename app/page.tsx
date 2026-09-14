@@ -117,6 +117,7 @@ export default async function Dashboard({
   // disagree about how much a section holds.
   const shownLowFit = inPlace(d.lowFit);
   const shownAwaiting = inPlace(d.awaitingAssessment);
+  const shownToWatch = inPlace(d.toWatch);
 
   const sidebarCounts = {
     places: {
@@ -282,6 +283,22 @@ export default async function Dashboard({
         >
           <Masonry className="dense-cards">
             {shownAwaiting.map((c) => (
+              <CompanyCase key={c.id} company={c} />
+            ))}
+          </Masonry>
+        </CollapsedSection>
+
+        {/* Rated worth caring about, and nothing happened this week worth
+            leading with. Collapsed like the other two standing lists: it is a
+            question an RD asks sometimes, not part of the weekly read, and a
+            company here is waiting on news rather than on the tool. */}
+        <CollapsedSection
+          title="To watch"
+          count={shownToWatch.length}
+          blurb="Worth caring about, with no trigger this week."
+        >
+          <Masonry className="dense-cards">
+            {shownToWatch.map((c) => (
               <CompanyCase key={c.id} company={c} />
             ))}
           </Masonry>
