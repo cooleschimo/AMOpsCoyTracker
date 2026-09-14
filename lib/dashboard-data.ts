@@ -669,6 +669,12 @@ async function signalRows(signalVersion: string, weekOf?: string): Promise<Row[]
       order by a.assessed_at desc limit 1
     ) ca on true
     where cs.signal_version = ${signalVersion}
+      -- Judged not to be a company EDB could attract, or not a company at all.
+      -- Every other read applies this; without it a row retired by review kept
+      -- its place on the page, because placement reads the signal rather than
+      -- the company behind it.
+      and coalesce(c.scope_status, 'unknown') <> 'out_of_scope'
+      and coalesce(c.discovered_via, '') <> 'portfolio'
       -- One week, and by default the latest. Signals accumulate week on week,
       -- and without this the dashboard showed every week at once: a company
       -- scored a fortnight ago sat beside one scored today, both reading as
