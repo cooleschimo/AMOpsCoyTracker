@@ -47,7 +47,7 @@ import { parseFundraise } from './fundraise';
 export const SECTIONS = [
   'worth_a_conversation', 'new_on_the_radar', 'who_we_know',
   'awaiting_assessment',
-  'monitoring', 'exploration', 'low_fit', 'omitted',
+  'monitoring', 'exploration', 'to_watch', 'low_fit', 'omitted',
 ] as const;
 export type Section = (typeof SECTIONS)[number];
 
@@ -593,11 +593,24 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
     }
   }
 
+  /**
+   * Companies worth an eye on: a real priority, and nothing happening this week.
+   *
+   * Derived fresh each run, and distinct from `monitoring`, which is the table
+   * of companies a person chose to follow. §7a requires a why-now for
+   * placement, so these are held back rather than featured.
+   */
   const placedIds = new Set(
     [...sections.worth_a_conversation, ...sections.new_on_the_radar, ...sections.who_we_know,
      ...sections.awaiting_assessment, ...sections.low_fit]
       .map((i) => i.itemId),
   );
+  for (const it of input) {
+    if (placedIds.has(it.itemId)) continue;
+    if (priorityScore(it.targetPriority) >= 2 && Math.max(it.expansion, it.partnership) < 2) {
+      sections.to_watch.push({ ...it, section: 'to_watch', rank: discoveryRank(it) });
+    }
+  }
 
   const represented = new Set(
     [...sections.worth_a_conversation, ...sections.new_on_the_radar, ...sections.who_we_know]
