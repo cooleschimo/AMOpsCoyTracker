@@ -27,6 +27,7 @@ import { people, runs } from '../lib/schema';
 import { search, searchRequestsUsed } from '../lib/search-providers';
 import { callJson } from '../lib/llm';
 import { Budget } from '../lib/budget';
+import { pool, workersFromArgs } from '../lib/pool';
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -56,6 +57,7 @@ Return ONE JSON object, no prose, no markdown fences:
   const limit = Number(arg('limit', '0'));
   const all = flag('all');
   const dry = flag('dry');
+  const workers = workersFromArgs();
 
   /**
    * People at companies with a live signal, unless --all. Someone nobody is
@@ -91,14 +93,14 @@ Return ONE JSON object, no prose, no markdown fences:
   };
 
   try {
-    for (const p of list) {
+    const enrichOne = async (p: any) => {
       counts.people++;
       const hits = await search(`"${p.name}" "${p.company}"`, { maxResults: 5 });
       counts.searched++;
       if (!hits.length) {
         counts.not_found++;
         console.log(`  ${p.name}: no results`);
-        continue;
+        return;
       }
 
       const snippets = hits.map((h, i) =>
@@ -115,11 +117,11 @@ Return ONE JSON object, no prose, no markdown fences:
         temperature: 0.1,
       });
 
-      if (!res.ok || !res.data) { counts.failed++; console.warn(`  ${p.name}: ${res.error}`); continue; }
+      if (!res.ok || !res.data) { counts.failed++; console.warn(`  ${p.name}: ${res.error}`); return; }
       if (!res.data.found) {
         counts.not_found++;
         console.log(`  ${p.name}: nothing usable`);
-        continue;
+        return;
       }
 
       // Only a url we actually supplied. A model returning one of its own has
@@ -177,7 +179,9 @@ Return ONE JSON object, no prose, no markdown fences:
       else if (emailRaw || phoneRaw) counts.contact_rejected++;
       if (profileUrl) counts.with_profile++;
       console.log(`  ${p.name}: ${res.data.title || '(no title)'} — ${host}${contactEmail ? ' · email' : ''}${profileUrl ? ' · profile' : ''}`);
-    }
+    };
+
+    await pool(list, workers, enrichOne, () => budget.halted);
 
     await db.update(runs).set({
       finishedAt: new Date(),

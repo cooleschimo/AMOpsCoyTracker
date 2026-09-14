@@ -32,6 +32,7 @@ import { hiringIsTheNews } from '../lib/job-signal';
 import { volumeTriggerFires } from '../lib/ats';
 import { parseFundraise } from '../lib/fundraise';
 import { weekOfSaturday } from '../lib/week';
+import { pool, workersFromArgs } from '../lib/pool';
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -81,6 +82,7 @@ type Out = {
   // Narrows to companies found a particular way, so a newly discovered set can
   // be brought current without re-scoring everything that already has a signal.
   const via = arg('via');
+  const workers = workersFromArgs();
 
   // Companies with kept items in the window. An ATS aggregate has no published
   // date by construction, so it is included on its fetch date instead.
@@ -115,11 +117,7 @@ type Out = {
   };
 
   try {
-    for (const c of list) {
-      if (budget.halted) {
-        console.warn(`\nBudget halted: ${budget.haltReason}`);
-        break;
-      }
+    const scoreOne = async (c: any) => {
       counts.companies++;
 
       const rows: any = await sqlc`
@@ -259,7 +257,7 @@ type Out = {
       if (!res.ok || !res.data) {
         counts.failed++;
         console.warn(`  ${c.name}: FAILED — ${res.error}`);
-        continue;
+        return;
       }
 
       const d = res.data;
@@ -402,7 +400,13 @@ type Out = {
       counts[`momentum_${momentum}`]++;
       counts[`partnership_${partnership}`]++;
       console.log(`  ${c.name}: expansion ${expansion} · momentum ${momentum} · partnership ${partnership} · ${items.length} items${representativeItemId ? '' : ' (no representative item)'}`);
-    }
+    };
+
+    await pool(list, workers, scoreOne, () => {
+      if (!budget.halted) return false;
+      console.warn(`\nBudget halted: ${budget.haltReason}`);
+      return true;
+    });
 
     Object.assign(counts, budget.summary());
     await budget.done();

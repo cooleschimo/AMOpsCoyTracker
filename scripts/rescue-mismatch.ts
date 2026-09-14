@@ -19,6 +19,7 @@ import { getDb, getSql, withRetry } from '../lib/db';
 import { items, runs } from '../lib/schema';
 import { openBudget } from '../lib/budget-store';
 import { EXPANSION_RE, adjudicate, type MismatchCandidate } from '../lib/mismatch';
+import { pool, batched, workersFromArgs } from '../lib/pool';
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -33,6 +34,7 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
   const batchSize = Number(arg('batch', '12'));
   const limit = Number(arg('limit', '0'));
   const dry = flag('dry');
+  const workers = workersFromArgs();
 
   /**
    * Dropped as a mismatch, recent, and not already adjudicated. A company-
@@ -69,13 +71,11 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
   const restored: Array<{ company: string; title: string; why: string }> = [];
 
   try {
-    for (let i = 0; i < list.length; i += batchSize) {
-      if (budget.halted) { console.warn(`\nBudget halted: ${budget.haltReason}`); break; }
-      const batch = list.slice(i, i + batchSize);
+    const runBatch = async (batch: any[]) => {
       counts.batches++;
 
       const { verdicts, error } = await adjudicate(batch, budget);
-      if (error) { counts.failed_batches++; console.warn(`  batch ${counts.batches}: ${error}`); continue; }
+      if (error) { counts.failed_batches++; console.warn(`  batch ${counts.batches}: ${error}`); return; }
       counts.verdicts += verdicts.length;
 
       const byId = new Map(batch.map((b) => [b.itemId, b]));
@@ -102,7 +102,13 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
       } else if (dry) {
         counts.restored += keep.length;
       }
-    }
+    };
+
+    await pool(batched(list, batchSize), workers, runBatch, () => {
+      if (!budget.halted) return false;
+      console.warn(`\nBudget halted: ${budget.haltReason}`);
+      return true;
+    });
   } finally {
     await budget.done();
     await db.update(runs).set({

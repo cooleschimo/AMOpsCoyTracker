@@ -36,6 +36,7 @@ import { regionForState, refineCaRegion } from '../lib/edgar';
 import { isUsState } from '../lib/scope';
 import { callJson } from '../lib/llm';
 import { openBudget } from '../lib/budget-store';
+import { pool, batched, workersFromArgs } from '../lib/pool';
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -81,6 +82,7 @@ function parseHq(hq: string | null | undefined) {
   const noEvents = flag('no-events');
   const csvOut = arg('csv', 'data/discovered_candidates.csv')!;
   const dry = flag('dry');
+  const workers = workersFromArgs();
   const kept: NewsCandidate[] = [];
 
   const known: any = await sqlc`select normalized_name from companies`;
@@ -138,9 +140,7 @@ function parseHq(hq: string | null | undefined) {
     const asItems = found.map((c) => ({ id: c.itemId, title: c.title, source: c.source }));
     const byItem = new Map(found.map((c) => [c.itemId, c]));
     const confirmed: NewsCandidate[] = [];
-    for (let i = 0; i < asItems.length; i += batchSize) {
-      if (budget.halted) break;
-      const batch = asItems.slice(i, i + batchSize);
+    const confirmBatch = async (batch: typeof asItems) => {
       const res = await callJson<{ results?: Array<{ id?: number; company?: string | null; hq?: string | null }> }>({
         system: EXTRACT_SYSTEM, user: buildExtractPrompt(batch), budget,
       });
@@ -148,7 +148,7 @@ function parseHq(hq: string | null | undefined) {
         // Unconfirmed rather than rejected: the regex found something real, and
         // a model failure is not evidence against it.
         for (const b of batch) { const c = byItem.get(b.id); if (c) confirmed.push(c); }
-        continue;
+        return;
       }
       for (const r of res.data.results) {
         const c = typeof r.id === 'number' ? byItem.get(r.id) : undefined;
@@ -160,7 +160,9 @@ function parseHq(hq: string | null | undefined) {
         if (isCategoryName(name)) { counts.category_rejected++; continue; }
         confirmed.push({ ...c, name, hq: (r.hq ?? '').trim() || null });
       }
-    }
+    };
+
+    await pool(batched(asItems, batchSize), workers, confirmBatch, () => budget.halted);
     found.length = 0;
     found.push(...confirmed);
   }
@@ -175,16 +177,14 @@ function parseHq(hq: string | null | undefined) {
     counts.event_headlines = events.length;
     console.log(`${events.length} more are other events, read by the model\n`);
 
-    for (let i = 0; i < events.length; i += batchSize) {
-      if (budget.halted) { console.warn(`budget halted: ${budget.haltReason}`); break; }
-      const batch = events.slice(i, i + batchSize);
+    const eventBatch = async (batch: typeof events) => {
       counts.event_batches++;
       const res = await callJson<{ results?: Array<{ id?: number; company?: string | null; hq?: string | null; event?: string }> }>({
         system: EXTRACT_SYSTEM,
         user: buildExtractPrompt(batch.map((b) => ({ id: b.id, title: b.title, source: b.source }))),
         budget,
       });
-      if (!res.ok || !res.data?.results) { console.warn(`  batch ${counts.event_batches}: ${res.error ?? 'no results'}`); continue; }
+      if (!res.ok || !res.data?.results) { console.warn(`  batch ${counts.event_batches}: ${res.error ?? 'no results'}`); return; }
 
       const byId = new Map(batch.map((b) => [b.id, b]));
       for (const r of res.data.results) {
@@ -201,7 +201,9 @@ function parseHq(hq: string | null | undefined) {
           itemId: it.id, title: it.title, source: it.source, url: it.url,
         } as NewsCandidate);
       }
-    }
+    };
+
+    await pool(batched(events, batchSize), workers, eventBatch, () => budget.halted);
   }
   console.log('');
 

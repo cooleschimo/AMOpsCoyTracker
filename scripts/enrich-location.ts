@@ -27,6 +27,7 @@ import { openBudget } from '../lib/budget-store';
 import { callJson } from '../lib/llm';
 import { refineCaRegion, regionForState } from '../lib/edgar';
 import { isUsState } from '../lib/scope';
+import { pool, batched, workersFromArgs } from '../lib/pool';
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -55,6 +56,7 @@ type Out = { results?: Array<{ id?: number; hq?: string | null; evidence?: strin
   const limit = Number(arg('limit', '0'));
   const all = flag('all');
   const dry = flag('dry');
+  const workers = workersFromArgs();
 
   /**
    * Companies whose location is a guess or missing, with enough news to do
@@ -86,9 +88,7 @@ type Out = { results?: Array<{ id?: number; hq?: string | null; evidence?: strin
   };
 
   try {
-    for (let i = 0; i < list.length; i += batchSize) {
-      if (budget.halted) { console.warn(`\nBudget halted: ${budget.haltReason}`); break; }
-      const batch = list.slice(i, i + batchSize);
+    const runBatch = async (batch: any[]) => {
       counts.batches++;
 
       const user = `Give each company's headquarters, or null.\n\n${batch.map((c: any) =>
@@ -99,7 +99,7 @@ type Out = { results?: Array<{ id?: number; hq?: string | null; evidence?: strin
       if (!res.ok || !res.data?.results) {
         counts.failed_batches++;
         console.warn(`  batch ${counts.batches}: ${res.error ?? 'no results'}`);
-        continue;
+        return;
       }
 
       const byId = new Map<number, any>(batch.map((b: any) => [b.id, b]));
@@ -136,7 +136,13 @@ type Out = { results?: Array<{ id?: number; hq?: string | null; evidence?: strin
         }
         counts.located++;
       }
-    }
+    };
+
+    await pool(batched(list, batchSize), workers, runBatch, () => {
+      if (!budget.halted) return false;
+      console.warn(`\nBudget halted: ${budget.haltReason}`);
+      return true;
+    });
   } finally {
     await budget.done();
     await db.update(runs).set({

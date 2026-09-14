@@ -19,6 +19,7 @@ import { companyEdges, runs } from '../lib/schema';
 import { canonicalEdge, extractEdges, type EdgeCandidate } from '../lib/company-edges';
 import { normalizeCompanyName } from '../lib/normalize';
 import { Budget } from '../lib/budget';
+import { pool, batched, workersFromArgs } from '../lib/pool';
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -31,6 +32,7 @@ const BATCH = 12;
 
 (async () => {
   const dry = flag('dry');
+  const workers = workersFromArgs();
   const limit = Number(arg('limit', '600'));
   const db = getDb();
   const sqlc = getSql();
@@ -96,11 +98,10 @@ const BATCH = 12;
     written: 0,
   };
 
-  for (let i = 0; i < candidates.length; i += BATCH) {
-    const batch = candidates.slice(i, i + BATCH);
+  const runBatch = async (batch: typeof candidates) => {
     counts.batches++;
     const { edges, failed } = await extractEdges(batch, { budget });
-    if (failed) { counts.failed_batches++; continue; }
+    if (failed) { counts.failed_batches++; return; }
     counts.extracted += edges.length;
 
     for (const e of edges) {
@@ -129,7 +130,9 @@ const BATCH = 12;
       }));
       counts.written++;
     }
-  }
+  };
+
+  await pool(batched(candidates, BATCH), workers, runBatch, () => budget.halted);
 
   await db.update(runs).set({
     finishedAt: new Date(), counts,

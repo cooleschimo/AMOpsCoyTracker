@@ -18,6 +18,7 @@ import { callJson } from '../lib/llm';
 import type { Budget } from '../lib/budget';
 import { openBudget } from '../lib/budget-store';
 import { researchCompany, findCompanyWebsiteWithContext } from '../lib/websearch';
+import { pool, workersFromArgs } from '../lib/pool';
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -58,6 +59,7 @@ async function isSameCompany(
   const db = getDb();
   const limit = Number(arg('limit', '0'));
   const dry = process.argv.includes('--dry');
+  const workers = workersFromArgs();
 
   // Every watched company (lib/scope.ts). A website is the gate on people and
   // therefore on warm paths, so restricting this to one discovery route left
@@ -90,7 +92,7 @@ async function isSameCompany(
   const budget = await openBudget();
   const counts = { attempted: 0, resolved: 0, unresolved: 0, via_domain_guess: 0, via_search: 0, search_ambiguous: 0, search_rejected: 0, same_name_rejected: 0, via_context_search: 0 };
 
-  for (const c of list) {
+  const resolveOne = async (c: any) => {
     counts.attempted++;
     // 1. Domain construction first: free, no external request beyond the
     //    candidate fetch itself.
@@ -216,7 +218,9 @@ async function isSameCompany(
           .where(eq(companies.id, c.id));
       }
     }
-  }
+  };
+
+  await pool(list, workers, resolveOne, () => budget.halted);
 
   await budget.done();
   if (!dry) await db.update(runs).set({ finishedAt: new Date(), counts }).where(eq(runs.id, run.id));
