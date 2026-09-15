@@ -706,11 +706,12 @@ async function signalRows(signalVersion: string, weekOf?: string): Promise<Row[]
             -- a week whose page has already been read. But an unbounded
             -- fetched-in-week test is worse: a backfill stamps today's date on
             -- everything it pulls, so re-pulling a month of archives would drag
-            -- all of it onto the current page. Fourteen days is wider than the
-            -- observed lag and far short of the thirty-day scoring window.
+            -- all of it onto the current page. Five days covers the ordinary
+            -- lag without letting a story from a previous week read as this
+            -- week's news.
             or (
               w.fetched_at >= cs.week_of and w.fetched_at < cs.week_of + 7
-              and (w.published_at is null or w.published_at >= cs.week_of - 14)
+              and (w.published_at is null or w.published_at >= cs.week_of - 5)
             )
           ))
     order by cs.expansion desc, cs.momentum desc`;
