@@ -30,6 +30,29 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+/**
+ * Is this session token a live row?
+ *
+ * Read straight from the database rather than trusted from the cookie. Next 16
+ * runs this file on the Node runtime, so the lookup that was once impossible
+ * here is now ordinary — and a gate that cannot tell a real token from a made-up
+ * one is not a gate.
+ *
+ * A failure is treated as "not admitted" rather than thrown: the caller falls
+ * through to the shared-token check, which is the same answer someone with no
+ * session would get. Failing open here would restore the bypass this replaced.
+ */
+async function sessionIsLive(token: string): Promise<boolean> {
+  try {
+    const { getSql } = await import('./lib/db');
+    const rows: any = await getSql()`
+      select 1 from sessions where token = ${token} and expires_at > now() limit 1`;
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 const COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: 'lax' as const,
@@ -66,7 +89,7 @@ function notAuthorised() {
  * monitoring page and the graph were all reachable without a token because
  * nobody added the call. Here a new page is gated by existing.
  */
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   /*
@@ -102,19 +125,23 @@ export function middleware(req: NextRequest) {
   }
 
   /*
-   * A session is its own admission.
+   * A session is its own admission, once it is known to be real.
    *
    * The shared token says a browser may look; a session says which person is
    * looking, and it is the stronger claim. Requiring both would lock an invited
    * teammate out of the tool they have an account for unless they also held the
    * link — which is the opposite of what accounts are for.
    *
-   * Only presence is checked here: the edge runtime cannot reach the database,
-   * so whether the token is live is settled by `currentUser()` on the page. A
-   * forged cookie therefore gets past this line and resolves to a guest, which
-   * is the same thing it would have got by not presenting one.
+   * The token is VERIFIED here, not merely presented. An earlier version tested
+   * only presence, on the reasoning that the edge runtime cannot reach the
+   * database and `currentUser()` would settle it on the page. Both halves were
+   * wrong: this file runs on the Node runtime under Next 16, and three pages
+   * (`/surfaced`, `/graph`, `/awaiting-assessment`) never call `currentUser()`
+   * at all — so `Cookie: session=anything` walked straight past the only gate
+   * they had.
    */
-  if (req.cookies.get(SESSION_COOKIE)?.value) return NextResponse.next();
+  const sessionToken = req.cookies.get(SESSION_COOKIE)?.value;
+  if (sessionToken && (await sessionIsLive(sessionToken))) return NextResponse.next();
 
   const cookieAdmin = req.cookies.get(ADMIN_COOKIE)?.value;
   const cookieDashboard = req.cookies.get(DASHBOARD_COOKIE)?.value;

@@ -917,7 +917,10 @@ export async function getWeeklyDigest(
 
   const plan = planDigest(rows.map(toPlacementInput));
   const ctx = await whyNowContext(rows, signalVersion);
-  const withOffer = opts?.withOffer !== false;
+  // Opt IN, not opt out. Defaulting this to true meant a page that simply did
+  // not pass the option leaked the proposition — which is how
+  // /awaiting-assessment shipped it to guests while / withheld it.
+  const withOffer = opts?.withOffer === true;
   const pick = (placed: Placed[]) =>
     placed
       .map((p) => (p.companyId === null ? null : byCompany.get(p.companyId)))
@@ -987,7 +990,7 @@ export async function getWeeklyDigest(
       where signal_version = ${signalVersion}
         and week_of = coalesce(${weekOf ?? null}::date,
           (select max(week_of) from company_signals where signal_version = ${signalVersion}))`,
-    getMonitoredCompanies(signalVersion, { withOffer: opts?.withOffer !== false }),
+    getMonitoredCompanies(signalVersion, { withOffer: opts?.withOffer === true }),
   ]);
 
   const worthAConversation = pick(plan.sections.worth_a_conversation);
@@ -1110,7 +1113,8 @@ export async function getMonitoredCompanies(
              ca.singapore_fit_reason, ca.contribution_reason, ca.confidence_reason
     order by max(m.added_at) desc`;
   const ctx = await whyNowContext(rows as Row[], signalVersion);
-  const withOffer = opts?.withOffer !== false;
+  // Opt in, as getWeeklyDigest.
+  const withOffer = opts?.withOffer === true;
   return (rows as Row[]).map((r) => {
     const c = toCompany(r, ctx);
     return withOffer ? c : { ...c, offer: null };

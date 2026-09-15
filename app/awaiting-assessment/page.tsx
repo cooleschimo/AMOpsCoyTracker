@@ -18,11 +18,26 @@ import { CompanyCase } from '@/components/company-case';
 import { Masonry } from '@/components/masonry';
 import { SectionHeading } from '@/components/primitives';
 import { getWeeklyDigest } from '@/lib/dashboard-data';
+import { redirect } from 'next/navigation';
+import { currentUser } from '@/lib/session';
+import { hasDashboard } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AwaitingAssessmentPage() {
-  const d = await getWeeklyDigest();
+/*
+ * Gated here as well as in the gate in front of it.
+ *
+ * The Next.js documentation for this convention warns that a matcher change or
+ * a moved route silently removes that coverage, and this page holds internal
+ * assessment detail — so it says what it needs rather than inheriting it.
+ *
+ * Either admission counts: an account, or the shared link.
+ */
+  const me = await currentUser();
+  if (!me && !(await hasDashboard())) redirect('/login');
+
+  const d = await getWeeklyDigest(undefined, undefined, { withOffer: Boolean(me) });
   const companies = d.awaitingAssessment;
 
   return (
@@ -57,7 +72,7 @@ export default async function AwaitingAssessmentPage() {
         ) : (
           <Masonry className="dense-cards">
             {companies.map((c) => (
-              <CompanyCase key={c.id} company={c} />
+              <CompanyCase key={c.id} company={c} canAct={Boolean(me)} />
             ))}
           </Masonry>
         )}

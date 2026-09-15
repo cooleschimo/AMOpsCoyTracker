@@ -14,6 +14,9 @@ import { SectionHeading } from '@/components/primitives';
 import { sectorLabel } from '@/lib/subsectors';
 import { everSurfacedCompanies, getCompanyGraph, getCompanyPaths } from '@/lib/dashboard-data';
 import { companiesWithPaths } from '@/lib/paths';
+import { redirect } from 'next/navigation';
+import { hasDashboard } from '@/lib/auth';
+import { currentUser } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +25,19 @@ export default async function GraphPage({
 }: {
   searchParams: Promise<{ company?: string }>;
 }) {
+  /*
+   * Gated here as well as in the gate in front of it.
+   *
+   * The Next.js documentation for this convention warns that a matcher change
+   * or a moved route silently removes that coverage, and this page draws the
+   * whole relationship graph — warm paths, the people behind them — so it
+   * states what it needs rather than inheriting it.
+   *
+   * Either admission counts: an account, or the shared link. Checking
+   * only the token locked out a member who had signed in but never held
+   * the link — which is precisely what accounts exist to avoid.
+   */
+  if (!(await currentUser()) && !(await hasDashboard())) redirect('/login');
   const { company } = await searchParams;
   /*
    * Every company that ever cleared the trigger bar, not this week's digest.

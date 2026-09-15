@@ -42,7 +42,7 @@ export default async function MonitoringPage() {
   // nothing in it and no business reading it, so this is a redirect rather than
   // an empty page.
   if (!(await currentUser())) redirect('/login');
-  const companies = await getMonitoredCompanies();
+  const companies = await getMonitoredCompanies(undefined, { withOffer: true });
   const groups = groupBySector(companies);
 
   return (

@@ -13,11 +13,25 @@
 import Link from 'next/link';
 import { SectionHeading } from '@/components/primitives';
 import { everSurfacedCompanies } from '@/lib/dashboard-data';
+import { redirect } from 'next/navigation';
+import { hasDashboard } from '@/lib/auth';
+import { currentUser } from '@/lib/session';
 import { sectorShort } from '@/lib/subsectors';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SurfacedPage() {
+/*
+ * Gated here as well as in the gate in front of it.
+ *
+ * The Next.js documentation for this convention warns that a matcher change or
+ * a moved route silently removes that coverage, and this page holds internal
+ * assessment detail — so it says what it needs rather than inheriting it.
+ *
+ * Either admission counts: an account, or the shared link.
+ */
+  if (!(await currentUser()) && !(await hasDashboard())) redirect('/login');
+
   const companies = await everSurfacedCompanies();
 
   return (
