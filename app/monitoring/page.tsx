@@ -85,7 +85,24 @@ export default async function MonitoringPage() {
                     // shared with the dashboard where the action has no meaning.
                     <div key={c.id}>
                       <CompanyCase company={c} />
-                      <MonitoringDrop companyId={c.id} />
+                      {/* Who is watching, under the card with the control that
+                          stops watching. The point of a shared list is that a
+                          colleague can see someone already has this one. */}
+                      <div className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        {c.watchers.length > 0 && (
+                          <span className="flex flex-wrap items-baseline gap-1.5">
+                            {c.watchers.map((w) => (
+                              <span
+                                key={w}
+                                className="rounded-full bg-primary/[0.1] px-2 py-0.5 text-2xs font-medium text-foreground"
+                              >
+                                {w}
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                        <MonitoringDrop companyId={c.id} />
+                      </div>
                     </div>
                   ))}
                 </Masonry>

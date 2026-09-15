@@ -125,6 +125,14 @@ export type DashboardCompany = {
   /** One-line summary of the strongest possible path, when one is reviewed. */
   possiblePathSummary: string | null;
   /**
+   * Who on the team is watching this company, by name.
+   *
+   * Empty everywhere except the monitoring list, which is the only view whose
+   * question is "who is looking at what". A company several people follow
+   * carries several names rather than several cards.
+   */
+  watchers: string[];
+  /**
    * Named people at the company. Shown when the graph found no path, because
    * "no path" is not an answer to "who do I call".
    */
@@ -397,6 +405,9 @@ function toCompany(
       dimensions: Array.isArray(r.contribution_drivers) ? (r.contribution_drivers as string[]) : [],
       confidence: band(r.confidence),
     },
+    watchers: Array.isArray(r.watchers)
+      ? (r.watchers as string[]).filter(Boolean)
+      : [],
     factSources: {
       'Total raised': String(
         r.valuation_source ? String(r.valuation_source).split(',')[0] : 'CB Insights',
@@ -1059,6 +1070,9 @@ export async function getMonitoredCompanies(
            c.description, c.one_liner, c.hq_city, c.hq_state, c.hq_region, c.total_raised, c.headcount_est,
            c.founded_year, c.hq_source, c.round_date, c.round_stage, c.round_amount_musd, c.valuation_est, c.valuation_source,
            m.added_at, m.note,
+           (select array_agg(distinct u.name order by u.name)
+              from monitoring m2 join users u on u.id = m2.user_id
+             where m2.company_id = m.company_id and m2.removed_at is null) as watchers,
            cs.expansion, cs.momentum, cs.partnership, cs.signal_type, cs.why,
            cs.why_item_ids,
            i.id as item_id, i.title, i.url, i.source, i.source_type, i.published_at,
@@ -1081,7 +1095,20 @@ export async function getMonitoredCompanies(
       order by a.assessed_at desc limit 1
     ) ca on true
     where m.removed_at is null
-    order by m.added_at desc`;
+    -- One card per company however many people watch it. Without this a company
+    -- three colleagues follow arrives three times, which reads as a duplicate
+    -- rather than as agreement.
+    group by c.id, c.name, c.familiarity, c.sectors, c.description, c.one_liner,
+             c.hq_city, c.hq_state, c.hq_region, c.total_raised, c.headcount_est,
+             c.founded_year, c.hq_source, c.round_date, c.round_stage,
+             c.round_amount_musd, c.valuation_est, c.valuation_source,
+             m.company_id, m.added_at, m.note, cs.expansion, cs.momentum,
+             cs.partnership, cs.signal_type, cs.why, cs.why_item_ids,
+             i.id, i.title, i.url, i.source, i.source_type, i.published_at,
+             ca.target_priority, ca.singapore_fit, ca.potential_contribution,
+             ca.confidence, ca.rationale, ca.assessed_at, ca.priority_reason,
+             ca.singapore_fit_reason, ca.contribution_reason, ca.confidence_reason
+    order by max(m.added_at) desc`;
   const ctx = await whyNowContext(rows as Row[], signalVersion);
   const withOffer = opts?.withOffer !== false;
   return (rows as Row[]).map((r) => {
@@ -1388,19 +1415,26 @@ export async function getCompanyPaths(companyId: number): Promise<PathRow[]> {
  * company outright, where the others only hold against news already seen, and
  * a reader deciding whether to undo needs to know which they chose.
  */
-export async function dismissedCompanies(voterKey: string | null): Promise<Array<{
+export async function dismissedCompanies(userId: number | null): Promise<Array<{
   id: number; name: string; oneLiner: string; sectors: string[]; hq: string;
-  reasons: string[]; note: string | null; at: string;
+  reasons: string[]; note: string | null; at: string; by: string;
 }>> {
-  if (!voterKey) return [];
+  if (!userId) return [];
   const sql = getSql();
+  /*
+   * Everyone's dismissals, not only this reader's, each carrying who made it.
+   *
+   * A dismissal removes a company from the week for the whole team, so a
+   * teammate wondering where something went needs to see that a person took it
+   * off and which person — the same transparency monitoring gives.
+   */
   const rows: any = await sql`
     select c.id, c.name, c.one_liner, c.sectors, c.hq_city, c.hq_state,
-           d.reasons, d.note, d.created_at
+           d.reasons, d.note, d.created_at, coalesce(u.name, 'Someone') as by_name
       from dispositions d
       join companies c on c.id = d.company_id
+      left join users u on u.id = d.user_id
      where d.disposition = 'dismiss'
-       and d.voter_key = ${voterKey}
      order by d.created_at desc`;
   return (rows as Row[]).map((r) => ({
     id: Number(r.id),
@@ -1411,6 +1445,7 @@ export async function dismissedCompanies(voterKey: string | null): Promise<Array
     reasons: Array.isArray(r.reasons) ? (r.reasons as string[]) : [],
     note: (r.note as string | null) ?? null,
     at: asDate(r.created_at),
+    by: String(r.by_name ?? 'Someone'),
   }));
 }
 

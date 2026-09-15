@@ -282,7 +282,13 @@ export function CompanyCase({
         {/* What Singapore would actually put on the table. The bands say how much
             we care and their hovers say why; this is the only place the card
             names the offer itself, which is what an approach is built on. */}
-        {(company.offer || company.checkFirst) && (
+        {/* The block stays for a guest, emptied.
+            Withholding the content by removing the section removes the evidence
+            that the section exists, so someone who simply has not signed in
+            cannot tell the difference between "not for you" and "nothing here".
+            The heading is the thing worth keeping: it says what they are
+            missing, and the link says how to get it. */}
+        {(company.offer || company.checkFirst || !canAct) && (
           <div className="space-y-1.5 rounded-md border border-[color:var(--hairline)] bg-muted/50 p-4 sm:p-5">
             <div className="flex items-baseline justify-between gap-x-3">
               <Label>Singapore could offer</Label>
@@ -291,6 +297,14 @@ export function CompanyCase({
                   than beside the company name. */}
               {company.checkFirst && <CheckFirst text={company.checkFirst} />}
             </div>
+            {!canAct && (
+              <p className="measure text-sm text-muted-foreground">
+                <Link href="/login" className="link-underline hover:text-foreground">
+                  Sign in
+                </Link>{' '}
+                to see what Singapore could offer this company.
+              </p>
+            )}
             {company.offer && (
               <>
             <p className="measure text-sm font-medium">

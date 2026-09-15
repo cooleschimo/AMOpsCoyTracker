@@ -15,7 +15,6 @@
  * dismissed it.
  */
 import Link from 'next/link';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/session';
 import { SectionHeading } from '@/components/primitives';
@@ -34,11 +33,9 @@ export const dynamic = 'force-dynamic';
 const ABOUT_THE_COMPANY: string[] = ['irrelevant_company', 'no_sg_angle'];
 
 export default async function DismissedPage() {
-  // Your own dismissals, so they need a "your".
-  if (!(await currentUser())) redirect('/login');
-  const jar = await cookies();
-  const voterKey = jar.get('voter_key')?.value ?? null;
-  const companies = await dismissedCompanies(voterKey);
+  const me = await currentUser();
+  if (!me) redirect('/login');
+  const companies = await dismissedCompanies(me.id);
 
   return (
     <main className="mx-auto max-w-[1400px] px-6 py-10 sm:px-12 sm:py-14 lg:px-16">
@@ -50,13 +47,13 @@ export default async function DismissedPage() {
         </p>
         <h1 className="font-display text-2xl font-semibold tracking-tight">Dismissed</h1>
         <p className="measure pt-1 text-sm text-muted-foreground">
-          Restore one and it returns to the week.
+          Taken off the week by someone on the team. Restore one and it comes back.
         </p>
       </header>
 
       <section className="space-y-4">
         <SectionHeading
-          title="Dismissed by you"
+          title="Dismissed"
           right={
             <span className="num text-2xs text-muted-foreground">
               {companies.length} {companies.length === 1 ? 'company' : 'companies'}
@@ -64,11 +61,7 @@ export default async function DismissedPage() {
           }
         />
         {companies.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {voterKey
-              ? 'Nothing dismissed.'
-              : 'Nothing dismissed from this browser yet.'}
-          </p>
+          <p className="text-sm text-muted-foreground">Nothing dismissed.</p>
         ) : (
           <ul className="divide-y divide-[color:var(--hairline)]">
             {companies.map((c) => {
@@ -105,6 +98,11 @@ export default async function DismissedPage() {
                       <span className="ml-2 text-muted-foreground/50">
                         {held ? 'held until restored' : 'returns on newer news'}
                       </span>
+                    </span>
+                    {/* Who did it, so a colleague looking for a company that
+                        vanished can see it was a decision rather than a fault. */}
+                    <span className="rounded-full bg-primary/[0.1] px-2 py-0.5 text-2xs font-medium text-foreground">
+                      {c.by}
                     </span>
                     <span className="num text-2xs text-muted-foreground/70">{c.at}</span>
                     <UndoDismiss companyId={c.id} />
