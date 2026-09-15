@@ -177,8 +177,9 @@ OPENROUTER_API_KEY     failover
 LLM_CHAIN              explicit failover order, comma-separated labels
 SEC_USER_AGENT         "Name email@domain" — required by the SEC
 RESEND_API_KEY         digest email
-DASHBOARD_TOKEN        shared-secret access to the web app
-ADMIN_TOKEN            admin routes and manual stage triggers
+ADMIN_TOKEN            bearer credential for /api/admin and /api/dev, which
+                       scripts call without a browser. Web access is a session:
+                       an account or a guest, never a shared secret.
 DIGEST_TEST_MODE       defaults true; confines all mail to the test recipient
 ```
 
@@ -256,14 +257,21 @@ Handle with care: `lib/llm.ts` (provider failover and quota parsing),
 
 ## Access model
 
-Two ways in. **An account** — invite-only, email and password, server-side
-sessions — identifies a person: what they monitor and dismiss is attributed to
-them and visible to the team. **The shared link** (`DASHBOARD_TOKEN` in the URL)
-admits a guest, who reads the week but cannot act on it, see monitoring or
-dismissals, or see what Singapore could offer a company.
+Everyone signs in, and a session is the only way in. **An account** —
+invite-only, email and password — identifies a person: what they monitor and
+dismiss is attributed to them and visible to the team. **A guest** clicks
+"Continue as a guest" and gets a session with no account behind it.
 
-The shared token remains a shared secret: anyone holding the link is a guest,
-and revoking that means rotating it for everyone. Reactions written before
-accounts existed are keyed on a per-browser cookie and carry no person. `DIGEST_TEST_MODE` defaults to true and confines every send to the
+A guest reads what has already been scored and assessed: the week, companies,
+people, investors, items and the connection graph. They cannot act on any card,
+and cannot see monitoring, dismissals, the unassessed backlog, or what Singapore
+could offer a company.
+
+There is no shared URL secret. `DASHBOARD_TOKEN` is gone: it admitted anyone
+holding a link, and could only be revoked by rotating it for everyone. A guest
+session is one row, expires in seven days, and can be dropped on its own.
+`ADMIN_TOKEN` survives only as a bearer credential for the machine-facing
+routes under `/api/admin` and `/api/dev`, which scripts call without a browser;
+`/admin` pages now key on an account's `admin` role. `DIGEST_TEST_MODE` defaults to true and confines every send to the
 test recipient; the mode is stored on each digest row, so a rehearsal is still
 distinguishable from a real send a fortnight later.

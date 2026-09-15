@@ -12,7 +12,8 @@
  */
 import { getSql } from '../../../lib/db';
 import { profileLabel } from '../../../lib/utils';
-import { hasDashboard } from '../../../lib/auth';
+import { redirect } from 'next/navigation';
+import { currentSession } from '../../../lib/session';
 import { SectionHeading } from '@/components/primitives';
 
 export const dynamic = 'force-dynamic';
@@ -39,10 +40,9 @@ export default async function PersonPage(
 ) {
   const { id } = await params;
   const sp = await searchParams;
-  if (!(await hasDashboard(sp.token))) {
-    return <main className={MAIN}><h1 className={H1}>Not authorised</h1>
-      <p className={BODY}>Append <code>?token=…</code> with your DASHBOARD_TOKEN.</p></main>;
-  }
+  // Scored and assessed already, so a guest may read it. `currentUser()` still
+  // decides what is withheld inside — the proposition, and every action.
+  if (!(await currentSession())) redirect('/login');
 
   const personId = Number(id);
   if (!Number.isFinite(personId)) return <main className={MAIN}><h1 className={H1}>Not found</h1></main>;

@@ -538,7 +538,16 @@ export const users = pgTable('users', {
 export const sessions = pgTable('sessions', {
   id: serial('id').primaryKey(),
   token: text('token').notNull(),
-  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  /**
+   * Null for a guest.
+   *
+   * A guest session admits a browser without naming a person: it is what the
+   * shared DASHBOARD_TOKEN used to do, except each one is its own row, expires
+   * on its own, and can be revoked alone rather than by rotating a secret
+   * everybody shares. `currentUser()` returns null for these, which is what
+   * every guest restriction already keys on.
+   */
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
 }, (t) => [

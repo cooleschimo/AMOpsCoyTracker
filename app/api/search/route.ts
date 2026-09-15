@@ -16,9 +16,8 @@
  * reader did not type.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { getSql } from '../../../lib/db';
-import { optional } from '../../../lib/env';
+import { currentUser } from '../../../lib/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,15 +42,10 @@ export function hrefFor(hit: SearchHit): string {
 export async function GET(req: NextRequest) {
   /*
    * The same gate as every page. Search reads the whole graph, so an endpoint
-   * that answered without a token would be a way around the dashboard's own
-   * lock — the tokens are shared secrets in a cookie, and this reads the one
-   * the page already set.
+   * answering without a session would be a way around the sign-in wall the
+   * pages sit behind. API routes are outside the matcher, so this asks itself.
    */
-  const jar = await cookies();
-  const tok = jar.get('dashboard_token')?.value ?? jar.get('admin_token')?.value;
-  const expected = optional('DASHBOARD_TOKEN');
-  const admin = optional('ADMIN_TOKEN');
-  if (!tok || (tok !== expected && tok !== admin)) {
+  if (!(await currentUser())) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 

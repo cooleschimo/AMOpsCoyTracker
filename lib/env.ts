@@ -35,7 +35,6 @@ export const env = {
   groqModelDrafting: () => optional('GROQ_MODEL_DRAFTING', 'openai/gpt-oss-120b'),
   resendApiKey: () => required('RESEND_API_KEY'),
   adminToken: () => required('ADMIN_TOKEN'),
-  dashboardToken: () => required('DASHBOARD_TOKEN'),
   appBaseUrl: () => optional('APP_BASE_URL', 'http://localhost:3000'),
   // SEC requires a descriptive User-Agent: "Name email@domain".
   secUserAgent: () => required('SEC_USER_AGENT'),

@@ -9,7 +9,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/session';
-import { signInAction } from '../actions';
+import { continueAsGuestAction, signInAction } from '../actions';
 import { AuthForm, Field } from '../auth-form';
 
 export const dynamic = 'force-dynamic';
@@ -41,14 +41,14 @@ export default async function LoginPage({
         action={signInAction}
         submitLabel="Sign in"
         footer={
-          <p className="pt-2 text-center text-xs text-muted-foreground">
-            <Link href="/?guest=1" className="link-underline hover:text-foreground">
+          <form action={continueAsGuestAction} className="pt-2 text-center">
+            <button
+              type="submit"
+              className="cursor-pointer text-xs text-muted-foreground link-underline hover:text-foreground"
+            >
               Continue as a guest
-            </Link>
-            <span className="mt-1 block text-2xs text-muted-foreground/70">
-              Read the week. Monitoring and dismissals stay with an account.
-            </span>
-          </p>
+            </button>
+          </form>
         }
       >
         <Field label="Email" name="email" type="email" autoComplete="email" />

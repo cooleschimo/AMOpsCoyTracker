@@ -1,34 +1,18 @@
 /**
- * Remember a token that arrives in the URL. Brief §11.
+ * One gate in front of every page: are you signed in?
  *
- * The gates read `?token=` or a cookie, but nothing ever wrote the cookie — so
- * arriving with a valid token and then clicking a link lost it on the first
- * hop, and every company, person and item page read as unauthorised to someone
- * who had just been let in.
+ * This used to exchange a `?token=` in the URL for a cookie, on the reasoning
+ * that a shared secret was enough for a handful of readers. Accounts replaced
+ * that. The link is now an ordinary URL — anyone opening it without a session
+ * lands on /login, signs in, and reads the week as themselves.
  *
- * A page render cannot set a cookie in the App Router; middleware can. It runs
- * before the page, stores the token, and strips it from the URL so the address
- * bar stops carrying a shared secret around.
- *
- * This is still a shared link, not authentication (§14). Anyone holding the
- * token has full access, and the cookie only saves them from re-pasting it.
+ * Verified against the database rather than trusted from the cookie. Next 16
+ * runs this file on the Node runtime, so the lookup is ordinary here, and a
+ * gate that cannot tell a real token from a made-up one is not a gate.
  */
 import { NextResponse, type NextRequest } from 'next/server';
 
-const DASHBOARD_COOKIE = 'dashboard_token';
 const SESSION_COOKIE = 'session';
-const ADMIN_COOKIE = 'admin_token';
-
-/**
- * Compared here rather than through lib/auth so this stays on the edge runtime,
- * which has no access to node:crypto or the env module's Node APIs.
- */
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
 
 /**
  * Is this session token a live row?
@@ -38,28 +22,26 @@ function timingSafeEqual(a: string, b: string): boolean {
  * here is now ordinary — and a gate that cannot tell a real token from a made-up
  * one is not a gate.
  *
- * A failure is treated as "not admitted" rather than thrown: the caller falls
- * through to the shared-token check, which is the same answer someone with no
- * session would get. Failing open here would restore the bypass this replaced.
+ * A failure is treated as "not admitted" rather than thrown. Failing open
+ * would turn a database blip into an open door.
  */
-async function sessionIsLive(token: string): Promise<boolean> {
+async function liveSession(token: string): Promise<{ role: string | null } | null> {
   try {
     const { getSql } = await import('./lib/db');
+    /*
+     * LEFT join: a guest session has no user_id, and an inner join read that as
+     * no session at all — which turned "Continue as a guest" into a redirect
+     * back to the page it came from. The row existing is admission; the role,
+     * when there is one, is what /admin needs.
+     */
     const rows: any = await getSql()`
-      select 1 from sessions where token = ${token} and expires_at > now() limit 1`;
-    return rows.length > 0;
+      select u.role from sessions s left join users u on u.id = s.user_id
+       where s.token = ${token} and s.expires_at > now() limit 1`;
+    return rows.length ? { role: rows[0].role ? String(rows[0].role) : null } : null;
   } catch {
-    return false;
+    return null;
   }
 }
-
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  sameSite: 'lax' as const,
-  path: '/',
-  maxAge: 60 * 60 * 24 * 30,
-  secure: process.env.NODE_ENV === 'production',
-};
 
 /** The page shown to someone without a token. Deliberately says nothing. */
 function notAuthorised() {
@@ -106,52 +88,25 @@ export async function middleware(req: NextRequest) {
     || pathname.startsWith('/join/')
     || pathname.startsWith('/reset/')
   ) return NextResponse.next();
-  const admin = process.env.ADMIN_TOKEN;
-  const dashboard = process.env.DASHBOARD_TOKEN;
-
-  const token = req.nextUrl.searchParams.get('token');
-  const isAdminToken = !!token && !!admin && timingSafeEqual(token, admin);
-  const isDashboardToken = !!token && !!dashboard && timingSafeEqual(token, dashboard);
-
-  // A token in the URL: store it, then drop it from the address bar. A URL gets
-  // pasted into chats and tickets; a cookie does not.
-  if (isAdminToken || isDashboardToken) {
-    const url = req.nextUrl.clone();
-    url.searchParams.delete('token');
-    const res = NextResponse.redirect(url);
-    if (isAdminToken) res.cookies.set(ADMIN_COOKIE, token!, COOKIE_OPTIONS);
-    if (isDashboardToken) res.cookies.set(DASHBOARD_COOKIE, token!, COOKIE_OPTIONS);
-    return res;
-  }
+  const token = req.cookies.get(SESSION_COOKIE)?.value;
+  const session = token ? await liveSession(token) : null;
 
   /*
-   * A session is its own admission, once it is known to be real.
-   *
-   * The shared token says a browser may look; a session says which person is
-   * looking, and it is the stronger claim. Requiring both would lock an invited
-   * teammate out of the tool they have an account for unless they also held the
-   * link — which is the opposite of what accounts are for.
-   *
-   * The token is VERIFIED here, not merely presented. An earlier version tested
-   * only presence, on the reasoning that the edge runtime cannot reach the
-   * database and `currentUser()` would settle it on the page. Both halves were
-   * wrong: this file runs on the Node runtime under Next 16, and three pages
-   * (`/surfaced`, `/graph`, `/awaiting-assessment`) never call `currentUser()`
-   * at all — so `Cookie: session=anything` walked straight past the only gate
-   * they had.
+   * Unauthenticated: send them to sign in, carrying where they were going so
+   * the trip is not lost. A bare 401 made sense when the answer was "ask
+   * whoever shared the link"; now there is something they can actually do.
    */
-  const sessionToken = req.cookies.get(SESSION_COOKIE)?.value;
-  if (sessionToken && (await sessionIsLive(sessionToken))) return NextResponse.next();
+  if (!session) {
+    const url = req.nextUrl.clone();
+    url.pathname = '/login';
+    url.search = pathname === '/' ? '' : `?next=${encodeURIComponent(pathname)}`;
+    return NextResponse.redirect(url);
+  }
 
-  const cookieAdmin = req.cookies.get(ADMIN_COOKIE)?.value;
-  const cookieDashboard = req.cookies.get(DASHBOARD_COOKIE)?.value;
-  const hasAdmin = !!admin && !!cookieAdmin && timingSafeEqual(cookieAdmin, admin);
-  // Admin is the strictly wider role, so it opens the dashboard too.
-  const hasDashboard =
-    hasAdmin || (!!dashboard && !!cookieDashboard && timingSafeEqual(cookieDashboard, dashboard));
+  // Admin is a property of the account now, not a second secret.
+  if (pathname.startsWith('/admin') && session.role !== 'admin') return notAuthorised();
 
-  if (pathname.startsWith('/admin')) return hasAdmin ? NextResponse.next() : notAuthorised();
-  return hasDashboard ? NextResponse.next() : notAuthorised();
+  return NextResponse.next();
 }
 
 export const config = {

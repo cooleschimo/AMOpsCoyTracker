@@ -1,57 +1,32 @@
 /**
- * Token gates. Brief §11 and §14: this is NOT authentication.
+ * Who may reach the admin pages.
  *
- * /admin/* is gated by ADMIN_TOKEN and the dashboard by DASHBOARD_TOKEN. Both
- * are shared secrets in a URL or cookie — anyone holding the link has full
- * access. Real auth is explicitly out of scope for the MVP; the README says so
- * plainly, and so does this comment, because the next person to read it needs
- * to know before they expose anything sensitive.
+ * The shared DASHBOARD_TOKEN and ADMIN_TOKEN gates are gone: every reader has
+ * an account, so "may this browser look" collapsed into "who is this", and
+ * `lib/session.ts` answers that. What remains is the narrower question of who
+ * is an admin, plus the bearer check the two machine-facing API routes use.
  */
-import { cookies } from 'next/headers';
 import { optional } from './env';
-
-export async function hasAdmin(searchParamToken?: string): Promise<boolean> {
-  const expected = optional('ADMIN_TOKEN');
-  if (!expected) return false;
-  if (searchParamToken && timingSafeEqual(searchParamToken, expected)) return true;
-  const jar = await cookies();
-  const c = jar.get('admin_token')?.value;
-  return !!c && timingSafeEqual(c, expected);
-}
+import { currentUser } from './session';
 
 /**
- * Dashboard gate. A SHARED token, not a person — §7a removed recipient identity
- * entirely, so whoever holds the link can read and react, and reactions key on
- * an anonymous per-browser voter_key rather than an account.
- */
-export async function hasDashboard(searchParamToken?: string): Promise<boolean> {
-  const expected = optional('DASHBOARD_TOKEN');
-  if (!expected) return false;
-  if (searchParamToken && timingSafeEqual(searchParamToken, expected)) return true;
-  const jar = await cookies();
-  const c = jar.get('dashboard_token')?.value;
-  if (c && timingSafeEqual(c, expected)) return true;
-  // An admin token opens the dashboard too: admin is the strictly wider role.
-  return hasAdmin(searchParamToken);
-}
-
-/**
- * Remember a valid token so the rest of the app opens without it in every URL.
+ * An admin is a role on an account.
  *
- * Arriving with `?token=` and then following a link lost the token on the first
- * hop, so every company, person and item page read as unauthorised even though
- * the reader had just been let in. Route handlers and server actions can write
- * cookies; a page render cannot, which is why this is called from middleware
- * rather than from the gate itself.
+ * The signature still takes an optional token so the admin pages did not all
+ * need editing; it is ignored. A URL secret is no longer a way in.
  */
-export const DASHBOARD_COOKIE = 'dashboard_token';
-export const ADMIN_COOKIE = 'admin_token';
-
-export function tokenMatches(kind: 'dashboard' | 'admin', token: string): boolean {
-  const expected = optional(kind === 'admin' ? 'ADMIN_TOKEN' : 'DASHBOARD_TOKEN');
-  return !!expected && timingSafeEqual(token, expected);
+export async function hasAdmin(_searchParamToken?: string): Promise<boolean> {
+  const me = await currentUser();
+  return me?.role === 'admin';
 }
 
+/**
+ * Bearer check for the machine-facing routes under /api/admin and /api/dev.
+ *
+ * These are called by scripts and GitHub Actions, which have no session and no
+ * browser, so they keep a shared secret. It is a different thing from a person
+ * signing in, and the token is never accepted from a page.
+ */
 export function checkAdminHeader(header: string | null): boolean {
   const expected = optional('ADMIN_TOKEN');
   if (!expected || !header) return false;

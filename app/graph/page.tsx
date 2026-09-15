@@ -15,8 +15,7 @@ import { sectorLabel } from '@/lib/subsectors';
 import { everSurfacedCompanies, getCompanyGraph, getCompanyPaths } from '@/lib/dashboard-data';
 import { companiesWithPaths } from '@/lib/paths';
 import { redirect } from 'next/navigation';
-import { hasDashboard } from '@/lib/auth';
-import { currentUser } from '@/lib/session';
+import { currentSession, currentUser } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,12 +31,9 @@ export default async function GraphPage({
    * or a moved route silently removes that coverage, and this page draws the
    * whole relationship graph — warm paths, the people behind them — so it
    * states what it needs rather than inheriting it.
-   *
-   * Either admission counts: an account, or the shared link. Checking
-   * only the token locked out a member who had signed in but never held
-   * the link — which is precisely what accounts exist to avoid.
    */
-  if (!(await currentUser()) && !(await hasDashboard())) redirect('/login');
+  if (!(await currentSession())) redirect('/login');
+  const me = await currentUser();
   const { company } = await searchParams;
   /*
    * Every company that ever cleared the trigger bar, not this week's digest.
@@ -70,7 +66,19 @@ export default async function GraphPage({
   const selectedId = company ? Number(company) : candidates[0]?.id;
   const selected = candidates.find((c) => c.id === selectedId) ?? candidates[0];
 
-  const [graph, paths] = selected
+  /*
+   * A guest sees which companies have connections, not the routes in.
+   *
+   * A warm path names who could make an introduction, which is the one thing
+   * here that is internal rather than assembled from public records. The paths
+   * are withheld rather than filtered, and the drawing is built FROM them — its
+   * nodes come from each path's via-person or via-fund — so a guest gets the
+   * empty state rather than a graph with the routes quietly removed.
+   *
+   * No confirmed path exists in the data today, so this changes nothing a
+   * reader would notice yet. It is here so it holds when one does.
+   */
+  const [graph, paths] = selected && me
     ? await Promise.all([
         getCompanyGraph(selected.id),
         getCompanyPaths(selected.id),

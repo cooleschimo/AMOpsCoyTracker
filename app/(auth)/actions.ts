@@ -9,8 +9,8 @@
  */
 import { redirect } from 'next/navigation';
 import {
-  beginPasswordReset, completePasswordReset, createSession, endSession,
-  signIn as check, signUpWithInvite,
+  beginPasswordReset, completePasswordReset, createGuestSession, createSession,
+  endSession, signIn as check, signUpWithInvite,
 } from '../../lib/session';
 import { sendPasswordReset } from '../../lib/account-mail';
 
@@ -104,4 +104,17 @@ export async function resetAction(
   // any an attacker held, and signing the browser straight back in would make
   // the reset indistinguishable from the thing it defends against.
   redirect('/login?reset=1');
+}
+
+/**
+ * Look around without an account.
+ *
+ * A real action rather than a link, because admission is now a row in the
+ * database rather than a secret in a URL. The guest reads the week and nothing
+ * else: monitoring, dismissals, the per-card actions and Singapore's
+ * proposition all check `currentUser()`, which stays null here.
+ */
+export async function continueAsGuestAction(): Promise<void> {
+  await createGuestSession();
+  redirect('/');
 }

@@ -11,7 +11,8 @@
  * before an RD acts, they should see whether someone already owns this company.
  */
 import { getSql } from '../../../lib/db';
-import { hasDashboard } from '../../../lib/auth';
+import { redirect } from 'next/navigation';
+import { currentSession } from '../../../lib/session';
 import { SectionHeading } from '@/components/primitives';
 import { recordDisposition } from './actions';
 import { REASONS, REASON_LABELS } from '../../../lib/dispositions';
@@ -37,10 +38,9 @@ export default async function ItemPage(
 ) {
   const { id } = await params;
   const sp = await searchParams;
-  if (!(await hasDashboard(sp.token))) {
-    return <main className={MAIN}><h1 className="mb-1.5 font-display text-2xl font-semibold tracking-tight">Not authorised</h1>
-      <p className={BODY}>Append <code>?token=…</code> with your DASHBOARD_TOKEN.</p></main>;
-  }
+  // Scored and assessed already, so a guest may read it. `currentUser()` still
+  // decides what is withheld inside — the proposition, and every action.
+  if (!(await currentSession())) redirect('/login');
 
   const itemId = Number(id);
   if (!Number.isFinite(itemId)) return <main className={MAIN}><h1 className="mb-1.5 font-display text-2xl font-semibold tracking-tight">Not found</h1></main>;

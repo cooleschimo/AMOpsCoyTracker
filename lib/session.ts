@@ -30,6 +30,8 @@ export const SESSION_COOKIE = 'session';
 
 /** Long enough that a week's reading does not ask for a password twice. */
 const SESSION_DAYS = 30;
+/** A guest is looking, not settling in. */
+const GUEST_DAYS = 7;
 /** An invite that is never used should not stay usable forever. */
 const INVITE_DAYS = 14;
 
@@ -56,7 +58,13 @@ export async function currentUser(): Promise<SessionUser | null> {
   return userForToken(token);
 }
 
-/** The same lookup, for callers that hold the token rather than the cookie. */
+/**
+ * The same lookup, for callers that hold the token rather than the cookie.
+ *
+ * A guest session has no `user_id`, so the join matches nothing and this
+ * returns null — which is exactly what a guest is. Every restriction in the app
+ * already keys on that null, so guests needed no separate concept.
+ */
 export async function userForToken(token: string): Promise<SessionUser | null> {
   const sql = getSql();
   const rows: any = await sql`
@@ -349,4 +357,52 @@ export async function completePasswordReset(
   await sql`update users set password_hash = ${hash} where id = ${userId}`;
   await revokeSessions(userId);
   return { ok: true };
+}
+
+/**
+ * Admit a browser without naming a person.
+ *
+ * This replaces the shared DASHBOARD_TOKEN. The token was one secret in a URL,
+ * pasted into chats and revocable only by rotating it for everyone; a guest
+ * session is a row per browser that expires on its own and can be dropped
+ * alone. Anyone with the link can still become a guest — that has not changed,
+ * and is the point of a link you can send someone.
+ *
+ * Shorter-lived than an account's session: a guest is someone taking a look,
+ * not someone coming back for a month.
+ */
+export async function createGuestSession(): Promise<void> {
+  const sql = getSql();
+  const token = randomBytes(32).toString('base64url');
+  const expires = new Date(Date.now() + GUEST_DAYS * 86400_000);
+  await sql`
+    insert into sessions (token, user_id, expires_at)
+    values (${token}, null, ${expires.toISOString()})`;
+
+  const jar = await cookies();
+  jar.set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: GUEST_DAYS * 86400,
+    secure: process.env.NODE_ENV === 'production',
+  });
+}
+
+/**
+ * Is anyone at all behind this request — a member or a guest?
+ *
+ * `currentUser()` answers "which person", and returns null for a guest, which
+ * is what every restriction keys on. This answers the wider question the page
+ * gates need: has this browser been admitted at all. A page that is readable by
+ * guests asks this; a page that needs a person asks `currentUser()`.
+ */
+export async function currentSession(): Promise<boolean> {
+  const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
+  if (!token) return false;
+  const sql = getSql();
+  const rows: any = await sql`
+    select 1 from sessions where token = ${token} and expires_at > now() limit 1`;
+  return rows.length > 0;
 }

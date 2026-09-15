@@ -11,7 +11,8 @@
  */
 import { getSql } from '../../../lib/db';
 import { sectorLabel } from '../../../lib/subsectors';
-import { hasDashboard } from '../../../lib/auth';
+import { redirect } from 'next/navigation';
+import { currentSession } from '../../../lib/session';
 import { ENGAGED, FAMILIARITY_LABELS, type Familiarity } from '../../../lib/familiarity';
 
 export const dynamic = 'force-dynamic';
@@ -50,10 +51,9 @@ export default async function OrgPage(
 ) {
   const { id } = await params;
   const sp = await searchParams;
-  if (!(await hasDashboard(sp.token))) {
-    return <main className={MAIN}><h1 className={H1}>Not authorised</h1>
-      <p className={`${BODY} mt-1`}>Append <code>?token=…</code> with your DASHBOARD_TOKEN.</p></main>;
-  }
+  // Scored and assessed already, so a guest may read it. `currentUser()` still
+  // decides what is withheld inside — the proposition, and every action.
+  if (!(await currentSession())) redirect('/login');
 
   const orgId = Number(id);
   if (!Number.isFinite(orgId)) return <main className={MAIN}><h1 className={H1}>Not found</h1></main>;

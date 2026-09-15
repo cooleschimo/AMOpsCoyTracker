@@ -19,7 +19,8 @@ import { getSql } from '../../../lib/db';
 import { InvestorChip } from '../../../components/investor-chip';
 import { SectionHeading } from '@/components/primitives';
 import { sectorLabel } from '../../../lib/subsectors';
-import { hasDashboard } from '../../../lib/auth';
+import { redirect } from 'next/navigation';
+import { currentSession } from '../../../lib/session';
 import { findWarmPaths } from '../../../lib/paths';
 import { PathReview } from '../../../components/path-review';
 import { PATH_REVIEW_STATUSES, type PathReviewStatus } from '../../../lib/ui-types';
@@ -106,10 +107,9 @@ export default async function CompanyPage(
 ) {
   const { id } = await params;
   const sp = await searchParams;
-  if (!(await hasDashboard(sp.token))) {
-    return <main className={MAIN}><h1 className={H1}>Not authorised</h1>
-      <p className={BODY}>Append <code>?token=…</code> with your DASHBOARD_TOKEN.</p></main>;
-  }
+  // Scored and assessed already, so a guest may read it. `currentUser()` still
+  // decides what is withheld inside — the proposition, and every action.
+  if (!(await currentSession())) redirect('/login');
 
   const companyId = Number(id);
   if (!Number.isFinite(companyId)) {
