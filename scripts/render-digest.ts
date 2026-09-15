@@ -101,12 +101,18 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
           and (
             -- Published in the week …
             (w.published_at >= cs.week_of and w.published_at < cs.week_of + 7)
-            -- … or FOUND in it. A quarter of kept news is discovered three or
-            -- more days after it was published and nine per cent a full week
-            -- later, so keying only on the publication date would file a
-            -- company into a week whose page has already been read and leave it
-            -- off the one where it was actually found.
-            or (w.fetched_at >= cs.week_of and w.fetched_at < cs.week_of + 7)
+            -- … or found in it, provided the story is not much older than the
+            -- week itself. A quarter of kept news is discovered three or more
+            -- days after it ran, so publication alone would file a company into
+            -- a week whose page has already been read. But an unbounded
+            -- fetched-in-week test is worse: a backfill stamps today's date on
+            -- everything it pulls, so re-pulling a month of archives would drag
+            -- all of it onto the current page. Fourteen days is wider than the
+            -- observed lag and far short of the thirty-day scoring window.
+            or (
+              w.fetched_at >= cs.week_of and w.fetched_at < cs.week_of + 7
+              and (w.published_at is null or w.published_at >= cs.week_of - 14)
+            )
           ))
     order by cs.expansion desc, cs.momentum desc`;
 
