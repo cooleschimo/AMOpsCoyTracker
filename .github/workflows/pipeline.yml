@@ -23,8 +23,12 @@ on:
         required: true
         default: 'daily'
         type: choice
-        options: [daily, weekly, discover, score, assess, review, ambiguous, formd, portfolios, acra]
+        options: [daily, weekly, resume, discover, score, assess, review, ambiguous, formd, portfolios, acra]
         # 'daily' is the pipeline; 'weekly' is the pipeline plus the digest.
+      from:
+        description: 'With mode=resume: the stage to restart from (e.g. score)'
+        required: false
+        type: string
 
 jobs:
   run:
@@ -84,10 +88,11 @@ jobs:
       DIGEST_FROM: ${{ vars.DIGEST_FROM || 'onboarding@resend.dev' }}
       APP_BASE_URL: ${{ vars.APP_BASE_URL || 'http://localhost:3111' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          # Matches the Node the scripts are developed against.
+          node-version: '24'
           cache: npm
       - run: npm ci
 
@@ -158,6 +163,18 @@ jobs:
         run: npx tsx scripts/weekly.ts --daily
 
       # ---- single stages, for a manual run -----------------------------------
+      # ---- resuming a run GitHub cut off -----------------------------------
+      #
+      # A hosted job is killed at six hours, and the stages that overrun are
+      # always the same three. Every stage picks up only what it has not done —
+      # the filter takes items still marked fetched, scoring takes companies
+      # with no signal for the week, assessment takes companies with no
+      # assessment at the current rubric — so restarting costs the time already
+      # spent and nothing else. weekly.ts prints the exact command on failure.
+      - name: Resume from a stage
+        if: ${{ github.event.inputs.mode == 'resume' && github.event.inputs.from != '' }}
+        run: npx tsx scripts/weekly.ts --from ${{ github.event.inputs.from }}
+
       - name: Discovery only
         if: ${{ github.event.inputs.mode == 'discover' }}
         run: |
