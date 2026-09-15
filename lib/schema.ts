@@ -7,8 +7,9 @@
  * - A departure sets roles.last_seen rather than removing the row, since a
  *   historical role is often the most valuable edge in the graph.
  * - Every graph edge carries source + source_url, so a claim can be checked.
- * - account_status and sg_match_status are tri-state, because the tool cannot
- *   verify either and a boolean would hide the third state.
+ * - familiarity and sg_match_status carry more than two states, because the
+ *   tool cannot verify either and a boolean would hide the state that says
+ *   nobody has checked.
  *
  * There is no `rds` table. Reactions are anonymous and voter_key is a
  * per-browser cookie UUID rather than a person (DESIGN_RATIONALE §7a).
