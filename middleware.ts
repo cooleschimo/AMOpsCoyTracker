@@ -16,6 +16,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 const DASHBOARD_COOKIE = 'dashboard_token';
+const SESSION_COOKIE = 'session';
 const ADMIN_COOKIE = 'admin_token';
 
 /**
@@ -67,6 +68,21 @@ function notAuthorised() {
  */
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  /*
+   * Signing in and creating an account come before any gate can pass.
+   *
+   * These two routes are the only way to obtain a session, so gating them on
+   * the thing a session provides would lock out every invited person who does
+   * not already hold the shared link. They carry their own protection instead:
+   * /join needs a single-use invite token, and /login needs a password.
+   */
+  if (
+    pathname === '/login'
+    || pathname === '/forgot'
+    || pathname.startsWith('/join/')
+    || pathname.startsWith('/reset/')
+  ) return NextResponse.next();
   const admin = process.env.ADMIN_TOKEN;
   const dashboard = process.env.DASHBOARD_TOKEN;
 
@@ -84,6 +100,21 @@ export function middleware(req: NextRequest) {
     if (isDashboardToken) res.cookies.set(DASHBOARD_COOKIE, token!, COOKIE_OPTIONS);
     return res;
   }
+
+  /*
+   * A session is its own admission.
+   *
+   * The shared token says a browser may look; a session says which person is
+   * looking, and it is the stronger claim. Requiring both would lock an invited
+   * teammate out of the tool they have an account for unless they also held the
+   * link — which is the opposite of what accounts are for.
+   *
+   * Only presence is checked here: the edge runtime cannot reach the database,
+   * so whether the token is live is settled by `currentUser()` on the page. A
+   * forged cookie therefore gets past this line and resolves to a guest, which
+   * is the same thing it would have got by not presenting one.
+   */
+  if (req.cookies.get(SESSION_COOKIE)?.value) return NextResponse.next();
 
   const cookieAdmin = req.cookies.get(ADMIN_COOKIE)?.value;
   const cookieDashboard = req.cookies.get(DASHBOARD_COOKIE)?.value;

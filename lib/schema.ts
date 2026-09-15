@@ -14,6 +14,7 @@
  * There is no `rds` table. Reactions are anonymous and voter_key is a
  * per-browser cookie UUID rather than a person (DESIGN_RATIONALE §7a).
  */
+import { sql } from 'drizzle-orm';
 import {
   pgTable, serial, text, integer, smallint, boolean, date, timestamp,
   numeric, jsonb, uniqueIndex, index, primaryKey,
@@ -505,6 +506,88 @@ export const digests = pgTable('digests', {
 });
 
 /**
+ * People with an account. DESIGN_RATIONALE §7a is superseded here: identity was
+ * deliberately absent while the tool had four readers and one shared link, and
+ * the cost named there — "the dashboard cannot show a person their own past
+ * reactions across devices" — is exactly what a team needs back.
+ *
+ * Registration is invite-only. The dashboard link is shared, so open signup
+ * would hand an account to anyone holding it; an invite is the one path in.
+ *
+ * `passwordHash` is scrypt with a per-row salt, stored as `salt:hash`. No
+ * dependency: node:crypto has scrypt, and a password library would be more
+ * surface than the thing it replaces.
+ */
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  email: text('email').notNull(),
+  /** Shown beside what they monitor, so a team can see who is looking at what. */
+  name: text('name').notNull(),
+  passwordHash: text('password_hash').notNull(),
+  /** 'member' or 'admin'. A guest has no row here at all. */
+  role: text('role').notNull().default('member'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+}, (t) => [uniqueIndex('users_email_key').on(sql`lower(${t.email})`)]);
+
+/**
+ * A logged-in browser. The token is the cookie value, and the row is the
+ * server's record of it — deleting the row ends the session, which a signed
+ * cookie alone could not do.
+ */
+export const sessions = pgTable('sessions', {
+  id: serial('id').primaryKey(),
+  token: text('token').notNull(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+}, (t) => [
+  uniqueIndex('sessions_token_key').on(t.token),
+  index('sessions_user_idx').on(t.userId),
+]);
+
+/**
+ * An invitation to create an account. Single use: `usedAt` is stamped when the
+ * account is made, and a used or expired invite opens nothing.
+ *
+ * The email is fixed at issue rather than chosen at signup, so forwarding an
+ * invite cannot create an account under a different address.
+ */
+export const invites = pgTable('invites', {
+  id: serial('id').primaryKey(),
+  token: text('token').notNull(),
+  email: text('email').notNull(),
+  name: text('name'),
+  role: text('role').notNull().default('member'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+}, (t) => [uniqueIndex('invites_token_key').on(t.token)]);
+
+/**
+ * A pending password reset.
+ *
+ * Separate from `invites` deliberately: the lifetimes differ by two orders of
+ * magnitude and the two mean different things, so sharing a table would let a
+ * reset link create an account or an invite change a password.
+ *
+ * Single use, and redeeming one ends every session for that user — a password
+ * changed because someone else may know it has to log that someone out, not
+ * merely re-issue a cookie for the person who changed it.
+ */
+export const passwordResets = pgTable('password_resets', {
+  id: serial('id').primaryKey(),
+  token: text('token').notNull(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+}, (t) => [
+  uniqueIndex('password_resets_token_key').on(t.token),
+  index('password_resets_user_idx').on(t.userId),
+]);
+
+/**
  * Anonymous. voter_key is a per-browser cookie UUID, not a person: it dedupes
  * repeat clicks, and identity is deliberately not recorded (§7a).
  */
@@ -542,6 +625,8 @@ export const dispositions = pgTable('dispositions', {
   itemId: integer('item_id').references(() => items.id, { onDelete: 'cascade' }),
   companyId: integer('company_id').references(() => companies.id),
   voterKey: text('voter_key').notNull(),
+  /** Who reacted, once they have an account. Null for pre-account rows. */
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }),
   disposition: text('disposition').notNull(),
   reasons: text('reasons').array().default([]),
   note: text('note'),
@@ -560,6 +645,12 @@ export const monitoring = pgTable('monitoring', {
   id: serial('id').primaryKey(),
   companyId: integer('company_id').references(() => companies.id).notNull(),
   voterKey: text('voter_key').notNull(),
+  /**
+   * Who is watching, once they have an account. Null for rows written before
+   * accounts existed, and for a browser that never signed in — the voter key
+   * still dedupes those, they just cannot be attributed to a person.
+   */
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }),
   /** The item that prompted the monitor, for the "why is this here" line. */
   itemId: integer('item_id').references(() => items.id, { onDelete: 'set null' }),
   note: text('note'),
