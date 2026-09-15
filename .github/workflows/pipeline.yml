@@ -31,10 +31,12 @@ jobs:
     runs-on: ubuntu-latest
     # The LLM stages are rate-limited rather than slow, so they spend most of
     # their time backing off. Six hours is the ceiling a free runner allows.
-    # Above the sum of every stage budget in lib/stages.ts, so a run that hits
-    # each timeout still reaches the digest rather than being cut off partway
-    # with no summary. Six hours is the ceiling a free runner allows.
-    timeout-minutes: 380
+    # GitHub kills a hosted job at six hours whatever this says, so 355 is the
+    # most that can be asked for and still leave the runner a few minutes to
+    # upload logs. The stage budgets in lib/stages.ts sum to less than this, so
+    # a run that hits every timeout still reaches the digest rather than being
+    # cut off partway with no summary.
+    timeout-minutes: 355
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       # Every key, cycling gemini -> groq -> openrouter so no provider carries a

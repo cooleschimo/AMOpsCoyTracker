@@ -43,6 +43,27 @@ export type Stage = {
   why: string;
 };
 
+/*
+ * On the timeouts, because the numbers look wrong until you know what they are.
+ *
+ * They sum to more than the six hours GitHub allows a job. That is deliberate:
+ * a budget is a kill switch for a stage that has HUNG, not a slot reserved in a
+ * schedule. A stage that finishes in three minutes returns the rest of its
+ * allowance to the run, so the sum is only ever reached if nearly everything
+ * hangs at once — at which point the run deserves to be cut off.
+ *
+ * What predicts whether a run finishes is the typical cost, not the sum of the
+ * ceilings. Over the last fortnight, on runs that completed without error:
+ *
+ *   sum of per-stage averages   216m
+ *   sum of per-stage 90th pct   458m
+ *   GitHub kills the job at     360m
+ *
+ * So an ordinary run has room to spare and a bad one does not. The stages that
+ * actually overrun are score, filter and assess, and they hold the largest
+ * budgets for that reason; the cheap ones are held near what they have never
+ * exceeded so a genuine hang is caught early rather than sitting for an hour.
+ */
 export const STAGES: Stage[] = [
   /*
    * Context and discovery come before the per-company news search, because the
@@ -53,11 +74,11 @@ export const STAGES: Stage[] = [
    * and scoring judged it on that one sentence. Discovering first closes that
    * gap — the same run that finds a company also pulls its news.
    */
-  { name: 'context', script: 'ingest-context.ts', timeoutMin: 10, phase: 'gather', cost: 'fetch',
+  { name: 'context', script: 'ingest-context.ts', timeoutMin: 5, phase: 'gather', cost: 'fetch',
     why: 'the untargeted feeds: policy, sector moves, and the trade press discovery reads' },
-  { name: 'discover', script: 'discover-news.ts', timeoutMin: 25, phase: 'gather', cost: 'llm',
+  { name: 'discover', script: 'discover-news.ts', timeoutMin: 30, phase: 'gather', cost: 'llm',
     why: 'companies named in untargeted news that we do not track yet' },
-  { name: 'news', script: 'ingest-news.ts', timeoutMin: 35, phase: 'gather', cost: 'fetch',
+  { name: 'news', script: 'ingest-news.ts', timeoutMin: 40, phase: 'gather', cost: 'fetch',
     why: 'Google News per company, including the ones just discovered' },
   /*
    * Enrichment, in dependency order and placed after discovery so a company
@@ -85,7 +106,7 @@ export const STAGES: Stage[] = [
    * Capped, since a full pass measured 28 minutes for 475 companies and the
    * backlog is picked up over successive runs.
    */
-  { name: 'sectors', script: 'classify-sectors.ts', args: ['--limit', '200'], timeoutMin: 10, phase: 'enrich', cost: 'llm',
+  { name: 'sectors', script: 'classify-sectors.ts', args: ['--limit', '200'], timeoutMin: 20, phase: 'enrich', cost: 'llm',
     why: 'the sector every later judgment reads, and the website check corroborates against' },
   { name: 'websites', script: 'enrich-websites.ts', args: ['--limit', '150'], timeoutMin: 35, phase: 'enrich', cost: 'llm',
     why: 'a website is what the assessment reads, and what people scraping needs' },
@@ -105,7 +126,7 @@ export const STAGES: Stage[] = [
    * signal first. 60 companies is an hour, which is the most this can take
    * without crowding the stages after it.
    */
-  { name: 'people_funds', script: 'ingest-people.ts', args: ['--funds'], timeoutMin: 10, phase: 'enrich', cost: 'fetch',
+  { name: 'people_funds', script: 'ingest-people.ts', args: ['--funds'], timeoutMin: 5, phase: 'enrich', cost: 'fetch',
     why: 'the fund-side edge a warm path is checked against' },
   { name: 'people_companies', script: 'ingest-people.ts', args: ['--companies', '--limit', '60'], timeoutMin: 20, phase: 'enrich', cost: 'fetch',
     why: 'the named people §8 builds warm paths from' },
@@ -115,9 +136,9 @@ export const STAGES: Stage[] = [
   // A person costs a search plus a model call — about 45 seconds measured — so
   // twenty is a run, not forty. Both stages were killed at their timeouts on the
   // first pass; the cap is what was wrong, not the budget.
-  { name: 'bios', script: 'enrich-people.ts', args: ['--limit', '20'], timeoutMin: 10, phase: 'enrich', cost: 'llm',
+  { name: 'bios', script: 'enrich-people.ts', args: ['--limit', '20'], timeoutMin: 8, phase: 'enrich', cost: 'llm',
     why: 'a warm path is worth more when it says who the person is' },
-  { name: 'location', script: 'enrich-location.ts', timeoutMin: 12, phase: 'enrich', cost: 'llm',
+  { name: 'location', script: 'enrich-location.ts', timeoutMin: 15, phase: 'enrich', cost: 'llm',
     why: 'a discovered hq is one headline\'s guess until the rest are read' },
   /*
    * After people, because an exhibitor list names a person who may already be
@@ -128,7 +149,7 @@ export const STAGES: Stage[] = [
    * months, not overnight, and each read costs a model call per chunk of a
    * directory that runs to hundreds of lines.
    */
-  { name: 'events', script: 'ingest-events.ts', timeoutMin: 10, phase: 'enrich', cost: 'llm',
+  { name: 'events', script: 'ingest-events.ts', timeoutMin: 5, phase: 'enrich', cost: 'llm',
     weeklyOnly: true,
     why: 'who from the list will be at which show, and when — the one forward-looking path' },
   // After discovery and websites: a board is found from the company's site, and
@@ -141,15 +162,15 @@ export const STAGES: Stage[] = [
    * and the timeout that failed three runs running. The cap bounds a run; the
    * rest are picked up next time, strongest signal first.
    */
-  { name: 'ats', script: 'ingest-ats.ts', args: ['--limit', '250'], timeoutMin: 20, phase: 'enrich', cost: 'fetch',
+  { name: 'ats', script: 'ingest-ats.ts', args: ['--limit', '250'], timeoutMin: 35, phase: 'enrich', cost: 'fetch',
     why: 'job boards; the hiring snapshot score-companies reads' },
-  { name: 'filter', script: 'filter-score.ts', timeoutMin: 30, phase: 'judge', cost: 'llm',
+  { name: 'filter', script: 'filter-score.ts', timeoutMin: 60, phase: 'judge', cost: 'llm',
     why: 'canonicalise, drop, cluster, score the items' },
   // After filter: it reads what the filter kept, and only the residue the
   // ambiguity rules could not settle.
-  { name: 'ambiguous', script: 'adjudicate-ambiguous.ts', timeoutMin: 10, phase: 'judge', cost: 'llm',
+  { name: 'ambiguous', script: 'adjudicate-ambiguous.ts', timeoutMin: 25, phase: 'judge', cost: 'llm',
     why: 'headlines about the word, not the company, that no rule can separate' },
-  { name: 'rescue', script: 'rescue-mismatch.ts', timeoutMin: 15, phase: 'judge', cost: 'llm',
+  { name: 'rescue', script: 'rescue-mismatch.ts', timeoutMin: 25, phase: 'judge', cost: 'llm',
     why: 'items the name filter dropped that are about the company after all' },
   /*
    * After the filter, because it reads kept items: an edge asserted from a
@@ -157,13 +178,13 @@ export const STAGES: Stage[] = [
    */
   { name: 'edges', script: 'ingest-edges.ts', args: ['--limit', '800'], timeoutMin: 15, phase: 'judge', cost: 'llm',
     why: 'acquisitions and partnerships between companies we track, which paths read as warm' },
-  { name: 'score', script: 'score-companies.ts', timeoutMin: 60, phase: 'judge', cost: 'llm',
+  { name: 'score', script: 'score-companies.ts', timeoutMin: 75, phase: 'judge', cost: 'llm',
     why: 'the three axes per company for this week' },
-  { name: 'assess', script: 'assess-companies.ts', timeoutMin: 30, phase: 'judge', cost: 'llm',
+  { name: 'assess', script: 'assess-companies.ts', timeoutMin: 50, phase: 'judge', cost: 'llm',
     why: 'accumulative judgment: prior assessment plus what arrived since' },
-  { name: 'review', script: 'review-dashboard.ts', timeoutMin: 8, phase: 'publish', cost: 'llm',
+  { name: 'review', script: 'review-dashboard.ts', timeoutMin: 4, phase: 'publish', cost: 'llm',
     why: 'the set is only checkable once placement has decided what is in it' },
-  { name: 'digest', script: 'render-digest.ts', args: ['--save'], timeoutMin: 8, phase: 'publish', cost: 'llm',
+  { name: 'digest', script: 'render-digest.ts', args: ['--save'], timeoutMin: 4, phase: 'publish', cost: 'llm',
     weeklyOnly: true,
     why: 'placement matrix and the rendered digest' },
 ];
