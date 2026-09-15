@@ -178,6 +178,23 @@ jobs:
         run: npx tsx scripts/weekly.ts --daily
 
       # ---- single stages, for a manual run -----------------------------------
+      # ---- did the run actually achieve anything? ---------------------------
+      #
+      # A stage can exit zero having done nothing, and a killed process cannot
+      # write its own finish, so "the job went green" has never been the same
+      # question as "the work happened". This asks the database instead: stages
+      # that did not run, run rows left open, queues that did not drain.
+      #
+      # always(), so it reports after a failed run too — that is precisely when
+      # the answer matters. It runs before the resume step so its output is in
+      # the log a resume is decided from.
+      - name: Check the pipeline actually progressed
+        if: ${{ always() && (github.event.inputs.mode == '' || contains(fromJSON('["daily","weekly","resume"]'), github.event.inputs.mode)) }}
+        run: |
+          SCOPE=""
+          if [ "${{ steps.dow.outputs.day }}" != "1" ]; then SCOPE="--daily"; fi
+          npx tsx scripts/dev/health.ts $SCOPE
+
       # ---- picking up after a deadline stop ---------------------------------
       #
       # weekly.ts stops itself before the runner would be cancelled and exits
