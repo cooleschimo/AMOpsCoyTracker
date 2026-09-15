@@ -20,8 +20,25 @@ import { companies, dispositions, monitoring, opportunities } from '../lib/schem
 import { isFamiliarity, type Familiarity } from '../lib/familiarity';
 import { DISPOSITIONS, REASONS, type Disposition, type Reason } from '../lib/dispositions';
 import { PATH_KINDS, PATH_REVIEW_STATUSES, type PathKind, type PathReviewStatus } from '../lib/ui-types';
+import { currentUser } from '../lib/session';
 
 const VOTER_COOKIE = 'voter_key';
+
+/**
+ * Every write here needs an account.
+ *
+ * Hiding a button is not an access control: a server action has a stable
+ * endpoint and anyone holding the shared dashboard link can post to it. So the
+ * refusal lives here, where the write actually happens, and the hidden controls
+ * are only there to stop a guest reaching for something that would fail.
+ */
+async function requireUser(): Promise<
+  { ok: true; user: { id: number; name: string } } | { ok: false; error: string }
+> {
+  const me = await currentUser();
+  if (!me) return { ok: false, error: 'Sign in to do that.' };
+  return { ok: true, user: { id: me.id, name: me.name } };
+}
 
 async function voterKey(): Promise<string> {
   const jar = await cookies();
@@ -50,6 +67,8 @@ export async function setDisposition(input: {
   reason?: Reason | null;
   note?: string | null;
 }): Promise<ActionResult> {
+  const auth = await requireUser();
+  if (!auth.ok) return auth;
   if (!DISPOSITIONS.includes(input.disposition)) return { ok: false, error: 'unknown disposition' };
   if (input.reason && !REASONS.includes(input.reason)) return { ok: false, error: 'unknown reason' };
 
@@ -101,6 +120,8 @@ export async function setDisposition(input: {
 
 /** Undo a disposition. The row is removed so the company returns to the list. */
 export async function clearDisposition(companyId: number): Promise<ActionResult> {
+  const auth = await requireUser();
+  if (!auth.ok) return auth;
   const key = await voterKey();
   try {
     await withRetry(async () => {
@@ -120,6 +141,8 @@ export async function clearDisposition(companyId: number): Promise<ActionResult>
 
 /** Drop a company from monitoring, keeping the record of the period it ran. */
 export async function dropFromMonitoring(companyId: number): Promise<ActionResult> {
+  const auth = await requireUser();
+  if (!auth.ok) return auth;
   const key = await voterKey();
   try {
     await withRetry(async () => {
@@ -143,6 +166,8 @@ export async function dropFromMonitoring(companyId: number): Promise<ActionResul
  * that opened a second row would read as two shorter watches with a gap.
  */
 export async function restoreToMonitoring(companyId: number): Promise<ActionResult> {
+  const auth = await requireUser();
+  if (!auth.ok) return auth;
   const key = await voterKey();
   try {
     await withRetry(async () => {
@@ -167,6 +192,8 @@ export async function setFamiliarity(
   companyId: number,
   status: Familiarity,
 ): Promise<ActionResult> {
+  const auth = await requireUser();
+  if (!auth.ok) return auth;
   if (!isFamiliarity(status)) return { ok: false, error: 'unknown account status' };
   try {
     await withRetry(() =>
@@ -203,6 +230,8 @@ export async function setLocation(
   city: string,
   state: string,
 ): Promise<ActionResult> {
+  const auth = await requireUser();
+  if (!auth.ok) return auth;
   const c = city.trim().slice(0, 120);
   const st = state.trim().slice(0, 60);
   if (!c) return { ok: false, error: 'a city is required' };
@@ -260,6 +289,8 @@ export async function reviewPath(input: {
   note?: string | null;
   doNotUse?: boolean;
 }): Promise<ActionResult> {
+  const auth = await requireUser();
+  if (!auth.ok) return auth;
   if (!PATH_KINDS.includes(input.pathKind)) return { ok: false, error: 'unknown path kind' };
   if (!PATH_REVIEW_STATUSES.includes(input.status)) return { ok: false, error: 'unknown review status' };
 

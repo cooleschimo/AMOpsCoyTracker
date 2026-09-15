@@ -13,6 +13,8 @@ import { SectionHeading } from '@/components/primitives';
 // From lib, not primitives: primitives is a client module, and a server
 // component cannot call a function that lives on the client.
 import { broadSectorLabel, sectorBroadSector } from '@/lib/subsectors';
+import { redirect } from 'next/navigation';
+import { currentUser } from '@/lib/session';
 import { getMonitoredCompanies, type DashboardCompany } from '@/lib/dashboard-data';
 
 export const dynamic = 'force-dynamic';
@@ -36,6 +38,10 @@ function groupBySector(companies: DashboardCompany[]) {
 }
 
 export default async function MonitoringPage() {
+  // Monitoring is a record of what people on the team are watching. A guest has
+  // nothing in it and no business reading it, so this is a redirect rather than
+  // an empty page.
+  if (!(await currentUser())) redirect('/login');
   const companies = await getMonitoredCompanies();
   const groups = groupBySector(companies);
 

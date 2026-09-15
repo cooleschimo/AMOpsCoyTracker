@@ -890,6 +890,15 @@ export async function availableWeeks(
 export async function getWeeklyDigest(
   signalVersion = COMPANY_SIGNAL_VERSION,
   weekOf?: string,
+  /**
+   * What Singapore could offer is withheld from a guest.
+   *
+   * Stripped here rather than hidden in the component: a card that renders
+   * without the block still carries it in the HTML the server sends, so the
+   * proposition would be one view-source away. The reader sees the week; the
+   * argument for approaching a company needs an account.
+   */
+  opts?: { withOffer?: boolean },
 ): Promise<WeeklyDigest> {
   const rows = await signalRows(signalVersion, weekOf);
   const byCompany = new Map<number, Row>();
@@ -897,11 +906,15 @@ export async function getWeeklyDigest(
 
   const plan = planDigest(rows.map(toPlacementInput));
   const ctx = await whyNowContext(rows, signalVersion);
+  const withOffer = opts?.withOffer !== false;
   const pick = (placed: Placed[]) =>
     placed
       .map((p) => (p.companyId === null ? null : byCompany.get(p.companyId)))
       .filter((r): r is Row => Boolean(r))
-      .map((r) => toCompany(r, ctx));
+      .map((r) => {
+        const c = toCompany(r, ctx);
+        return withOffer ? c : { ...c, offer: null };
+      });
 
   const sql = getSql();
   // Companies actually watched, not every row in the table. Portfolio scraping
@@ -963,7 +976,7 @@ export async function getWeeklyDigest(
       where signal_version = ${signalVersion}
         and week_of = coalesce(${weekOf ?? null}::date,
           (select max(week_of) from company_signals where signal_version = ${signalVersion}))`,
-    getMonitoredCompanies(signalVersion),
+    getMonitoredCompanies(signalVersion, { withOffer: opts?.withOffer !== false }),
   ]);
 
   const worthAConversation = pick(plan.sections.worth_a_conversation);
@@ -1037,6 +1050,8 @@ function weekLabel(weekOf?: string | Date | null): string {
 /** Companies an RD chose to monitor, with their signal row when one exists. */
 export async function getMonitoredCompanies(
   signalVersion = COMPANY_SIGNAL_VERSION,
+  /** As getWeeklyDigest: a guest reads the week without the proposition. */
+  opts?: { withOffer?: boolean },
 ): Promise<DashboardCompany[]> {
   const sql = getSql();
   const rows: any = await sql`
@@ -1068,7 +1083,11 @@ export async function getMonitoredCompanies(
     where m.removed_at is null
     order by m.added_at desc`;
   const ctx = await whyNowContext(rows as Row[], signalVersion);
-  return (rows as Row[]).map((r) => toCompany(r, ctx));
+  const withOffer = opts?.withOffer !== false;
+  return (rows as Row[]).map((r) => {
+    const c = toCompany(r, ctx);
+    return withOffer ? c : { ...c, offer: null };
+  });
 }
 
 /** One company in full, for /company/[id]. */

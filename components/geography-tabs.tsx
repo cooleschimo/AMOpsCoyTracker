@@ -22,12 +22,15 @@ export function GeographySection({
   companies,
   empty,
   id,
+  canAct = true,
 }: {
   title: string;
   blurb?: string;
   companies: DashboardCompany[];
   empty: string;
   id?: string;
+  /** False for a guest, which hides the per-card actions. */
+  canAct?: boolean;
 }) {
   return (
     <section id={id} className="scroll-mt-6 space-y-4">
@@ -45,7 +48,7 @@ export function GeographySection({
       ) : (
         <Masonry className="dense-cards">
           {companies.map((c) => (
-            <CompanyCase key={c.id} company={c} />
+            <CompanyCase key={c.id} company={c} canAct={canAct} />
           ))}
         </Masonry>
       )}

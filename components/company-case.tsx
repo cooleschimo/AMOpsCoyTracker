@@ -82,11 +82,21 @@ export function CompanyCase({
   note,
   preselect,
   defaultOpen = false,
+  canAct = true,
 }: {
   company: Company;
   note?: string | undefined;
   preselect?: "draft_email" | "monitor" | "dismiss" | undefined;
   defaultOpen?: boolean;
+  /**
+   * False for a guest. The controls are hidden rather than disabled: a row of
+   * dead buttons invites a click and then explains itself, where their absence
+   * with one line saying why does not waste the reader's attention.
+   *
+   * This is presentation only — the refusal that matters is in app/actions.ts,
+   * since a server action can be posted to whatever the page renders.
+   */
+  canAct?: boolean;
 }) {
   const a = company.assessment;
   // Collapsed by default. The header and the bands are what a reader scans; the
@@ -218,8 +228,19 @@ export function CompanyCase({
           the pilot measures, and a disposition that costs an extra click to
           reach is a disposition that does not get recorded. */}
       <div className="space-y-2.5 rounded-b-md border-t border-[color:var(--hairline)] bg-muted/30 p-5 sm:px-7">
-        <FamiliarityControl company={company} />
-        <DispositionControls company={company} preselect={preselect} />
+        {canAct ? (
+          <>
+            <FamiliarityControl company={company} />
+            <DispositionControls company={company} preselect={preselect} />
+          </>
+        ) : (
+          <p className="mt-3 text-2xs text-muted-foreground">
+            <Link href="/login" className="link-underline hover:text-foreground">
+              Sign in
+            </Link>{' '}
+            to draft, monitor or dismiss.
+          </p>
+        )}
       </div>
 
       {/* The detail opens in an overlay rather than in place. Growing a card

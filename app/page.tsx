@@ -35,6 +35,7 @@ function Section({
   companies,
   empty,
   id,
+  canAct = true,
 }: {
   title: string;
   blurb?: string;
@@ -42,6 +43,8 @@ function Section({
   empty: string;
   /** Scroll target for the sidebar's jump links. */
   id?: string;
+  /** False for a guest, which hides the per-card actions. */
+  canAct?: boolean;
 }) {
   return (
     <section id={id} className="scroll-mt-6 space-y-4">
@@ -59,7 +62,7 @@ function Section({
       ) : (
         <Masonry className="dense-cards">
           {companies.map((c) => (
-            <CompanyCase key={c.id} company={c} />
+            <CompanyCase key={c.id} company={c} canAct={canAct} />
           ))}
         </Masonry>
       )}
@@ -80,8 +83,12 @@ export default async function Dashboard({
    * a reader picks to widen it, and is what clearing the filter now sets.
    */
   const geo = geoParam ?? 'west_coast';
-  const [d, weeks, me] = await Promise.all([
-    getWeeklyDigest(undefined, week), availableWeeks(), currentUser(),
+  const me = await currentUser();
+  const [d, weeks] = await Promise.all([
+    // A guest reads the week; what Singapore could offer is withheld at the
+    // source rather than hidden in the markup.
+    getWeeklyDigest(undefined, week, { withOffer: Boolean(me) }),
+    availableWeeks(),
   ]);
   const currentWeek = weeks.find((w) => w.label === d.weekLabel)?.weekOf ?? weeks[0]?.weekOf ?? '';
   const isArchive = Boolean(week) && week !== weeks[0]?.weekOf;
@@ -233,6 +240,7 @@ export default async function Dashboard({
           blurb="Something happening now, at a company past the early rounds."
           companies={inPlace(d.worthAConversation)}
           empty="Nothing cleared the bar this week."
+          canAct={Boolean(me)}
         />
         <GeographySection
           id="radar"
@@ -240,6 +248,7 @@ export default async function Dashboard({
           blurb="Earlier stage, by the round or valuation reported."
           companies={inPlace(d.newOnTheRadar)}
           empty="No early-stage finds this week."
+          canAct={Boolean(me)}
         />
         <Section
           id="known"
@@ -247,12 +256,14 @@ export default async function Dashboard({
           blurb="Already known or in conversation, and something moved."
           companies={inPlace(d.whoWeKnow)}
           empty="No companies marked as known yet."
+          canAct={Boolean(me)}
         />
         <Section
           title="Monitoring"
           blurb="Companies someone chose to follow."
           companies={inPlace(d.monitoring)}
           empty="Nothing monitored yet."
+          canAct={Boolean(me)}
         />
 
         {/*
@@ -275,7 +286,7 @@ export default async function Dashboard({
         >
           <Masonry className="dense-cards">
             {shownLowFit.map((c) => (
-              <CompanyCase key={c.id} company={c} />
+              <CompanyCase key={c.id} company={c} canAct={Boolean(me)} />
             ))}
           </Masonry>
         </CollapsedSection>
@@ -287,7 +298,7 @@ export default async function Dashboard({
         >
           <Masonry className="dense-cards">
             {shownAwaiting.map((c) => (
-              <CompanyCase key={c.id} company={c} />
+              <CompanyCase key={c.id} company={c} canAct={Boolean(me)} />
             ))}
           </Masonry>
         </CollapsedSection>
@@ -303,7 +314,7 @@ export default async function Dashboard({
         >
           <Masonry className="dense-cards">
             {shownToWatch.map((c) => (
-              <CompanyCase key={c.id} company={c} />
+              <CompanyCase key={c.id} company={c} canAct={Boolean(me)} />
             ))}
           </Masonry>
         </CollapsedSection>

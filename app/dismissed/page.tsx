@@ -16,6 +16,8 @@
  */
 import Link from 'next/link';
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { currentUser } from '@/lib/session';
 import { SectionHeading } from '@/components/primitives';
 import { UndoDismiss } from '@/components/undo-dismiss';
 import { dismissedCompanies } from '@/lib/dashboard-data';
@@ -32,6 +34,8 @@ export const dynamic = 'force-dynamic';
 const ABOUT_THE_COMPANY: string[] = ['irrelevant_company', 'no_sg_angle'];
 
 export default async function DismissedPage() {
+  // Your own dismissals, so they need a "your".
+  if (!(await currentUser())) redirect('/login');
   const jar = await cookies();
   const voterKey = jar.get('voter_key')?.value ?? null;
   const companies = await dismissedCompanies(voterKey);
