@@ -256,9 +256,14 @@ Handle with care: `lib/llm.ts` (provider failover and quota parsing),
 
 ## Access model
 
-Dashboard access is a shared secret in the URL, not authentication — anyone with
-the link has full access, which is adequate for a small internal tool and
-nothing more. Reactions are anonymous, keyed on a per-browser cookie rather than
-a user table. `DIGEST_TEST_MODE` defaults to true and confines every send to the
+Two ways in. **An account** — invite-only, email and password, server-side
+sessions — identifies a person: what they monitor and dismiss is attributed to
+them and visible to the team. **The shared link** (`DASHBOARD_TOKEN` in the URL)
+admits a guest, who reads the week but cannot act on it, see monitoring or
+dismissals, or see what Singapore could offer a company.
+
+The shared token remains a shared secret: anyone holding the link is a guest,
+and revoking that means rotating it for everyone. Reactions written before
+accounts existed are keyed on a per-browser cookie and carry no person. `DIGEST_TEST_MODE` defaults to true and confines every send to the
 test recipient; the mode is stored on each digest row, so a rehearsal is still
 distinguishable from a real send a fortnight later.
