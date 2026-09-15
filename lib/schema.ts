@@ -597,6 +597,29 @@ export const passwordResets = pgTable('password_resets', {
 ]);
 
 /**
+ * Failed authentication attempts, for rate limiting.
+ *
+ * Only failures are recorded, and only enough to count them: a scope, a subject
+ * and a time. No password, no token, no outcome detail — a table built to stop
+ * guessing should not itself become a thing worth stealing.
+ *
+ * The subject is an email for the per-account limit and a client address for
+ * the per-source limit. Both are needed: counting only by email lets one
+ * attacker work through a list of addresses unimpeded, and counting only by
+ * address lets a botnet spread the same guesses across many of them.
+ *
+ * Rows age out rather than accumulating — anything past the window is deleted
+ * on the next check, so the table stays the size of recent activity.
+ */
+export const authAttempts = pgTable('auth_attempts', {
+  id: serial('id').primaryKey(),
+  /** 'login:email', 'login:ip', 'forgot:ip', 'join:ip'. */
+  scope: text('scope').notNull(),
+  subject: text('subject').notNull(),
+  attemptedAt: timestamp('attempted_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('auth_attempts_lookup_idx').on(t.scope, t.subject, t.attemptedAt)]);
+
+/**
  * Anonymous. voter_key is a per-browser cookie UUID, not a person: it dedupes
  * repeat clicks, and identity is deliberately not recorded (§7a).
  */

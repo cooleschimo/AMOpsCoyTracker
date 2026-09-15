@@ -9,8 +9,9 @@
  */
 import { redirect } from 'next/navigation';
 import {
-  beginPasswordReset, completePasswordReset, createGuestSession, createSession,
-  endSession, signIn as check, signUpWithInvite,
+  beginPasswordReset, checkForgotAllowed, checkLoginAllowed, completePasswordReset,
+  createGuestSession, createSession, endSession, noteLoginFailure,
+  signIn as check, signUpWithInvite,
 } from '../../lib/session';
 import { sendPasswordReset } from '../../lib/account-mail';
 
@@ -49,8 +50,22 @@ export async function signInAction(
   const password = String(formData.get('password') ?? '');
   if (!email || !password) return { error: 'Email and password are both needed.' };
 
+  /*
+   * Checked before the password, so a refusal costs no scrypt work — the
+   * limiter should not become the expensive path it exists to protect.
+   *
+   * The message says "too many attempts" rather than "wrong password", which
+   * does tell an attacker they have hit a limit. That is unavoidable and worth
+   * it: the alternative is a lockout the account holder cannot understand.
+   */
+  const allowed = await checkLoginAllowed(email);
+  if (!allowed.ok) return { error: allowed.error };
+
   const res = await check(email, password);
-  if (!res.ok) return { error: res.error };
+  if (!res.ok) {
+    await noteLoginFailure(email);
+    return { error: res.error };
+  }
 
   await createSession(res.userId);
   redirect('/');
@@ -78,6 +93,14 @@ export async function forgotAction(
 ): Promise<FormState> {
   const email = String(formData.get('email') ?? '').trim();
   if (!email) return { error: 'Enter the address you signed up with.' };
+
+  /*
+   * Counted per source, and every request counts — not only the ones that
+   * match an account. Counting only hits would make the limiter itself answer
+   * the question the identical-response rule exists to refuse.
+   */
+  const allowed = await checkForgotAllowed();
+  if (!allowed.ok) return { error: allowed.error };
 
   const started = await beginPasswordReset(email);
   if (started) {

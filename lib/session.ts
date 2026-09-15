@@ -17,7 +17,7 @@
  * node:crypto has scrypt, and a password library would be more surface than the
  * thing it replaces.
  */
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { randomBytes, scrypt, timingSafeEqual as nodeTimingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { getSql } from './db';
@@ -405,4 +405,120 @@ export async function currentSession(): Promise<boolean> {
   const rows: any = await sql`
     select 1 from sessions where token = ${token} and expires_at > now() limit 1`;
   return rows.length > 0;
+}
+
+/*
+ * Rate limiting.
+ *
+ * Without this a wrong password costs an attacker one scrypt hash — about 60ms
+ * — and nothing else, so guessing runs at roughly sixteen tries a second per
+ * connection and never stops. The point is not to make guessing impossible but
+ * to make it slow enough to be useless against a password worth the name.
+ *
+ * Counted in two dimensions at once. Per email, so one account cannot be worked
+ * on indefinitely; per client address, so someone cannot sidestep that by
+ * walking through a list of addresses. Either limit refuses on its own.
+ */
+const LIMITS = {
+  /** Wrong passwords for one address before it stops answering. */
+  loginPerEmail: 5,
+  /** Failures from one source, across every address it tries. */
+  loginPerIp: 20,
+  /** Reset requests from one source. Generous: the cost is mail, not access. */
+  forgotPerIp: 10,
+  /** How far back failures count, and how long a refusal lasts. */
+  windowMinutes: 15,
+} as const;
+
+/**
+ * The client's address, as far as it can be known.
+ *
+ * Behind a proxy this is the left-most entry in `x-forwarded-for`, which the
+ * proxy sets. A client can send the header itself, so this is not identity and
+ * is never trusted as such — it is a bucket to count in, and the per-email
+ * limit is what holds when the bucket is forged.
+ */
+async function clientIp(): Promise<string> {
+  const h = await headers();
+  const fwd = h.get('x-forwarded-for');
+  if (fwd) return fwd.split(',')[0]!.trim().slice(0, 64) || 'unknown';
+  return h.get('x-real-ip')?.slice(0, 64) || 'unknown';
+}
+
+/** Write down one failure. Only failures: a success proves nothing worth storing. */
+async function recordFailure(scope: string, subject: string): Promise<void> {
+  const sql = getSql();
+  await sql`insert into auth_attempts (scope, subject) values (${scope}, ${subject.toLowerCase().slice(0, 200)})`;
+}
+
+/** How many failures this subject has had inside the window. */
+async function recentFailures(scope: string, subject: string): Promise<number> {
+  const sql = getSql();
+  const rows: any = await sql`
+    select count(*)::int as n from auth_attempts
+     where scope = ${scope} and subject = ${subject.toLowerCase().slice(0, 200)}
+       and attempted_at > now() - make_interval(mins => ${LIMITS.windowMinutes})`;
+  return Number(rows[0]?.n ?? 0);
+}
+
+/** Drop rows past the window, so the table stays the size of recent activity. */
+async function pruneAttempts(): Promise<void> {
+  const sql = getSql();
+  await sql`delete from auth_attempts
+             where attempted_at < now() - make_interval(mins => ${LIMITS.windowMinutes})`;
+}
+
+export type Throttle = { ok: true } | { ok: false; error: string };
+
+const TOO_MANY =
+  `Too many attempts. Wait ${LIMITS.windowMinutes} minutes and try again.`;
+
+/**
+ * May this sign-in attempt proceed?
+ *
+ * Checked before the password is, so a refusal costs no scrypt work — the
+ * limiter should not become the expensive path it exists to protect.
+ */
+export async function checkLoginAllowed(email: string): Promise<Throttle> {
+  try {
+    await pruneAttempts();
+    const ip = await clientIp();
+    const [byEmail, byIp] = await Promise.all([
+      recentFailures('login:email', email),
+      recentFailures('login:ip', ip),
+    ]);
+    if (byEmail >= LIMITS.loginPerEmail || byIp >= LIMITS.loginPerIp) {
+      return { ok: false, error: TOO_MANY };
+    }
+    return { ok: true };
+  } catch {
+    // A database failure must not become a way through the limiter. Refusing
+    // here would lock everyone out of a working app over a transient blip, so
+    // this allows — the password check still has to pass on its own.
+    return { ok: true };
+  }
+}
+
+/** Record a failed sign-in against both buckets. */
+export async function noteLoginFailure(email: string): Promise<void> {
+  try {
+    await Promise.all([
+      recordFailure('login:email', email),
+      recordFailure('login:ip', await clientIp()),
+    ]);
+  } catch { /* counting is best-effort; never break the response over it */ }
+}
+
+/** May this reset request proceed? Counted per source only. */
+export async function checkForgotAllowed(): Promise<Throttle> {
+  try {
+    const ip = await clientIp();
+    if ((await recentFailures('forgot:ip', ip)) >= LIMITS.forgotPerIp) {
+      return { ok: false, error: TOO_MANY };
+    }
+    await recordFailure('forgot:ip', ip);
+    return { ok: true };
+  } catch {
+    return { ok: true };
+  }
 }
