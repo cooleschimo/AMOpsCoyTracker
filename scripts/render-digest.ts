@@ -85,6 +85,29 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
       -- digest read every week at once and then labelled the result with a
       -- single week's date.
       and cs.week_of = ${weekOf}::date
+      /*
+       * And something published in that week. The scoring window is thirty
+       * days, so without this a company carried by a three-week-old story
+       * reads as this week's news. lib/dashboard-data.ts applies the same
+       * condition, because the digest and the dashboard must not disagree
+       * about which companies belong to a week.
+       *
+       * Published in the week or first seen in it: an ATS aggregate carries no
+       * publication date, and ordinary news is often found days after it ran.
+       */
+      and exists (
+        select 1 from items w
+        where w.company_id = cs.company_id and w.status = 'kept'
+          and (
+            -- Published in the week …
+            (w.published_at >= cs.week_of and w.published_at < cs.week_of + 7)
+            -- … or FOUND in it. A quarter of kept news is discovered three or
+            -- more days after it was published and nine per cent a full week
+            -- later, so keying only on the publication date would file a
+            -- company into a week whose page has already been read and leave it
+            -- off the one where it was actually found.
+            or (w.fetched_at >= cs.week_of and w.fetched_at < cs.week_of + 7)
+          ))
     order by cs.expansion desc, cs.momentum desc`;
 
   if (!rows.length) {

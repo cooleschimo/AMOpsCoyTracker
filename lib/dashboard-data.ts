@@ -682,6 +682,31 @@ async function signalRows(signalVersion: string, weekOf?: string): Promise<Row[]
       and cs.week_of = coalesce(
         ${weekOf ?? null}::date,
         (select max(week_of) from company_signals where signal_version = ${signalVersion}))
+      /*
+       * A week's page shows companies that did something THAT WEEK.
+       *
+       * The scoring window is thirty days, so a company scored on Monday can be
+       * carried by a story from three weeks earlier and still read as this
+       * week's news. Fifty-five of the current week's signals had no item
+       * published inside the week at all.
+       *
+       * Published in the week or first seen in it. An ATS aggregate has no
+       * publication date by construction, and ordinary news is often found
+       * days after it ran, so both dates count.
+       */
+      and exists (
+        select 1 from items w
+        where w.company_id = cs.company_id and w.status = 'kept'
+          and (
+            -- Published in the week …
+            (w.published_at >= cs.week_of and w.published_at < cs.week_of + 7)
+            -- … or FOUND in it. A quarter of kept news is discovered three or
+            -- more days after it was published and nine per cent a full week
+            -- later, so keying only on the publication date would file a
+            -- company into a week whose page has already been read and leave it
+            -- off the one where it was actually found.
+            or (w.fetched_at >= cs.week_of and w.fetched_at < cs.week_of + 7)
+          ))
     order by cs.expansion desc, cs.momentum desc`;
   /*
    * Funds, REITs, insurers and the rest are dropped here rather than in the
