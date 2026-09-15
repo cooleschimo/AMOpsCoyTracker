@@ -1477,3 +1477,106 @@ export async function everSurfacedCompanies(): Promise<Array<{
     weeks: Number(r.weeks ?? 1),
   }));
 }
+
+export type StageStatus = {
+  name: string;
+  phase: string;
+  cost: 'llm' | 'fetch';
+  why: string;
+  /** running | ok | failed | stale — stale means it has not run today. */
+  state: 'running' | 'ok' | 'failed' | 'stale';
+  startedAt: string | null;
+  minutes: number | null;
+  timeoutMin: number;
+  counts: Record<string, unknown> | null;
+  error: string | null;
+};
+
+export type PipelineStatus = {
+  stages: StageStatus[];
+  /** The queues, so a stage that is between runs still says how much is left. */
+  backlog: { filter: number; score: number; assess: number };
+  /** Work landing right now, which is what separates wedged from slow. */
+  rate: { itemsScored5m: number; assessed30m: number };
+  weekOf: string;
+};
+
+/**
+ * What the pipeline is doing, stage by stage.
+ *
+ * A process list answers "is it alive" and never "is it getting anywhere" — a
+ * wedged stage and a working one look identical from outside. Every stage
+ * leaves a countable trace as it goes, so this pairs each one's most recent run
+ * with the queues it drains and the work landing in the last few minutes.
+ *
+ * Driven by lib/stages.ts rather than by whatever happens to be in `runs`, so a
+ * stage that has never run still appears, as stale, instead of silently
+ * missing.
+ */
+export async function getPipelineStatus(): Promise<PipelineStatus> {
+  const sql = getSql();
+  const { STAGES } = await import('./stages');
+  const { COMPANY_SIGNAL_VERSION: sigV, WINDOW_DAYS } = await import('./company-signal');
+  const { COMPANY_RUBRIC_VERSION: rubV } = await import('./company-rubric');
+  const wk = weekOfSaturday();
+
+  /*
+   * The runs table records a stage name, not the stage list's name, and the two
+   * differ (`score` vs `score_companies`). Matching on a prefix of either keeps
+   * the page working when a script is renamed without a migration.
+   */
+  const [latest, [queue], [scored5], [target], [assessed30], [toAssess]]: any = await Promise.all([
+    sql`select distinct on (stage) stage, started_at, finished_at, counts, error,
+               extract(epoch from (coalesce(finished_at, now()) - started_at))/60 as minutes
+        from runs where started_at > now() - interval '3 days'
+        order by stage, started_at desc`,
+    sql`select count(*)::int c from items where status = 'fetched'`,
+    sql`select count(*)::int c from scores where scored_at > now() - interval '5 minutes'`,
+    sql`select count(distinct c.id)::int c from companies c
+        join items i on i.company_id = c.id and i.status = 'kept'
+        where coalesce(i.published_at, i.fetched_at) > now() - make_interval(days => ${WINDOW_DAYS})
+          and not exists (select 1 from company_signals cs
+            where cs.company_id = c.id and cs.week_of = ${wk}::date
+              and cs.signal_version = ${sigV})`,
+    sql`select count(*)::int c from company_assessments
+        where rubric_version = ${rubV} and assessed_at > now() - interval '30 minutes'`,
+    sql`select count(*)::int c from companies c
+        where coalesce(c.scope_status, 'unknown') <> 'out_of_scope'
+          and exists (select 1 from company_signals s
+            where s.company_id = c.id and s.week_of > current_date - 60)
+          and not exists (select 1 from company_assessments a
+            where a.company_id = c.id and a.rubric_version = ${rubV})`,
+  ]);
+
+  const rowFor = (name: string) =>
+    (latest as any[]).find((r) => {
+      const s = String(r.stage);
+      return s === name || s.startsWith(`${name}_`) || name.startsWith(s);
+    });
+
+  const stages: StageStatus[] = (STAGES as any[]).map((st) => {
+    const r = rowFor(st.name);
+    const minutes = r ? Math.round(Number(r.minutes) * 10) / 10 : null;
+    const state: StageStatus['state'] = !r
+      ? 'stale'
+      : !r.finished_at
+        ? 'running'
+        : r.error
+          ? 'failed'
+          : 'ok';
+    return {
+      name: st.name, phase: st.phase, cost: st.cost, why: st.why,
+      state, minutes, timeoutMin: st.timeoutMin,
+      startedAt: r ? new Date(r.started_at).toISOString() : null,
+      counts: r?.counts ?? null,
+      error: r?.error ?? null,
+    };
+  });
+
+  return {
+    stages,
+    backlog: { filter: queue.c, score: target.c, assess: toAssess.c },
+    rate: { itemsScored5m: scored5.c, assessed30m: assessed30.c },
+    weekOf: wk,
+  };
+}
