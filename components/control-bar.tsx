@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Globe2, Layers, Trash2 } from 'lucide-react';
+import { Globe2, Layers, Trash2, UserRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SearchBox } from '@/components/search-box';
 
@@ -47,8 +47,14 @@ export function ControlBar({
   counts,
   masthead,
   summary,
+  user,
 }: {
   counts: ControlCounts;
+  /**
+   * Who is reading, or null for a guest. Passed down rather than read here:
+   * this is a client component and the session lives on the server.
+   */
+  user?: { name: string } | null;
   /** Title and week. Stays visible in both states — it is what the page IS. */
   masthead: React.ReactNode;
   /** The week's numbers. Shown open, dropped when the bar shrinks. */
@@ -117,6 +123,13 @@ export function ControlBar({
     // fourth way to read the week, and naming it would give it the same weight
     // as the sections that carry the work.
     { href: '/dismissed', label: '', icon: Trash2, count: undefined as number | undefined },
+    // Last, and an icon: whose account this is belongs to the bar rather than
+    // to the week, and a guest needs the way in more than a member needs the
+    // way to their own settings.
+    user
+      ? { href: '/account', label: '', icon: UserRound, count: undefined as number | undefined }
+      : { href: '/login', label: 'Sign in', count: undefined as number | undefined,
+          icon: undefined as React.ComponentType<{ className?: string }> | undefined },
   ];
 
   // No geography in the URL means the West Coast, matching what the page
@@ -168,12 +181,14 @@ export function ControlBar({
                     ? 'font-medium text-foreground'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
-                title={n.icon ? 'Dismissed' : undefined}
+                title={n.icon ? (n.href === '/account' ? `Signed in as ${user?.name}` : 'Dismissed') : undefined}
               >
                 {n.icon ? (
                   <>
                     <n.icon className="size-3.5" aria-hidden />
-                    <span className="sr-only">Dismissed</span>
+                    <span className="sr-only">
+                      {n.href === '/account' ? 'Your account' : 'Dismissed'}
+                    </span>
                   </>
                 ) : (
                   n.label

@@ -16,6 +16,7 @@ import { Building2, Radio, Sparkles } from 'lucide-react';
 import { Masonry } from '@/components/masonry';
 import { CollapsedSection, SectionHeading } from '@/components/primitives';
 import { availableWeeks, getWeeklyDigest, type DashboardCompany } from '@/lib/dashboard-data';
+import { currentUser } from '@/lib/session';
 import { WeekPicker } from '@/components/week-picker';
 import { ControlBar } from '@/components/control-bar';
 import { isBroadSector, sectorShort } from '@/lib/subsectors';
@@ -79,7 +80,9 @@ export default async function Dashboard({
    * a reader picks to widen it, and is what clearing the filter now sets.
    */
   const geo = geoParam ?? 'west_coast';
-  const [d, weeks] = await Promise.all([getWeeklyDigest(undefined, week), availableWeeks()]);
+  const [d, weeks, me] = await Promise.all([
+    getWeeklyDigest(undefined, week), availableWeeks(), currentUser(),
+  ]);
   const currentWeek = weeks.find((w) => w.label === d.weekLabel)?.weekOf ?? weeks[0]?.weekOf ?? '';
   const isArchive = Boolean(week) && week !== weeks[0]?.weekOf;
 
@@ -152,6 +155,7 @@ export default async function Dashboard({
       <main className="mx-auto max-w-[1400px] px-6 pb-10 sm:px-12 sm:pb-14 lg:px-16">
       <ControlBar
         counts={sidebarCounts}
+        user={me}
         masthead={
           <>
             {/* Sized for a bar, not for a page title. At 3xl this was taller
