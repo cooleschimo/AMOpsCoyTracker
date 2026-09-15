@@ -375,6 +375,15 @@ export function isDiscovery(it: PlacementInput): boolean {
   if (it.companyId === null) return false;
   if (isSingaporeBased(it)) return false;
   if (it.familiarity && NOT_DISCOVERABLE.includes(it.familiarity)) return false;
+  /*
+   * The scorer already read this item and said it was not about the company
+   * doing anything — a share-price move, a listicle, a mention in passing.
+   * Placement reads the company's numbers rather than the item behind them, so
+   * without this an Amgen stock story took a slot while its own score said
+   * "no expansion language". A judgment the pipeline already made is not one
+   * to make again from the aggregates.
+   */
+  if (it.signalType === 'noise') return false;
   // §7a: presence always requires a why-now. Expansion or partnership is what
   // makes a company actionable; a company with neither is held back whatever
   // its standing assessment says. QUALIFY is the bar, and it does not move with

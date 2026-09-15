@@ -1357,6 +1357,44 @@ export async function getCompanyPaths(companyId: number): Promise<PathRow[]> {
  * company — a company that qualified in three separate weeks is one entry, with
  * the week it was last seen.
  */
+/**
+ * Companies this reader has dismissed.
+ *
+ * Scoped to the browser's own voter key, because that is the only identity the
+ * schema has (§7a) and one person's dismissal is not a verdict for everyone.
+ *
+ * A dismissal is easy to make by accident and, once made, the company stops
+ * appearing — so the only way back is a list of what was dismissed. The reason
+ * travels with each row: 'irrelevant_company' and 'no_sg_angle' suppress the
+ * company outright, where the others only hold against news already seen, and
+ * a reader deciding whether to undo needs to know which they chose.
+ */
+export async function dismissedCompanies(voterKey: string | null): Promise<Array<{
+  id: number; name: string; oneLiner: string; sectors: string[]; hq: string;
+  reasons: string[]; note: string | null; at: string;
+}>> {
+  if (!voterKey) return [];
+  const sql = getSql();
+  const rows: any = await sql`
+    select c.id, c.name, c.one_liner, c.sectors, c.hq_city, c.hq_state,
+           d.reasons, d.note, d.created_at
+      from dispositions d
+      join companies c on c.id = d.company_id
+     where d.disposition = 'dismiss'
+       and d.voter_key = ${voterKey}
+     order by d.created_at desc`;
+  return (rows as Row[]).map((r) => ({
+    id: Number(r.id),
+    name: String(r.name ?? ''),
+    oneLiner: String(r.one_liner ?? ''),
+    sectors: Array.isArray(r.sectors) ? (r.sectors as string[]) : [],
+    hq: [r.hq_city, r.hq_state].filter(Boolean).join(', ') || 'Unknown',
+    reasons: Array.isArray(r.reasons) ? (r.reasons as string[]) : [],
+    note: (r.note as string | null) ?? null,
+    at: asDate(r.created_at),
+  }));
+}
+
 export async function everSurfacedCompanies(): Promise<Array<{
   id: number; name: string; sectors: string[]; hq: string;
   lastWeek: string; weeks: number;
@@ -1370,6 +1408,10 @@ export async function everSurfacedCompanies(): Promise<Array<{
     join companies c on c.id = cs.company_id
     where greatest(cs.expansion, cs.partnership) >= ${QUALIFY.minTopAxis}
       and cs.momentum >= ${QUALIFY.minMomentum}
+      -- The same scope the week's page applies. A company retired by review
+      -- never belonged in the standing record either.
+      and coalesce(c.scope_status, 'unknown') <> 'out_of_scope'
+      and coalesce(c.discovered_via, '') <> 'portfolio'
     group by c.id, c.name, c.sectors, c.hq_city, c.hq_state
     order by max(cs.week_of) desc, c.name`;
   return (rows as Row[]).map((r) => ({

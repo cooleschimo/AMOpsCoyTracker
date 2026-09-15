@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Globe2, Layers } from 'lucide-react';
+import { Globe2, Layers, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SearchBox } from '@/components/search-box';
 
@@ -108,10 +108,15 @@ export function ControlBar({
   };
 
   const NAV = [
-    { href: '/', label: 'This week', count: undefined as number | undefined },
+    { href: '/', label: 'This week', count: undefined as number | undefined,
+      icon: undefined as React.ComponentType<{ className?: string }> | undefined },
     { href: '/monitoring', label: 'Monitoring', count: counts.monitoring },
     { href: '/awaiting-assessment', label: 'Awaiting', count: counts.awaiting },
     { href: '/graph', label: 'Connections', count: undefined as number | undefined },
+    // An icon rather than a word: this is the way back from a misclick, not a
+    // fourth way to read the week, and naming it would give it the same weight
+    // as the sections that carry the work.
+    { href: '/dismissed', label: '', icon: Trash2, count: undefined as number | undefined },
   ];
 
   // No geography in the URL means the West Coast, matching what the page
@@ -158,12 +163,21 @@ export function ControlBar({
                 aria-current={pathname === n.href ? 'page' : undefined}
                 className={cn(
                   'whitespace-nowrap text-xs transition-colors',
+                  n.icon && 'inline-flex items-center self-center',
                   pathname === n.href
                     ? 'font-medium text-foreground'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
+                title={n.icon ? 'Dismissed' : undefined}
               >
-                {n.label}
+                {n.icon ? (
+                  <>
+                    <n.icon className="size-3.5" aria-hidden />
+                    <span className="sr-only">Dismissed</span>
+                  </>
+                ) : (
+                  n.label
+                )}
                 {n.count !== undefined && n.count > 0 && (
                   <span className="num ml-1 text-2xs text-muted-foreground/60">{n.count}</span>
                 )}
