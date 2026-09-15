@@ -24,6 +24,7 @@ data/cbi_backfill_*.csv
 
 # Working notes, design material and tool-generated scratch files.
 design/
+lovable/
 PROGRESS.md
 BLOCKERS.md
 CLAUDE.md
