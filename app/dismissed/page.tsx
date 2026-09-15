@@ -45,9 +45,8 @@ export default async function DismissedPage() {
           </Link>
         </p>
         <h1 className="font-display text-2xl font-semibold tracking-tight">Dismissed</h1>
-        <p className="pt-1 text-sm text-muted-foreground">
-          Companies you took off the week. Restoring one puts it back wherever the
-          week&rsquo;s ranking places it.
+        <p className="measure pt-1 text-sm text-muted-foreground">
+          Restore one and it returns to the week.
         </p>
       </header>
 

@@ -40,6 +40,15 @@ export function CompanyHeading({ company, note }: { company: Company; note?: str
       {/* The sector is already tagged above the name; repeating it here spends
           a line on something the reader has just read. */}
       <LocationEdit companyId={Number(company.companyId)} hq={company.hq} source={company.hqSource} />
+      {/* A live conversation is a fact about the company, not a reason to move
+          it out of the week — the reader may not be the person talking, and
+          hiding it would take a company demonstrably in play off their page. So
+          it stays where the ranking puts it and says so here. */}
+      {company.familiarity === 'in_conversation' && (
+        <span className="rounded-full bg-primary/[0.1] px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.12em] text-foreground">
+          In conversation
+        </span>
+      )}
       {note && (
         <span className="font-mono text-2xs uppercase tracking-[0.12em] text-muted-foreground">
           {note}

@@ -25,7 +25,7 @@
  * the scoped exception: momentum never lifts a company into discovery.
  */
 import type { Band } from './company-rubric';
-import { ENGAGED, type Familiarity } from './familiarity';
+import { type Familiarity } from './familiarity';
 import { parseFundraise } from './fundraise';
 
 /**
@@ -273,12 +273,18 @@ const daysOld = (d: Date) => Math.floor((Date.now() - d.getTime()) / 86400_000);
 /**
  * Familiarity values that disqualify a company from discovery.
  *
- * A company EDB already knows, or is already talking to, is not a find — it
- * belongs under Who we know instead. 'not_known' is deliberately absent:
- * a company someone checked and does not know is precisely what discovery is
- * for, and 'no_status' means nobody has said, which is no reason to exclude it.
+ * A company EDB already knows is not a find — it belongs under Who we know
+ * instead. 'not_known' is deliberately absent: a company someone checked and
+ * does not know is precisely what discovery is for, and 'no_status' means
+ * nobody has said, which is no reason to exclude it.
+ *
+ * 'in_conversation' is absent too, and that is the point. A live conversation
+ * is a fact worth showing ON the company, not a reason to move it out of the
+ * week: the person reading may not be the person talking, and taking it off
+ * their dashboard hides a company that is demonstrably in play. It stays where
+ * the ranking puts it and carries a tag saying a conversation is open.
  */
-const NOT_DISCOVERABLE: Familiarity[] = ['known', 'in_conversation'];
+const NOT_DISCOVERABLE: Familiarity[] = ['known'];
 
 /**
  * Which discovery section, or null if not a discovery candidate at all.
@@ -409,7 +415,10 @@ export function isDiscovery(it: PlacementInput): boolean {
  */
 export function isWhoWeKnow(it: PlacementInput): boolean {
   if (!it.familiarity) return false;
-  if (!ENGAGED.includes(it.familiarity)) return false;
+  // 'known' only, matching NOT_DISCOVERABLE. A company in conversation stays in
+  // discovery and carries a tag there, so claiming it here as well would put it
+  // on the page twice under two different headings.
+  if (it.familiarity !== 'known') return false;
   return it.momentum >= 2 || Math.max(it.expansion, it.partnership) >= 2;
 }
 
