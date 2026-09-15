@@ -29,10 +29,20 @@ on:
         description: 'With mode=resume: the stage to restart from (e.g. score)'
         required: false
         type: string
+      depth:
+        description: 'Internal. How many times this run has already resumed.'
+        required: false
+        default: '0'
+        type: string
 
 jobs:
   run:
     runs-on: ubuntu-latest
+    # Re-dispatching this workflow after a deadline stop is a write to Actions.
+    # The default token is read-only for that, so it is asked for explicitly.
+    permissions:
+      contents: read
+      actions: write
     # The LLM stages are rate-limited rather than slow, so they spend most of
     # their time backing off. Six hours is the ceiling a free runner allows.
     # GitHub kills a hosted job at six hours whatever this says, so 355 is the
@@ -40,7 +50,12 @@ jobs:
     # upload logs. The stage budgets in lib/stages.ts sum to less than this, so
     # a run that hits every timeout still reaches the digest rather than being
     # cut off partway with no summary.
-    timeout-minutes: 355
+    # The run stops itself at 290 minutes (scripts/weekly.ts --deadline), which
+    # ends the job as `failure` and lets the resume step below fire. This is
+    # only a backstop for a stage that hangs so hard the deadline check between
+    # stages is never reached; GitHub kills a hosted job at 360 regardless, and
+    # that kill lands as `cancelled`, where no step of ours would run.
+    timeout-minutes: 330
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       # Every key, cycling gemini -> groq -> openrouter so no provider carries a
@@ -163,6 +178,39 @@ jobs:
         run: npx tsx scripts/weekly.ts --daily
 
       # ---- single stages, for a manual run -----------------------------------
+      # ---- picking up after a deadline stop ---------------------------------
+      #
+      # weekly.ts stops itself before the runner would be cancelled and exits
+      # non-zero, so this fires. It asks the database which stage to resume
+      # from rather than parsing logs, and re-dispatches this same workflow.
+      #
+      # The depth guard is what stops a genuinely broken pipeline dispatching
+      # itself all night: three resumes is more than a slow day needs and far
+      # short of a loop.
+      - name: Resume automatically after a deadline stop
+        # One guarded condition, not two ored together: `&&` binds tighter than
+        # `||`, so a two-clause version fires on any failure whatever the depth,
+        # which is how a crash-looping pipeline dispatches itself all night.
+        if: ${{ failure() && fromJSON(github.event.inputs.depth || '0') < 3 }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Monday's run includes the weekly-only stages; resuming it as daily
+          # would skip them permanently.
+          SCOPE=""
+          if [ "${{ github.event.inputs.mode }}" = "daily" ] || [ "${{ steps.dow.outputs.day }}" != "1" ]; then
+            SCOPE="--daily"
+          fi
+          NEXT=$(npx tsx scripts/dev/resume-point.ts $SCOPE 2>/dev/null | tail -1)
+          if [ -z "$NEXT" ]; then
+            echo "Every stage finished; nothing to resume."
+            exit 0
+          fi
+          DEPTH=$(( ${{ github.event.inputs.depth || 0 }} + 1 ))
+          echo "::notice::Resuming from $NEXT (attempt $DEPTH)"
+          gh workflow run pipeline.yml \
+            -f mode=resume -f from="$NEXT" -f depth="$DEPTH"
+
       # ---- resuming a run GitHub cut off -----------------------------------
       #
       # A hosted job is killed at six hours, and the stages that overrun are

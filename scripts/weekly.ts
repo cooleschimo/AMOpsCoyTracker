@@ -115,7 +115,35 @@ function run(stage: Stage, dry: boolean): Promise<{ ok: boolean; ms: number; not
   };
   const results: Array<{ stage: string; ok: boolean; ms: number; note: string }> = [];
 
+  /*
+   * Stop before the runner does.
+   *
+   * A hosted job is killed at six hours, and that kill lands as `cancelled`,
+   * not `failure` — every step shows `skipped`, so an `if: failure()` cleanup
+   * never runs and nothing records where the work got to. Two runs died that
+   * way at 350 and 351 minutes with no trace beyond the stage list.
+   *
+   * So the run ends itself while it still can. Stopping between stages rather
+   * than mid-stage keeps the guarantee every stage already offers: each one
+   * takes only what it has not done, so the next run picks up exactly here.
+   *
+   * --deadline is minutes from start; 0 disables it, which is the right default
+   * for a laptop where nothing is going to cancel the process.
+   */
+  const deadlineMin = Number(argOf('deadline', inCi ? '290' : '0'));
+  const startedAt = Date.now();
+  let stoppedEarly: string | null = null;
+
   for (const stage of stages) {
+    const elapsedMin = (Date.now() - startedAt) / 60_000;
+    if (deadlineMin > 0 && elapsedMin >= deadlineMin) {
+      stoppedEarly = stage.name;
+      console.log(`\n${'='.repeat(70)}`);
+      console.log(`DEADLINE — ${elapsedMin.toFixed(0)}m elapsed, stopping before ${stage.name}`);
+      console.log(`Resume with: npx tsx scripts/weekly.ts --from ${stage.name}`);
+      console.log(`${'='.repeat(70)}`);
+      break;
+    }
     enterPhase(stage.phase);
     console.log(`\n${'='.repeat(70)}\n${stage.name} [${stage.cost}] — ${stage.why}\n${'='.repeat(70)}`);
     const r = await run(stage, dry);
@@ -194,5 +222,11 @@ function run(stage: Stage, dry: boolean): Promise<{ ok: boolean; ms: number; not
     console.log('Usually the daily LLM allowance: every provider spent before the run started.');
   }
 
+  if (stoppedEarly) {
+    console.log(`\nStopped at the deadline. Next stage: ${stoppedEarly}`);
+    // Non-zero on purpose: a job that ends 0 concludes `success` and the
+    // re-dispatch step never fires.
+    process.exit(1);
+  }
   process.exit(failed.length || barren.length ? 1 : 0);
 })();
