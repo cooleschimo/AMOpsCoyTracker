@@ -625,17 +625,6 @@ export function planDigest(input: PlacementInput[]): DigestPlan {
   );
   for (const it of input) {
     if (placedIds.has(it.itemId)) continue;
-    /*
-     * Noise is refused here as it is in discovery.
-     *
-     * This section means "rated worth caring about, and nothing happened" — so
-     * it takes companies with no trigger, which is precisely the state a
-     * wrong-company week leaves behind. Dexterity sat here for weeks leading
-     * with a Jamaican athletics report about "dexterity competition", while its
-     * own why-now said the items were unrelated mentions of the word. A quiet
-     * week should read as quiet, not as an article about something else.
-     */
-    if (it.signalType === 'noise') continue;
     if (priorityScore(it.targetPriority) >= 2 && Math.max(it.expansion, it.partnership) < 2) {
       sections.to_watch.push({ ...it, section: 'to_watch', rank: discoveryRank(it) });
     }

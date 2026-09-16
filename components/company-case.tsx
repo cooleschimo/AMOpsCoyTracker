@@ -142,17 +142,33 @@ export function CompanyCase({
         <div>
           <CompanyHeading company={company} note={note} />
           <OneLiner text={company.oneLiner} />
-          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <a
-              href={company.trigger.source.url}
-              target="_blank"
-              rel="noreferrer"
-              className="measure text-sm leading-snug text-muted-foreground link-underline hover:text-foreground"
-            >
-              {company.trigger.headline}
-            </a>
-            <SourceLink source={company.trigger.source} />
-          </div>
+          {/*
+            * A noise week has no headline worth leading with.
+            *
+            * The scorer has already judged that the item is about something
+            * else wearing the same name — Dexterity led for weeks with a
+            * Jamaican athletics report about "dexterity competition". Linking
+            * it invites a reader to open an article about another subject
+            * entirely, so the company keeps its place, its bands and its facts,
+            * and says plainly that this week produced nothing about it.
+            */}
+          {company.trigger.signalType === 'noise' ? (
+            <p className="measure mt-1.5 text-sm italic leading-snug text-muted-foreground/70">
+              Nothing about this company in the news this week.
+            </p>
+          ) : (
+            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <a
+                href={company.trigger.source.url}
+                target="_blank"
+                rel="noreferrer"
+                className="measure text-sm leading-snug text-muted-foreground link-underline hover:text-foreground"
+              >
+                {company.trigger.headline}
+              </a>
+              <SourceLink source={company.trigger.source} />
+            </div>
+          )}
         </div>
       </div>
 

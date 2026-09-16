@@ -93,6 +93,14 @@ export type DashboardCompany = {
     headline: string;
     score: 0 | 1 | 2 | 3;
     source: Source;
+    /**
+     * What the week's representative item was judged to be.
+     *
+     * 'noise' means the scorer found nothing about this company — usually
+     * another entity wearing the same name. The card reads it so it does not
+     * link a reader to an article about something else.
+     */
+    signalType: string;
     /** The three axes the company was scored on. Brief §7. */
     expansion: number;
     partnership: number;
@@ -339,6 +347,7 @@ function toCompany(
       // expansion score would label a qualified entry 'noise'.
       score: (Math.max(Number(r.expansion) || 0, Number(r.partnership) || 0) || 0) as 0 | 1 | 2 | 3,
       source,
+      signalType: String(r.signal_type ?? 'other'),
       expansion: Number(r.expansion) || 0,
       partnership: Number(r.partnership) || 0,
       momentum: Number(r.momentum) || 0,
