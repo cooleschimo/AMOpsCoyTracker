@@ -37,20 +37,16 @@ export default async function LoginPage({
         )}
       </header>
 
-      <AuthForm
-        action={signInAction}
-        submitLabel="Sign in"
-        footer={
-          <form action={continueAsGuestAction} className="pt-2 text-center">
-            <button
-              type="submit"
-              className="cursor-pointer text-xs text-muted-foreground link-underline hover:text-foreground"
-            >
-              Continue as a guest
-            </button>
-          </form>
-        }
-      >
+      {/*
+        * The guest form is a SIBLING of the sign-in form, not a child.
+        *
+        * It was passed as `footer`, which renders inside AuthForm's own
+        * <form> — and HTML forbids nesting forms, so the browser dropped the
+        * inner one and the button submitted the sign-in action with empty
+        * fields. It answered "Email and password are both needed" and never
+        * created a session.
+        */}
+      <AuthForm action={signInAction} submitLabel="Sign in">
         <Field label="Email" name="email" type="email" autoComplete="email" />
         <Field label="Password" name="password" type="password" autoComplete="current-password" />
         <p className="text-right text-2xs">
@@ -59,6 +55,18 @@ export default async function LoginPage({
           </Link>
         </p>
       </AuthForm>
+
+      <form action={continueAsGuestAction} className="pt-3 text-center">
+        <button
+          type="submit"
+          className="cursor-pointer text-xs text-muted-foreground link-underline hover:text-foreground"
+        >
+          Continue as a guest
+        </button>
+        <span className="mt-1 block text-2xs text-muted-foreground/70">
+          Read the week. Acting on a card needs an account.
+        </span>
+      </form>
 
       <p className="mt-8 text-center text-2xs text-muted-foreground/70">
         Accounts are by invitation.
