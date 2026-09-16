@@ -78,10 +78,20 @@ export default async function GraphPage({
    * No confirmed path exists in the data today, so this changes nothing a
    * reader would notice yet. It is here so it holds when one does.
    */
-  const [graph, paths] = selected && me
+  /*
+   * A guest sees the graph, minus the routes that run through a person.
+   *
+   * Withholding it whole was too blunt: of the paths in the data, the
+   * overwhelming majority are fund-portfolio and company-to-company edges —
+   * public-record relationships, and exactly what this page says it draws. Only
+   * a person_role path names an individual as a way in, and that is the part
+   * that is internal. So guests get the graph with those filtered out.
+   */
+  const withPeople = Boolean(me);
+  const [graph, paths] = selected
     ? await Promise.all([
-        getCompanyGraph(selected.id),
-        getCompanyPaths(selected.id),
+        getCompanyGraph(selected.id, { withPeople }),
+        getCompanyPaths(selected.id, { withPeople }),
       ])
     : [{ nodes: [], edges: [] }, []];
 

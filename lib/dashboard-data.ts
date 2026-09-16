@@ -1210,13 +1210,27 @@ export type CompanyGraph = { nodes: GraphNode[]; edges: GraphEdge[] };
  * unreviewed inference, and below that the score carries it. Nothing here is
  * called a warm introduction — an unreviewed edge is an association.
  */
-export async function getCompanyGraph(companyId: number): Promise<CompanyGraph> {
+export async function getCompanyGraph(
+  companyId: number,
+  /**
+   * Drop routes that run through a named individual.
+   *
+   * A fund's portfolio or a company-to-company edge is a public-record
+   * relationship — the thing this page says it draws. A person_role path is an
+   * introduction route through someone by name, which is internal. Guests get
+   * the former and not the latter, so the graph is still worth opening.
+   */
+  opts?: { withPeople?: boolean },
+): Promise<CompanyGraph> {
   const { findWarmPaths } = await import('./paths');
   const sql = getSql();
   const [company]: any = await sql`select id, name, sectors from companies where id = ${companyId}`;
   if (!company) return { nodes: [], edges: [] };
 
-  const paths = await findWarmPaths(companyId);
+  const all = await findWarmPaths(companyId);
+  const paths = opts?.withPeople === false
+    ? all.filter((p) => p.kind !== 'person_role')
+    : all;
   const hubId = `c${companyId}`;
   const nodes = new Map<string, GraphNode>([
     [
@@ -1327,9 +1341,16 @@ export type PathRow = {
 };
 
 /** The ranked path list for a company. Brief §8. */
-export async function getCompanyPaths(companyId: number): Promise<PathRow[]> {
+export async function getCompanyPaths(
+  companyId: number,
+  /** As getCompanyGraph: person routes are withheld from guests. */
+  opts?: { withPeople?: boolean },
+): Promise<PathRow[]> {
   const { findWarmPaths } = await import('./paths');
-  const paths = await findWarmPaths(companyId);
+  const all = await findWarmPaths(companyId);
+  const paths = opts?.withPeople === false
+    ? all.filter((p) => p.kind !== 'person_role')
+    : all;
   return paths.map((p, i) => ({
     id: `path-${companyId}-${i}`,
     kind: p.kind,
