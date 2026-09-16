@@ -31,6 +31,7 @@ export const dynamic = 'force-dynamic';
  */
 function Section({
   title,
+  subtitle,
   blurb,
   companies,
   empty,
@@ -38,6 +39,8 @@ function Section({
   canAct = true,
 }: {
   title: string;
+  /** The standing line above the blurb, set in tracked caps. */
+  subtitle?: string;
   blurb?: string;
   companies: DashboardCompany[];
   empty: string;
@@ -50,6 +53,7 @@ function Section({
     <section id={id} className="scroll-mt-6 space-y-4">
       <SectionHeading
         title={title}
+        subtitle={subtitle}
         blurb={blurb}
         right={
           <span className="num text-2xs text-muted-foreground">
@@ -85,9 +89,13 @@ export default async function Dashboard({
   const geo = geoParam ?? 'west_coast';
   const me = await currentUser();
   const [d, weeks] = await Promise.all([
-    // A guest reads the week; what Singapore could offer is withheld at the
-    // source rather than hidden in the markup.
-    getWeeklyDigest(undefined, week, { withOffer: Boolean(me) }),
+    /*
+     * A guest reads the week. What Singapore could offer, and everything people
+     * here have recorded — familiarity, watchers, open outreach — is withheld
+     * at the source rather than hidden in the markup, so none of it reaches the
+     * HTML the server sends.
+     */
+    getWeeklyDigest(undefined, week, { withOffer: Boolean(me), withInternal: Boolean(me) }),
     availableWeeks(),
   ]);
   const currentWeek = weeks.find((w) => w.label === d.weekLabel)?.weekOf ?? weeks[0]?.weekOf ?? '';
@@ -250,21 +258,53 @@ export default async function Dashboard({
           empty="No early-stage finds this week."
           canAct={Boolean(me)}
         />
+        {/* Directly under the two discovery sections, because it answers the
+            question they raise: a company rated worth caring about that did not
+            appear above is not missing, it is quiet. Held open rather than
+            collapsed — a quiet week should read as quiet, and a list nobody
+            expands cannot say that. */}
         <Section
-          id="known"
-          title="Who we know"
-          blurb="Already known or in conversation, and something moved."
-          companies={inPlace(d.whoWeKnow)}
-          empty="No companies marked as known yet."
+          id="watch"
+          title="To watch"
+          subtitle="Rated, waiting on news"
+          blurb="Worth caring about, with no trigger this week."
+          companies={shownToWatch}
+          empty="Nothing rated and waiting."
           canAct={Boolean(me)}
         />
-        <Section
-          title="Monitoring"
-          blurb="Companies someone chose to follow."
-          companies={inPlace(d.monitoring)}
-          empty="Nothing monitored yet."
-          canAct={Boolean(me)}
-        />
+        {/*
+          * Members only, both of them.
+          *
+          * These two are not a read of the week — they are a read of EDB. One
+          * says which companies somebody here is already talking to, the other
+          * which colleagues are watching what, by name. /monitoring and
+          * /awaiting-assessment already redirect a guest for exactly this
+          * reason; these sections are the same material rendered inline, and
+          * were the place the rule had not reached.
+          *
+          * Hidden rather than emptied: the headings alone disclose. "Who we
+          * know" over a filtered list still says the category exists and that
+          * something is in it.
+          */}
+        {me && (
+          <>
+            <Section
+              id="known"
+              title="Who we know"
+              blurb="Already known or in conversation, and something moved."
+              companies={inPlace(d.whoWeKnow)}
+              empty="No companies marked as known yet."
+              canAct
+            />
+            <Section
+              title="Monitoring"
+              blurb="Companies someone chose to follow."
+              companies={inPlace(d.monitoring)}
+              empty="Nothing monitored yet."
+              canAct
+            />
+          </>
+        )}
 
         {/*
           * Both of these are complete lists rather than a week's read, and both
@@ -291,33 +331,29 @@ export default async function Dashboard({
           </Masonry>
         </CollapsedSection>
 
-        <CollapsedSection
-          title="Awaiting assessment"
-          count={shownAwaiting.length}
-          blurb="Surfaced this week but not yet assessed."
-        >
-          <Masonry className="dense-cards">
-            {shownAwaiting.map((c) => (
-              <CompanyCase key={c.id} company={c} canAct={Boolean(me)} />
-            ))}
-          </Masonry>
-        </CollapsedSection>
-
-        {/* Rated worth caring about, and nothing happened this week worth
-            leading with. Collapsed like the other two standing lists: it is a
-            question an RD asks sometimes, not part of the weekly read, and a
-            company here is waiting on news rather than on the tool. */}
-        <CollapsedSection
-          title="To watch"
-          count={shownToWatch.length}
-          blurb="Worth caring about, with no trigger this week."
-        >
-          <Masonry className="dense-cards">
-            {shownToWatch.map((c) => (
-              <CompanyCase key={c.id} company={c} canAct={Boolean(me)} />
-            ))}
-          </Masonry>
-        </CollapsedSection>
+        {/*
+          * Absent entirely when there is nothing waiting, and always for a
+          * guest.
+          *
+          * The other collapsed sections stay and say they are empty, because an
+          * empty section there is a finding — a quiet week for weak fits is
+          * worth knowing. A backlog is different: nothing awaiting assessment
+          * is the tool being up to date, not a result to report. And a guest
+          * reads what has been assessed, so work in progress is not theirs.
+          */}
+        {me && shownAwaiting.length > 0 && (
+          <CollapsedSection
+            title="Awaiting assessment"
+            count={shownAwaiting.length}
+            blurb="Surfaced this week but not yet assessed."
+          >
+            <Masonry className="dense-cards">
+              {shownAwaiting.map((c) => (
+                <CompanyCase key={c.id} company={c} canAct={Boolean(me)} />
+              ))}
+            </Masonry>
+          </CollapsedSection>
+        )}
 
       </div>
       </main>
