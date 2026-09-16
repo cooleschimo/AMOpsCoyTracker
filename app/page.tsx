@@ -319,27 +319,30 @@ export default async function Dashboard({
             and the page defaults to the West Coast. A section that says five
             and reveals none reads as broken, where a section that says nothing
             is there is merely a filtered view. */}
-        <CollapsedSection
-          title="Assessed as a weak fit"
-          count={shownLowFit.length}
-          blurb="Rated low on priority or Singapore fit."
-        >
-          <Masonry className="dense-cards">
-            {shownLowFit.map((c) => (
-              <CompanyCase key={c.id} company={c} canAct={Boolean(me)} />
-            ))}
-          </Masonry>
-        </CollapsedSection>
+        {me && (
+          <CollapsedSection
+            title="Assessed as a weak fit"
+            count={shownLowFit.length}
+            blurb="Rated low on priority or Singapore fit."
+          >
+            <Masonry className="dense-cards">
+              {shownLowFit.map((c) => (
+                <CompanyCase key={c.id} company={c} canAct />
+              ))}
+            </Masonry>
+          </CollapsedSection>
+        )}
 
         {/*
-          * Absent entirely when there is nothing waiting, and always for a
-          * guest.
+          * Absent entirely when there is nothing waiting.
           *
-          * The other collapsed sections stay and say they are empty, because an
-          * empty section there is a finding — a quiet week for weak fits is
-          * worth knowing. A backlog is different: nothing awaiting assessment
-          * is the tool being up to date, not a result to report. And a guest
-          * reads what has been assessed, so work in progress is not theirs.
+          * Weak fit above stays and says it is empty, because an empty section
+          * there is a finding — a quiet week for weak fits is worth knowing. A
+          * backlog is different: nothing awaiting assessment is the tool being
+          * up to date, not a result to report.
+          *
+          * Both are members-only. One holds the tool's verdicts on companies,
+          * the other its unfinished work, and a guest reads neither.
           */}
         {me && shownAwaiting.length > 0 && (
           <CollapsedSection

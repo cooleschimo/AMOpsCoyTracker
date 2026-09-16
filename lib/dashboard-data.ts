@@ -1038,7 +1038,15 @@ export async function getWeeklyDigest(
    */
   const whoWeKnow = withInternal ? pick(plan.sections.who_we_know) : [];
   const awaitingAssessment = withInternal ? pick(plan.sections.awaiting_assessment) : [];
-  const lowFit = pick(plan.sections.low_fit);
+  /*
+   * The weak-fit list is a verdict, not a find.
+   *
+   * It names companies the tool rated low on priority or Singapore fit — a
+   * judgment made here about somebody else's business, and the one section
+   * whose contents nobody outside would expect to be reading. The other two
+   * above disclose what EDB knows; this discloses what EDB thinks.
+   */
+  const lowFit = withInternal ? pick(plan.sections.low_fit) : [];
   // Rated worth caring about, but nothing happened this week worth leading
   // with. Kept visible so a quiet week reads as quiet rather than as absence.
   const toWatch = pick(plan.sections.to_watch);
