@@ -613,18 +613,34 @@ async function signalRows(signalVersion: string, weekOf?: string): Promise<Row[]
          -- the same company has two rows here, and listing them twice is a
          -- duplicate in the reader's list rather than a display detail.
          select distinct on (p.id)
-                p.name, coalesce(p.title, nullif(ro.role_raw, '')) as title,
+                /*
+                 * The scraper's own title only. The raw role fragment it
+                 * captured beside the name is unparsed, and falling back to it
+                 * put a page's pipe-delimited navigation and an unclosed anchor
+                 * tag on the card as a founder's job title. No title is better
+                 * than the page's markup.
+                 */
+                p.name, p.title,
                 p.contact_email, p.profile_url,
                 case when p.contact_email is not null then 0
                      when p.profile_url is not null then 1 else 2 end as rank
          from roles ro join people p on p.id = ro.person_id
          where ro.company_id = cs.company_id
-           -- The people extractor sometimes lifts a product or partner name off
-           -- a page. A person has a forename and a surname and is not the
-           -- company itself; anything else is not someone to write to.
+           /*
+            * A person has a forename and a surname and is not the company, a
+            * product, or a heading off the page.
+            *
+            * Shape alone cannot separate a page heading set in title case
+            * from a person's name: both are capitalised words. So the words
+            * themselves are tested against the nouns a marketing page uses,
+            * none of which appears in a real name.
+            */
            and p.name ~ '^[A-Z][a-z]+ [A-Z]'
            and p.name <> c.name
            and p.name !~* '(cloud|aws|azure|foundry|powered by|claude|api|platform|inc\.?$|llc$)'
+           -- Doubled backslashes: a single \m is swallowed as a JS escape
+           -- before Postgres sees it, which left this pattern matching nothing.
+           and p.name !~* '\\y(transformation|expansion|leadership|partnership|innovation|solutions|systems|services|strategy|growth|results|overview|highlights|mission|vision|values|careers|investor|technolog|enterprise|platform|research|development|operations|excellence|commitment|sustainability|governance|diversity|culture|community|policy|cookie|privacy|terms)\\y'
          -- distinct on needs the deduped column to lead; current roles first so
          -- the surviving row is the one still true.
          order by p.id, ro.last_seen desc nulls last
