@@ -1051,8 +1051,18 @@ export async function getMonitoredCompanies(
     from monitoring m
     join companies c on c.id = m.company_id
     left join lateral (
+      /*
+       * The NEWEST signal, not an arbitrary one.
+       *
+       * A bare limit without an order let Postgres return whichever row it
+       * reached first, so a monitored company could show a fortnight-old
+       * headline while this week's sat unread. Amgen led with a share-price
+       * story from the 5th when a Phase 3 result from the 12th was already in
+       * the table, and every monitored card was wrong the same way.
+       */
       select * from company_signals s
       where s.company_id = m.company_id and s.signal_version = ${signalVersion}
+      order by s.week_of desc
       limit 1
     ) cs on true
     left join items i on i.id = cs.representative_item_id
