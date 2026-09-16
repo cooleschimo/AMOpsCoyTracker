@@ -17,6 +17,7 @@
  * node:crypto has scrypt, and a password library would be more surface than the
  * thing it replaces.
  */
+import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { randomBytes, scrypt, timingSafeEqual as nodeTimingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
@@ -64,8 +65,13 @@ export async function currentUser(): Promise<SessionUser | null> {
  * A guest session has no `user_id`, so the join matches nothing and this
  * returns null — which is exactly what a guest is. Every restriction in the app
  * already keys on that null, so guests needed no separate concept.
+ *
+ * Memoised per render with React's `cache`, which the Next documentation
+ * recommends for data access that is not `fetch`. A guarded page asked about
+ * the same token three times — the gate, the page's own check, the reader
+ * lookup — at roughly 75ms each against a database in another region.
  */
-export async function userForToken(token: string): Promise<SessionUser | null> {
+export const userForToken = cache(async (token: string): Promise<SessionUser | null> => {
   const sql = getSql();
   const rows: any = await sql`
     select u.id, u.email, u.name, u.role
@@ -80,7 +86,7 @@ export async function userForToken(token: string): Promise<SessionUser | null> {
     name: String(u.name),
     role: u.role === 'admin' ? 'admin' : 'member',
   };
-}
+});
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString('hex');
@@ -396,16 +402,23 @@ export async function createGuestSession(): Promise<void> {
  * is what every restriction keys on. This answers the wider question the page
  * gates need: has this browser been admitted at all. A page that is readable by
  * guests asks this; a page that needs a person asks `currentUser()`.
+ *
+ * Memoised on the token rather than on the cookie read, so the gate and the
+ * page share one answer.
  */
 export async function currentSession(): Promise<boolean> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return false;
+  return sessionExists(token);
+}
+
+const sessionExists = cache(async (token: string): Promise<boolean> => {
   const sql = getSql();
   const rows: any = await sql`
     select 1 from sessions where token = ${token} and expires_at > now() limit 1`;
   return rows.length > 0;
-}
+});
 
 /*
  * Rate limiting.

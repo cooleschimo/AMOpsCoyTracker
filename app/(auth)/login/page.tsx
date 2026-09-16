@@ -63,9 +63,6 @@ export default async function LoginPage({
         >
           Continue as a guest
         </button>
-        <span className="mt-1 block text-2xs text-muted-foreground/70">
-          Read the week. Acting on a card needs an account.
-        </span>
       </form>
 
       <p className="mt-8 text-center text-2xs text-muted-foreground/70">
