@@ -17,6 +17,7 @@
  *
  * Usage: npx tsx scripts/classify-sectors.ts [--limit N] [--batch 15] [--all] [--dry]
  *        --all      also re-classify companies that already carry a sector
+ *        --ids      only these company ids, comma-separated
  *        --out      where to write (default data/sectors_classified.csv)
  */
 import '../lib/loadenv';
@@ -92,6 +93,16 @@ ${batch.map((c) => `id ${c.id}: ${c.name}
   const concurrency = Math.max(1, Number(arg('workers', '4')));
   const all = flag('all');
   const dry = flag('dry');
+  /*
+   * A named set of companies, for a targeted retag.
+   *
+   * Without this the only choices are "everything unclassified" and
+   * "everything", and a migration that needs a hundred rows would spend the
+   * day's allowance on nine hundred. Empty means no filter, so the default
+   * behaviour is unchanged.
+   */
+  const ids = (arg('ids', '') ?? '')
+    .split(',').map((x) => Number(x.trim())).filter((n) => Number.isFinite(n) && n > 0);
 
   /**
    * Companies worth classifying: something to read, and either no sector yet or
@@ -127,13 +138,18 @@ ${batch.map((c) => `id ${c.id}: ${c.name}
       )
       and (${all} or not exists (select 1 from unnest(c.sectors) s
                                  where s = any(${SUBSECTOR_IDS})))
+      -- Same shape as the flag above: a plain boolean guard rather than a
+      -- spliced fragment, since a nested tagged fragment carrying an array
+      -- does not compose on the Neon HTTP driver.
+      and (${ids.length === 0} or c.id = any(${ids}))
     order by
       exists (select 1 from company_signals cs
               where cs.company_id = c.id and cs.week_of > current_date - 60) desc,
       c.name`;
 
   const list: Row[] = limit ? rows.slice(0, limit) : rows;
-  console.log(`${rows.length} companies with a usable description${all ? '' : ' and no current-taxonomy sector'}`);
+  console.log(`${rows.length} companies with a usable description${all ? '' : ' and no current-taxonomy sector'}`
+    + `${ids.length ? ` (limited to ${ids.length} named ids)` : ''}`);
   console.log(`classifying ${list.length} in batches of ${batchSize}\n`);
   if (!list.length) return;
 
