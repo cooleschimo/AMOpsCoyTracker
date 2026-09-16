@@ -35,7 +35,7 @@ export default async function AwaitingAssessmentPage() {
   // Members only: this is the unassessed backlog, not the week's findings.
   if (!me) redirect('/login');
 
-  const d = await getWeeklyDigest(undefined, undefined, { withOffer: Boolean(me) });
+  const d = await getWeeklyDigest(undefined, undefined, { withOffer: Boolean(me), withInternal: Boolean(me) });
   const companies = d.awaitingAssessment;
 
   return (

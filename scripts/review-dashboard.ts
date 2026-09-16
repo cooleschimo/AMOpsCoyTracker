@@ -53,7 +53,10 @@ type Out = {
    * so the review sees exactly what a reader would. Querying company_signals
    * directly would review companies that placement had already left out.
    */
-  const digest: any = await getWeeklyDigest(undefined, week);
+  // withInternal: this reads whoWeKnow and monitoring, which are empty
+  // without it — the review would then pass over exactly the companies a
+  // person had marked.
+  const digest: any = await getWeeklyDigest(undefined, week, { withInternal: true });
   const seen = new Set<number>();
   const placed: ReviewInput[] = [];
   for (const list of [digest.worthAConversation, digest.newOnTheRadar,

@@ -116,13 +116,24 @@ export function ControlBar({
   const NAV = [
     { href: '/', label: 'This week', count: undefined as number | undefined,
       icon: undefined as React.ComponentType<{ className?: string }> | undefined },
-    { href: '/monitoring', label: 'Monitoring', count: counts.monitoring },
-    { href: '/awaiting-assessment', label: 'Awaiting', count: counts.awaiting },
+    /*
+     * Members only, the three of them. Each page redirects a guest to /login,
+     * so for a guest these were links to a door they cannot open — and the
+     * labels and counts said what was behind it: how many companies the team
+     * watches, how much work is queued. That is the same disclosure the
+     * dashboard sections make, so it goes the same way.
+     */
+    ...(user ? [
+      { href: '/monitoring', label: 'Monitoring', count: counts.monitoring },
+      { href: '/awaiting-assessment', label: 'Awaiting', count: counts.awaiting },
+    ] : []),
     { href: '/graph', label: 'Connections', count: undefined as number | undefined },
     // An icon rather than a word: this is the way back from a misclick, not a
     // fourth way to read the week, and naming it would give it the same weight
     // as the sections that carry the work.
-    { href: '/dismissed', label: '', icon: Trash2, count: undefined as number | undefined },
+    ...(user ? [
+      { href: '/dismissed', label: '', icon: Trash2, count: undefined as number | undefined },
+    ] : []),
     // Last, and an icon: whose account this is belongs to the bar rather than
     // to the week, and a guest needs the way in more than a member needs the
     // way to their own settings.

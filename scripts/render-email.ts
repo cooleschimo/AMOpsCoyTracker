@@ -21,7 +21,8 @@ const arg = (n: string, d: string) => {
   const outDir = arg('out', 'out');
   const base = arg('base', process.env.APP_BASE_URL ?? 'http://localhost:3111');
 
-  const d = await getWeeklyDigest();
+  // A preview of the members' email, so it reads the members' digest.
+  const d = await getWeeklyDigest(undefined, undefined, { withOffer: true, withInternal: true });
   const total = d.worthAConversation.length + d.newOnTheRadar.length
     + d.newOnTheRadar.length + d.whoWeKnow.length + d.monitoring.length;
   if (!total) {

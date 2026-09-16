@@ -254,6 +254,25 @@ function whyPoints(
 
 type Row = Record<string, unknown>;
 
+/**
+ * What a guest may not read.
+ *
+ * Three fields on a card are records of what PEOPLE here have done, rather than
+ * anything the tool found in public: how well EDB knows a company, which
+ * colleagues are watching it by name, and who already has outreach open.
+ *
+ * Stripped here rather than hidden in the component, for the reason the
+ * proposition is: a card that renders without the markup still carries the
+ * value in the HTML the server sends, so it would be one view-source away.
+ *
+ * `contacts` is deliberately NOT in this set. Those are scraped from public
+ * pages — a name and title anyone could read on the company's own site — where
+ * these three exist only because somebody at EDB recorded them.
+ */
+function stripInternal(c: DashboardCompany): DashboardCompany {
+  return { ...c, familiarity: 'no_status', watchers: [], duplicateOutreach: null };
+}
+
 function toCompany(
   r: Row,
   ctx?: {
@@ -891,14 +910,19 @@ export async function getWeeklyDigest(
   signalVersion = COMPANY_SIGNAL_VERSION,
   weekOf?: string,
   /**
-   * What Singapore could offer is withheld from a guest.
+   * What is withheld from a guest.
    *
-   * Stripped here rather than hidden in the component: a card that renders
-   * without the block still carries it in the HTML the server sends, so the
-   * proposition would be one view-source away. The reader sees the week; the
-   * argument for approaching a company needs an account.
+   * `withOffer` covers what Singapore could offer; `withInternal` covers what
+   * people here have recorded — familiarity, watchers, open outreach. Both are
+   * stripped at the source rather than hidden in the component: a card that
+   * renders without the block still carries the value in the HTML the server
+   * sends, so either would be one view-source away.
+   *
+   * Two options rather than one, because they are different claims. A guest
+   * reading the week is a deliberate feature; a guest reading which companies
+   * EDB is talking to, and which colleagues are watching them, never was.
    */
-  opts?: { withOffer?: boolean },
+  opts?: { withOffer?: boolean; withInternal?: boolean },
 ): Promise<WeeklyDigest> {
   const rows = await signalRows(signalVersion, weekOf);
   const byCompany = new Map<number, Row>();
@@ -910,12 +934,16 @@ export async function getWeeklyDigest(
   // not pass the option leaked the proposition — which is how
   // /awaiting-assessment shipped it to guests while / withheld it.
   const withOffer = opts?.withOffer === true;
+  // Opt IN, exactly as withOffer is, and for the same reason: a caller that
+  // forgets the option leaks nothing.
+  const withInternal = opts?.withInternal === true;
   const pick = (placed: Placed[]) =>
     placed
       .map((p) => (p.companyId === null ? null : byCompany.get(p.companyId)))
       .filter((r): r is Row => Boolean(r))
       .map((r) => {
-        const c = toCompany(r, ctx);
+        const c0 = toCompany(r, ctx);
+        const c = withInternal ? c0 : stripInternal(c0);
         return withOffer ? c : { ...c, offer: null };
       });
 
@@ -979,17 +1007,37 @@ export async function getWeeklyDigest(
       where signal_version = ${signalVersion}
         and week_of = coalesce(${weekOf ?? null}::date,
           (select max(week_of) from company_signals where signal_version = ${signalVersion}))`,
-    getMonitoredCompanies(signalVersion, { withOffer: opts?.withOffer === true }),
+    /*
+     * Not fetched for a guest, rather than fetched and hidden.
+     *
+     * /monitoring redirects a guest outright — "a record of what people on the
+     * team are watching, and no business of theirs" — and this is the same
+     * list. Returning [] keeps that answer in one place instead of leaving the
+     * dashboard to remember it.
+     */
+    opts?.withInternal === true
+      ? getMonitoredCompanies(signalVersion, { withOffer: opts?.withOffer === true })
+      : Promise.resolve([] as DashboardCompany[]),
   ]);
 
   const worthAConversation = pick(plan.sections.worth_a_conversation);
   const newOnTheRadar = pick(plan.sections.new_on_the_radar);
-  // Account activity: companies EDB already holds or is talking to, where
-  // something moved this week.
-  const whoWeKnow = pick(plan.sections.who_we_know);
-  // The assessment backlog. Not a verdict, so it is kept apart from the bands
-  // and given its own page rather than a slot in the weekly read.
-  const awaitingAssessment = pick(plan.sections.awaiting_assessment);
+  /*
+   * Empty for a guest, not merely unlabelled.
+   *
+   * Stripping `familiarity` takes the badge off the card and leaves the company
+   * in the list, but BEING in this list is the disclosure — who_we_know holds
+   * companies precisely because somebody here marked them known or in
+   * conversation. A guest reading the name learns the fact the label spelled
+   * out.
+   *
+   * The backlog goes the same way. /awaiting-assessment redirects a guest
+   * ("not the week's findings, work in progress"), and the dashboard's own
+   * collapsed section is already members-only; without this the companies still
+   * travelled in the HTML behind it.
+   */
+  const whoWeKnow = withInternal ? pick(plan.sections.who_we_know) : [];
+  const awaitingAssessment = withInternal ? pick(plan.sections.awaiting_assessment) : [];
   const lowFit = pick(plan.sections.low_fit);
   // Rated worth caring about, but nothing happened this week worth leading
   // with. Kept visible so a quiet week reads as quiet rather than as absence.

@@ -12,7 +12,7 @@
  */
 import { getSql } from '../../../lib/db';
 import { redirect } from 'next/navigation';
-import { currentSession } from '../../../lib/session';
+import { currentSession, currentUser } from '../../../lib/session';
 import { SectionHeading } from '@/components/primitives';
 import { recordDisposition } from './actions';
 import { REASONS, REASON_LABELS } from '../../../lib/dispositions';
@@ -41,6 +41,9 @@ export default async function ItemPage(
   // Scored and assessed already, so a guest may read it. `currentUser()` still
   // decides what is withheld inside — the proposition, and every action.
   if (!(await currentSession())) redirect('/login');
+  // A guest is admitted above; this says whether they are a member, which is
+  // what the account-status line turns on.
+  const me = await currentUser();
 
   const itemId = Number(id);
   if (!Number.isFinite(itemId)) return <main className={MAIN}><h1 className="mb-1.5 font-display text-2xl font-semibold tracking-tight">Not found</h1></main>;
@@ -112,7 +115,9 @@ export default async function ItemPage(
         </p>
       ) : null}
 
-      {it.familiarity && it.familiarity !== 'unknown' ? (
+      {/* Recorded by a person here, so it is not a guest's to read. The rest of
+          the page is the item and its scoring, which is public reporting. */}
+      {me && it.familiarity && it.familiarity !== 'unknown' ? (
         <p className={CAUTION}>Account status: <b>{it.familiarity}</b> — recorded by a person, not derived by the tool.</p>
       ) : null}
 
