@@ -13,9 +13,24 @@ name: pipeline
 
 on:
   schedule:
-    # 06:15 UTC daily — early afternoon in Singapore. GitHub's scheduler can
-    # lag 5-15 min under load, which does not matter for a daily job.
-    - cron: '15 6 * * *'
+    # Anchored to the US working day, because that is where the sources are.
+    # 06:15 UTC put the run at 2am ET, reading a day that had not happened yet:
+    # EDGAR takes Form D filings through the US afternoon and a feed holds a
+    # story a day or two, so the run consistently read them a day late.
+    #
+    # 22:00 UTC is 6pm ET / 3pm PT — after the US business day, and still the
+    # SAME UTC calendar day as the news it reads. That second part is why not
+    # 01:00 UTC: weeks here are Saturday-anchored UTC (lib/week.ts), so a run
+    # past midnight UTC carries the next day's date and the Friday/Saturday
+    # boundary would file a run under the wrong week. A late-afternoon filing
+    # missed by an hour is recovered by the next run, since Form D is
+    # date-addressable; a misfiled week is not.
+    - cron: '0 22 * * *'
+    # The digest send, Monday 12:00 UTC — 8am ET / 5am PT, ahead of the ET
+    # working day. Sunday's 22:00 run renders the draft; this sends it. They
+    # are separate jobs because the render belongs to the week it reports on
+    # and the send belongs to the morning somebody reads it.
+    - cron: '0 12 * * 1'
   workflow_dispatch:
     inputs:
       mode:
@@ -23,7 +38,7 @@ on:
         required: true
         default: 'daily'
         type: choice
-        options: [daily, weekly, resume, discover, score, assess, review, ambiguous, formd, portfolios, acra]
+        options: [daily, weekly, senddigest, resume, discover, score, assess, review, ambiguous, formd, portfolios, acra]
         # 'daily' is the pipeline; 'weekly' is the pipeline plus the digest.
       from:
         description: 'With mode=resume: the stage to restart from (e.g. score)'
@@ -125,9 +140,15 @@ jobs:
             exit 1
           fi
 
+      # Two schedules land in this one workflow, so a scheduled run has to know
+      # WHICH it is. The hour separates them: 22 is the nightly pipeline, 12 is
+      # Monday's send. GitHub can fire a cron 5-15 min late but not into another
+      # hour, and both crons sit on the hour, so the comparison holds.
       - id: dow
-        name: Day of week (1=Monday)
-        run: echo "day=$(date -u +%u)" >> "$GITHUB_OUTPUT"
+        name: Day of week (1=Monday, 7=Sunday) and UTC hour
+        run: |
+          echo "day=$(date -u +%u)" >> "$GITHUB_OUTPUT"
+          echo "hour=$(date -u +%H)" >> "$GITHUB_OUTPUT"
 
       # ---- Form D, before the pipeline reads it ------------------------------
       #
@@ -140,42 +161,59 @@ jobs:
       # company, the ATS boards — is inside weekly.ts already. Only Form D,
       # the portfolio pages and ACRA sit outside it.
       - name: Form D ingestion
-        if: ${{ github.event.inputs.mode == 'formd' || github.event_name == 'schedule' }}
+        if: >-
+          ${{ github.event.inputs.mode == 'formd'
+              || (github.event_name == 'schedule' && steps.dow.outputs.hour == '22') }}
         run: npx tsx scripts/ingest-formd.ts --days 3
 
       # ---- the pipeline ------------------------------------------------------
       #
-      # Both steps run the same twelve stages — news, context, discovery, ATS,
-      # websites, people, location, filter, rescue, score, assess, review. The Monday
-      # one adds a twelfth, the digest, which is the only difference between
-      # them: find and score every day, publish once a week.
-      - name: Pipeline and weekly digest (Mondays)
-        if: >-
-          ${{ github.event.inputs.mode == 'weekly'
-              || (github.event_name == 'schedule' && steps.dow.outputs.day == '1') }}
-        run: npx tsx scripts/weekly.ts
-
-      # Approving and sending stay two commands here as they are by hand: the
-      # digest render above writes a draft, and nothing leaves until these run.
-      # Keeping them separate means a failed send does not lose the approval,
-      # and the digests row still records which items were placed.
+      # Every stage in lib/stages.ts except the two marked weeklyOnly runs every
+      # night: find, enrich, judge. The Sunday run adds the digest render, which
+      # is the only difference between the two commands.
       #
-      # DIGEST_TEST_MODE governs where it goes, not whether it goes. While it is
-      # true the mail is confined to DIGEST_TEST_RECIPIENT, which is what makes
-      # turning this on safe before a real recipient list exists.
-      - name: Approve and send the weekly digest (Mondays)
+      # Sunday rather than Monday because the digest reports on a FINISHED week.
+      # Weeks close Friday (Saturday-anchored, lib/week.ts), so by Sunday 22:00
+      # UTC the week is closed and scored, and render-digest.ts defaults to
+      # lastWeekSaturday() — the week just ended. Rendering it Sunday and
+      # sending Monday means the mail reflects a week nothing more will be added
+      # to, rather than one still being written as it goes out.
+      - name: Pipeline and digest render (Sundays)
         if: >-
           ${{ github.event.inputs.mode == 'weekly'
-              || (github.event_name == 'schedule' && steps.dow.outputs.day == '1') }}
-        run: |
-          npx tsx scripts/send-digest.ts --approve
-          npx tsx scripts/send-digest.ts --send
+              || (github.event_name == 'schedule'
+                  && steps.dow.outputs.hour == '22' && steps.dow.outputs.day == '7') }}
+        run: npx tsx scripts/weekly.ts
 
       - name: Pipeline, no digest
         if: >-
           ${{ github.event.inputs.mode == 'daily'
-              || (github.event_name == 'schedule' && steps.dow.outputs.day != '1') }}
+              || (github.event_name == 'schedule'
+                  && steps.dow.outputs.hour == '22' && steps.dow.outputs.day != '7') }}
         run: npx tsx scripts/weekly.ts --daily
+
+      # ---- the send, Monday morning -----------------------------------------
+      #
+      # Its own scheduled run, holding nothing but the send. The draft was
+      # written and saved by Sunday night's render; this approves it and sends.
+      #
+      # Approval is automatic here, which send-digest.ts deliberately does not
+      # do by default — it keeps approve and send apart so somebody reads what
+      # is about to leave. A scheduled send gives that up by definition. What
+      # still stands between a draft and a stranger's inbox is DIGEST_TEST_MODE,
+      # which confines every send to DIGEST_TEST_RECIPIENT until it is
+      # explicitly false, and the digests row that records what went out.
+      #
+      # No --week on either command: both default to lastWeekSaturday(), and on
+      # Monday 12:00 UTC that is the same week Sunday 22:00 UTC rendered.
+      - name: Approve and send the weekly digest (Monday morning)
+        if: >-
+          ${{ github.event.inputs.mode == 'senddigest'
+              || (github.event_name == 'schedule'
+                  && steps.dow.outputs.hour == '12' && steps.dow.outputs.day == '1') }}
+        run: |
+          npx tsx scripts/send-digest.ts --approve
+          npx tsx scripts/send-digest.ts --send
 
       # ---- single stages, for a manual run -----------------------------------
       # ---- did the run actually achieve anything? ---------------------------
@@ -189,10 +227,13 @@ jobs:
       # the answer matters. It runs before the resume step so its output is in
       # the log a resume is decided from.
       - name: Check the pipeline actually progressed
-        if: ${{ always() && (github.event.inputs.mode == '' || contains(fromJSON('["daily","weekly","resume"]'), github.event.inputs.mode)) }}
+        if: >-
+          ${{ always() && steps.dow.outputs.hour != '12'
+              && (github.event.inputs.mode == ''
+                  || contains(fromJSON('["daily","weekly","resume"]'), github.event.inputs.mode)) }}
         run: |
           SCOPE=""
-          if [ "${{ steps.dow.outputs.day }}" != "1" ]; then SCOPE="--daily"; fi
+          if [ "${{ steps.dow.outputs.day }}" != "7" ]; then SCOPE="--daily"; fi
           npx tsx scripts/dev/health.ts $SCOPE
 
       # ---- picking up after a deadline stop ---------------------------------
@@ -208,14 +249,24 @@ jobs:
         # One guarded condition, not two ored together: `&&` binds tighter than
         # `||`, so a two-clause version fires on any failure whatever the depth,
         # which is how a crash-looping pipeline dispatches itself all night.
-        if: ${{ failure() && fromJSON(github.event.inputs.depth || '0') < 3 }}
+        #
+        # Never on the 12:00 send job. Resuming means "restart the pipeline from
+        # the stage it stopped at", which is the right answer for a run that
+        # timed out mid-pipeline and a wrong one for a mail that failed to send:
+        # that job ran no stages, so resume-point.ts would pick up whatever the
+        # night before left and re-run it on a Monday morning.
+        if: >-
+          ${{ failure() && steps.dow.outputs.hour != '12'
+              && fromJSON(github.event.inputs.depth || '0') < 3 }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Monday's run includes the weekly-only stages; resuming it as daily
-          # would skip them permanently.
+          # Sunday's run includes the weekly-only stages; resuming it as daily
+          # would skip them permanently, and the digest would never be rendered
+          # for that week. 7 is Sunday under `date -u +%u`, matching the run
+          # steps above.
           SCOPE=""
-          if [ "${{ github.event.inputs.mode }}" = "daily" ] || [ "${{ steps.dow.outputs.day }}" != "1" ]; then
+          if [ "${{ github.event.inputs.mode }}" = "daily" ] || [ "${{ steps.dow.outputs.day }}" != "7" ]; then
             SCOPE="--daily"
           fi
           NEXT=$(npx tsx scripts/dev/resume-point.ts $SCOPE 2>/dev/null | tail -1)
@@ -272,14 +323,23 @@ jobs:
       # So they run last, on the companies the pipeline just scored, and weekly
       # rather than daily because portfolio and team pages change slowly. Both
       # are idempotent: re-running matches rather than duplicating.
+      #
+      # Sunday 22:00, with the digest render — the same run whose scoring they
+      # read. The hour is part of every condition because Monday 12:00 is the
+      # send job: a day-only test would fire these there, against a graph no
+      # pipeline had just refreshed, and skip the run they were written to
+      # follow.
       - name: VC portfolio scraping
         if: >-
           ${{ github.event.inputs.mode == 'portfolios'
-              || (github.event_name == 'schedule' && steps.dow.outputs.day == '1') }}
+              || (github.event_name == 'schedule'
+                  && steps.dow.outputs.hour == '22' && steps.dow.outputs.day == '7') }}
         run: npx tsx scripts/ingest-portfolios.ts
 
       - name: Fund team pages -> people + affiliations
-        if: ${{ github.event_name == 'schedule' && steps.dow.outputs.day == '1' }}
+        if: >-
+          ${{ github.event_name == 'schedule'
+              && steps.dow.outputs.hour == '22' && steps.dow.outputs.day == '7' }}
         run: npx tsx scripts/ingest-people.ts --funds
 
       # ACRA refreshes monthly, so a weekly pass is ample. It is a courtesy
@@ -288,5 +348,6 @@ jobs:
       - name: ACRA resolution -> sg_links
         if: >-
           ${{ github.event.inputs.mode == 'acra'
-              || (github.event_name == 'schedule' && steps.dow.outputs.day == '1') }}
+              || (github.event_name == 'schedule'
+                  && steps.dow.outputs.hour == '22' && steps.dow.outputs.day == '7') }}
         run: npx tsx scripts/ingest-acra.ts --limit 300
