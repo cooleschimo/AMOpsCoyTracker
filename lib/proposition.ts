@@ -17,6 +17,7 @@
  * Collapsing those would have EDB promising things that do not exist yet.
  */
 import { VALUE_PROPS, type ValueProp } from './valueprops';
+import { valuePropSectors } from './subsectors';
 import { callJson } from './llm';
 import { search } from './search-providers';
 import type { Budget } from './budget';
@@ -49,10 +50,17 @@ export type Precedent = { title: string; url: string; snippet: string };
  * has never touched Singapore still has a sector that has.
  */
 export async function findPrecedent(sectors: string[], engagement: string): Promise<Precedent[]> {
-  const sectorTerm = sectors.includes('biotech') ? 'biomedical'
-    : sectors.includes('defence_tech') ? 'aerospace defence'
-    : sectors.includes('deeptech') ? 'semiconductor'
-    : sectors.includes('ai') ? 'artificial intelligence'
+  /*
+   * Through the bridge, because these arrive as taxonomy ids. Tested directly,
+   * `includes('deeptech')` stopped matching the day companies started carrying
+   * `semiconductors` and `robotics`, and every company fell through to the bare
+   * 'technology' query — which returns vendor blogs, not precedent.
+   */
+  const vp = valuePropSectors(sectors);
+  const sectorTerm = vp.includes('biotech') ? 'biomedical'
+    : vp.includes('defence_tech') ? 'aerospace defence'
+    : vp.includes('deeptech') ? 'semiconductor'
+    : vp.includes('ai') ? 'artificial intelligence'
     : 'technology';
 
   /**
@@ -137,7 +145,9 @@ export type Proposition = {
  * repeated here because we need the objects, not the prompt text.
  */
 export function candidateProps(sectors: string[]): ValueProp[] {
-  const s = sectors ?? [];
+  // Same bridge, same reason: the menu is written in the value-prop vocabulary
+  // and a company arrives carrying taxonomy ids.
+  const s = valuePropSectors(sectors ?? []) as string[];
   return VALUE_PROPS.filter(
     (v) => v.sectors.some((x) => s.includes(x)) || v.sectors.includes('cross_sector'),
   );

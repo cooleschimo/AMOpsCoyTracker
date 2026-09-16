@@ -31,7 +31,7 @@ import { env } from '../lib/env';
 import {
   COMPANY_ASSESSMENT_SYSTEM, COMPANY_RUBRIC_VERSION, buildAssessmentPrompt, isBand,
 } from '../lib/company-rubric';
-import { isSector, isUsState } from '../lib/scope';
+import { isUsState } from '../lib/scope';
 import { CONTRIBUTION_DRIVERS } from '../lib/company-rubric';
 
 const arg = (n: string, d?: string) => {

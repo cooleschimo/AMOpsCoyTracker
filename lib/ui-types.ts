@@ -12,8 +12,19 @@ export type { Disposition, Reason as DismissReason } from './dispositions';
 export type { SignalType } from './rubric';
 export type { Source, EvidencePoint, Assessment, DashboardCompany } from './dashboard-data';
 
-/** The four sectors in scope. Brief §2. */
-export type Sector = 'deeptech' | 'biotech' | 'defence_tech' | 'ai';
+/**
+ * A sector id, as a component receives it.
+ *
+ * Deliberately a plain string rather than a union. The taxonomy has thirty-six
+ * values across two levels and lives in lib/subsectors.ts; restating it here
+ * would be a second copy to keep in step, which is exactly how this file came
+ * to declare the four tags the taxonomy had already replaced.
+ *
+ * Components resolve a value through `sectorBroadSector` / `sectorShort`, both
+ * of which fall back to the id itself, so an unrecognised value renders as
+ * itself rather than breaking the tag.
+ */
+export type Sector = string;
 
 /** Warm-path kinds. Brief §8, lib/paths.ts. */
 export const PATH_KINDS = ['person_role', 'fund_portfolio', 'company_edge', 'event'] as const;

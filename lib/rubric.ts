@@ -141,8 +141,8 @@ CRITICAL RULES:
 
 - SECTORS ARE GIVEN, NOT GUESSED. "Sectors on file" comes from a verified
   company record. Copy it. Measured on the first run, inferring sectors from
-  headlines put 'biotech' on a web-search company and added 'deeptech' to most
-  AI firms — the record is right and the inference is not.
+  headlines mislabelled a web-search company as a drug company and tagged most
+  AI firms as hardware — the record is right and the inference is not.
 
 - A JOB POSTING item (source is a job board) is scored like any other item: a
   posting located in Asia or with an APAC/international title is a decision

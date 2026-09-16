@@ -81,7 +81,7 @@ async function main() {
       const sectorsRaw = parsePipeList(r.sectors);
       const sectors = sectorsRaw.filter(isSector);
       for (const bad of sectorsRaw.filter((s) => !isSector(s))) {
-        issues.push({ row: rowNum, company: name, field: 'sectors', value: bad, note: 'not in SECTORS enum - dropped' });
+        issues.push({ row: rowNum, company: name, field: 'sectors', value: bad, note: 'not a known sector id - dropped' });
       }
       if (sectors.length === 0) {
         counts.rows_failed++;

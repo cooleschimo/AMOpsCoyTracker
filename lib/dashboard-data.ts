@@ -15,7 +15,7 @@ import { COMPANY_SIGNAL_VERSION } from './company-signal';
 import { planDigest, coverageLine, QUALIFY, type PlacementInput, type Placed } from './placement';
 import { assembleWhyNow, type WhyNowInput } from './why-now';
 import { candidateProps } from './proposition';
-import { sectorBroadSector, isBroadSector, isSurfaceable } from './subsectors';
+import { isSurfaceable, valuePropSectors } from './subsectors';
 import { isUsState } from './scope';
 import type { Band } from './company-rubric';
 import type { Familiarity } from './familiarity';
@@ -242,42 +242,6 @@ function whyPoints(
     source: sourcesByItem.get(p.itemId) ?? fallback,
     isNew: fetchedToday.has(p.itemId),
   }));
-}
-
-/**
- * Map the pipeline's subsectors onto the four `valueprops.ts` sectors.
- *
- * The two taxonomies diverged: companies now carry subsectors like
- * `ai_software` or `semiconductors`, which resolve to one of ten broad sectors,
- * while the value propositions are still written against deeptech / biotech /
- * defence_tech / ai. Without the bridge every company falls through to the
- * cross-sector props and gets the same generic offer.
- */
-function valuePropSectors(sectors: string[]): string[] {
-  const out = new Set<string>();
-  for (const s of sectors) {
-    const broad = sectorBroadSector(s) ?? (isBroadSector(s) ? s : undefined);
-    switch (broad) {
-      case 'ai':
-      case 'digital':
-        out.add('ai');
-        break;
-      case 'compute':
-      case 'industrial':
-      case 'aerospace':
-        out.add('deeptech');
-        break;
-      case 'health':
-        out.add('biotech');
-        break;
-      case 'defence':
-        out.add('defence_tech');
-        break;
-      default:
-        break;
-    }
-  }
-  return [...out];
 }
 
 type Row = Record<string, unknown>;

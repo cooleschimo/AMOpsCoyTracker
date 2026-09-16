@@ -1,17 +1,60 @@
 import { and, ne, sql } from 'drizzle-orm';
+import {
+  isSector as isCurrentSector,
+  isBroadSector as isCurrentBroadSector,
+} from './subsectors';
 
 /**
  * Scope definitions. Brief §2.
  *
- * AI is a cross-cutting TAG, not a category: an AI chip company is both
- * 'deeptech' and 'ai'. This is why companies.sectors is an array.
+ * The sector vocabulary lives in lib/subsectors.ts — ten broad sectors and
+ * twenty-six subsectors, grouped by what a company would need from Singapore.
+ * This file no longer declares one of its own.
  *
- * Adding a sector must be a config change plus new keyword sets — nothing
- * structural.
+ * What remains here is the LEGACY axis: the four tags — deeptech, biotech,
+ * defence_tech, ai — that the two-tier taxonomy replaced. They are kept for
+ * reading, not writing. Several hundred company rows and every row of
+ * data/companies.csv still carry them, and a validator that rejected them
+ * would drop those rows on import rather than migrate them.
+ *
+ * So `isSector` accepts BOTH vocabularies. Nothing in the pipeline should
+ * produce a legacy tag any more — classify-sectors.ts emits broad + subsector
+ * ids from lib/subsectors.ts, and that is the only thing that writes
+ * companies.sectors — but a value already on a row is still a value we have to
+ * read back without discarding it.
  */
 
-export const SECTORS = ['deeptech', 'biotech', 'defence_tech', 'ai'] as const;
-export type Sector = (typeof SECTORS)[number];
+/**
+ * The four tags the current taxonomy replaced.
+ *
+ * Kept so old rows survive a round trip and so `isLegacySector` can answer
+ * "does this company still need retagging" without a second list somewhere.
+ */
+export const LEGACY_SECTORS = ['deeptech', 'biotech', 'defence_tech', 'ai'] as const;
+export type LegacySector = (typeof LEGACY_SECTORS)[number];
+
+/**
+ * Where a legacy tag lands in the current taxonomy.
+ *
+ * A broad sector rather than a subsector, because that is genuinely all the old
+ * tag said: 'deeptech' covered semiconductors, robotics and launch vehicles
+ * alike, and inventing a subsector from it would be a guess dressed as a fact.
+ * classify-sectors.ts reads the description and picks the subsector properly;
+ * this is only for reading an unmigrated row.
+ *
+ * 'deeptech' has no single home — it spanned compute, industrial and aerospace
+ * — so it maps to `undefined` rather than to whichever of the three is
+ * commonest. A caller that needs a family for it has to say what it wants.
+ */
+export const LEGACY_SECTOR_BROAD: Record<LegacySector, string | undefined> = {
+  deeptech: undefined,
+  biotech: 'health',
+  defence_tech: 'defence',
+  ai: 'ai',
+};
+
+export const isLegacySector = (v: string): v is LegacySector =>
+  (LEGACY_SECTORS as readonly string[]).includes(v);
 
 export const HQ_REGIONS = [
   'bay_area',
@@ -86,7 +129,17 @@ const US_STATE_CODES = new Set([
 export const isUsState = (v: unknown): boolean =>
   typeof v === 'string' && US_STATE_CODES.has(v.trim().toUpperCase());
 
-export const isSector = (v: string): v is Sector => (SECTORS as readonly string[]).includes(v);
+/**
+ * Is this a sector value we can store?
+ *
+ * True for the current taxonomy and for the legacy four. Used by the CSV
+ * importer, which skips a row with no valid sector, and by the scorer, which
+ * filters the model's output — both would silently lose data on a narrower
+ * test. `isSector` from lib/subsectors.ts is the one to use when the question
+ * is specifically "is this a CURRENT subsector".
+ */
+export const isSector = (v: string): boolean =>
+  isCurrentSector(v) || isCurrentBroadSector(v) || isLegacySector(v);
 export const isHqRegion = (v: string): v is HqRegion => (HQ_REGIONS as readonly string[]).includes(v);
 export const isRoundStage = (v: string): v is RoundStage => (ROUND_STAGES as readonly string[]).includes(v);
 export const isExclusionReason = (v: string): v is ExclusionReason =>

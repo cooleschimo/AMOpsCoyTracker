@@ -12,27 +12,36 @@
  *                  than `companies` — a VC fund raising from its LPs is not a
  *                  company raising money. This is routing, not filtering.
  *
- *  'out_of_scope'  Confidently outside deeptech/biotech/defence_tech/ai. Hotels,
- *                  restaurants, retail, insurance. Persisted and labelled, since
- *                  DESIGN_RATIONALE §15.4 needs this set to answer "is the
- *                  filter wrong?" later.
+ *  'out_of_scope'  Confidently outside the taxonomy's technical families.
+ *                  Hotels, restaurants, retail, insurance. Persisted and
+ *                  labelled, since DESIGN_RATIONALE §15.4 needs this set to
+ *                  answer "is the filter wrong?" later.
  *
- *  'in_scope'      Either a direct sector match (Biotechnology is biotech) or a
+ *  'in_scope'      Either a direct sector match (Biotechnology is health) or a
  *                  generic technology bucket that needs assessment. `sectors`
  *                  carries the confident mapping; an empty array means the
  *                  company-level assessment (§7a) decides.
+ *
+ * A mapping here gives a BROAD sector only. An EDGAR industry group is a label
+ * the filer picked off a fixed list — 'Computers' covers a chip designer and a
+ * laptop reseller alike — and it does not carry enough to choose between
+ * twenty-six subsectors. classify-sectors.ts reads the description and picks
+ * the subsector; this only says which family to start in.
  *
  * The generic buckets are why an empty `sectors` matters. 'Other Technology' is
  * EDGAR's catch-all and holds both real targets (Standard Cognition — computer
  * vision) and non-targets (Bidbus — used-car auctions), so it resolves to
  * in_scope with no sectors and the assessment classifies it.
  */
-import type { Sector } from './scope';
+import type { BroadSectorId } from './subsectors';
 
 export type IndustryRouting = {
   disposition: 'organization' | 'out_of_scope' | 'in_scope';
-  /** Confident sector mapping. Empty = needs the company-level assessment. */
-  sectors: Sector[];
+  /**
+   * Confident BROAD sector mapping. Empty = needs the company-level assessment.
+   * Never a subsector: see the note above on what an industry group can carry.
+   */
+  sectors: BroadSectorId[];
   /** Why, for the audit trail. */
   reason: string;
 };
@@ -44,10 +53,15 @@ const M: Record<string, IndustryRouting> = {
   'Investment Banking':     { disposition: 'organization', sectors: [], reason: 'investment bank' },
 
   // ── Direct sector matches: EDGAR's label is our sector ──────────────────
-  'Biotechnology':  { disposition: 'in_scope', sectors: ['biotech'], reason: 'EDGAR Biotechnology = biotech' },
-  'Pharmaceuticals':{ disposition: 'in_scope', sectors: ['biotech'], reason: 'EDGAR Pharmaceuticals = biotech' },
-  'Computers':      { disposition: 'in_scope', sectors: ['deeptech'], reason: 'EDGAR Computers = deeptech; AI tag needs assessment' },
-  'Telecommunications': { disposition: 'in_scope', sectors: ['deeptech'], reason: 'EDGAR Telecommunications = deeptech' },
+  'Biotechnology':  { disposition: 'in_scope', sectors: ['health'], reason: 'EDGAR Biotechnology = health' },
+  'Pharmaceuticals':{ disposition: 'in_scope', sectors: ['health'], reason: 'EDGAR Pharmaceuticals = health' },
+  // 'Computers' spans chip designers, box shifters and SaaS. 'digital' is the
+  // family that holds the last of those and is the safest default; a hardware
+  // company lands there and gets moved to 'compute' once its description is
+  // classified, which is the mistake that costs an assessment rather than a
+  // company.
+  'Computers':      { disposition: 'in_scope', sectors: ['digital'], reason: 'EDGAR Computers = digital; hardware vs software needs assessment' },
+  'Telecommunications': { disposition: 'in_scope', sectors: ['digital'], reason: 'EDGAR Telecommunications = digital (networking)' },
 
   // ── In scope, but sector needs judgment ─────────────────────────────────
   // Manufacturing spans advanced manufacturing (in scope) and commodity
@@ -55,9 +69,9 @@ const M: Record<string, IndustryRouting> = {
   'Manufacturing':      { disposition: 'in_scope', sectors: [], reason: 'may be advanced manufacturing; needs assessment' },
   'Other Technology':   { disposition: 'in_scope', sectors: [], reason: "EDGAR's tech catch-all; needs assessment" },
   'Other Health Care':  { disposition: 'in_scope', sectors: [], reason: 'may be biotech/medtech; needs assessment' },
-  'Environmental Services': { disposition: 'in_scope', sectors: [], reason: 'may be climate deeptech; needs assessment' },
-  'Energy Conservation':{ disposition: 'in_scope', sectors: [], reason: 'may be energy deeptech; needs assessment' },
-  'Other Energy':       { disposition: 'in_scope', sectors: [], reason: 'may be energy deeptech; needs assessment' },
+  'Environmental Services': { disposition: 'in_scope', sectors: [], reason: 'may be climate/materials tech; needs assessment' },
+  'Energy Conservation':{ disposition: 'in_scope', sectors: [], reason: 'may be energy/materials tech; needs assessment' },
+  'Other Energy':       { disposition: 'in_scope', sectors: [], reason: 'may be energy/materials tech; needs assessment' },
   'Business Services':  { disposition: 'in_scope', sectors: [], reason: 'may be AI/software; needs assessment' },
   'Other':              { disposition: 'in_scope', sectors: [], reason: 'unlabelled; needs assessment' },
 

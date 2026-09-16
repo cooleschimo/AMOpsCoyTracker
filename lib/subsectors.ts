@@ -434,6 +434,64 @@ export const SEARCHABLE_SUBSECTORS = SECTOR_DEFS.filter((s) => (s.searchTerms?.l
  * two answers cannot drift: a subsector gains a query and leaves this set in
  * one edit.
  */
+/**
+ * The four sectors lib/valueprops.ts is written against.
+ *
+ * Not the old taxonomy resurrected. The value propositions are a SEPARATE axis
+ * — what Singapore can offer — and they are written in four families because
+ * that is how the offer actually divides: a semiconductor argument covers chips,
+ * robotics and launch alike. Mapping them onto twenty-six subsectors would be
+ * twenty-six copies of four arguments.
+ *
+ * `cross_sector` is not produced here; it is a property of a prop, not of a
+ * company.
+ */
+export type ValuePropSector = 'deeptech' | 'biotech' | 'defence_tech' | 'ai';
+
+/**
+ * A company's sectors, as lib/valueprops.ts names them.
+ *
+ * Lives here, beside the taxonomy, because it is the taxonomy that moves: a new
+ * broad sector has to gain a line in this switch or its companies silently fall
+ * through to the cross-sector props and get the generic offer. That failure is
+ * invisible — the digest still renders, with a blander proposition — which is
+ * why the mapping is one exported function rather than a test repeated at each
+ * call site.
+ *
+ * `commerce`, `finance` and `other` map to nothing on purpose. There is no
+ * Singapore deep-tech argument for a marketplace or a REIT, and inventing one
+ * would put a semiconductor pitch in front of a logistics company.
+ */
+export function valuePropSectors(sectors: readonly string[]): ValuePropSector[] {
+  const out = new Set<ValuePropSector>();
+  for (const s of sectors) {
+    const broad = sectorBroadSector(s) ?? (isBroadSector(s) ? s : undefined);
+    switch (broad) {
+      case 'ai':
+      case 'digital':
+        out.add('ai');
+        break;
+      case 'compute':
+      case 'industrial':
+      case 'aerospace':
+        out.add('deeptech');
+        break;
+      case 'health':
+        out.add('biotech');
+        break;
+      case 'defence':
+        out.add('defence_tech');
+        break;
+      default:
+        break;
+    }
+    // A row that never got retagged still carries the legacy tag itself, and it
+    // is already in this vocabulary. Read it rather than dropping it.
+    if (s === 'deeptech' || s === 'biotech' || s === 'defence_tech') out.add(s);
+  }
+  return [...out];
+}
+
 export const UNSURFACED_SUBSECTORS: ReadonlySet<string> = new Set(
   SECTOR_DEFS.filter((s) => !(s.searchTerms?.length ?? 0)).map((s) => s.id),
 );
