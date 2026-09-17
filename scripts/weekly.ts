@@ -36,6 +36,8 @@ import '../lib/loadenv';
 import { spawn } from 'node:child_process';
 
 import { STAGES, PHASE_WHAT, type Stage, type Cost, type Phase } from '../lib/stages';
+import { llmProviders } from '../lib/env';
+import { spentToday } from '../lib/budget-store';
 
 
 const argOf = (n: string, d?: string) => {
@@ -134,7 +136,45 @@ function run(stage: Stage, dry: boolean): Promise<{ ok: boolean; ms: number; not
   const startedAt = Date.now();
   let stoppedEarly: string | null = null;
 
+  /*
+   * Is there any LLM allowance left at all?
+   *
+   * Asked once, before the stages run, because the answer is the same for all
+   * of them: every key in the chain is shared, so when the last one is spent no
+   * LLM stage can do anything. Yesterday three of them found that out the
+   * expensive way — discover exited at 5.7m, sectors and rescue each spun until
+   * their timeout killed them, 68 minutes to produce nothing, and the run then
+   * failed as though something had gone wrong with the work.
+   *
+   * lib/llm.ts declines to gate per provider, and it is right to: a chain of
+   * twenty-two keys is exactly the thing that should try the next one. This is
+   * the level above, where "nothing to try" is knowable before a stage starts.
+   *
+   * Never throws. spentToday() already swallows its own errors, and a run that
+   * cannot read the table should attempt the work rather than refuse it.
+   */
+  const labels = llmProviders().map((p) => (p.label ?? p.name).toLowerCase());
+  const spent = new Set((await spentToday()).map(([label]) => label.toLowerCase()));
+  const live = labels.filter((l) => !spent.has(l));
+  const noAllowance = labels.length > 0 && live.length === 0;
+  if (noAllowance) {
+    console.log(`\nEvery LLM key is spent for today (${labels.length} in the chain).`);
+    console.log('LLM stages will be skipped rather than spend their timeouts failing.');
+    console.log('The allowance resets at the UTC day boundary.');
+  }
+
   for (const stage of stages) {
+    /*
+     * Skipped, and recorded as skipped. Not ok:true — the work did not happen
+     * and the summary must not imply it did — but not a failure either, or the
+     * job goes red for a quota that will reset on its own and the resume step
+     * dispatches a run that would find the same empty chain.
+     */
+    if (noAllowance && stage.cost === 'llm') {
+      console.log(`\n${'='.repeat(70)}\n${stage.name} [llm] — SKIPPED, no allowance\n${'='.repeat(70)}`);
+      results.push({ stage: stage.name, ok: true, ms: 0, note: 'skipped: no LLM allowance today' });
+      continue;
+    }
     const elapsedMin = (Date.now() - startedAt) / 60_000;
     if (deadlineMin > 0 && elapsedMin >= deadlineMin) {
       stoppedEarly = stage.name;
