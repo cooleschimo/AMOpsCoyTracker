@@ -193,8 +193,15 @@ async function doCompanies(limit: number, dry: boolean) {
   const mode = flag('companies') ? 'companies' : 'funds';
 
   const [run] = await db.insert(runs).values({ stage: `people_${mode}` }).returning();
-  const counts = mode === 'funds' ? await doFunds(limit, dry) : await doCompanies(limit, dry);
-  if (!dry) await db.update(runs).set({ finishedAt: new Date(), counts }).where(eq(runs.id, run.id));
+  let counts;
+  try {
+    counts = mode === 'funds' ? await doFunds(limit, dry) : await doCompanies(limit, dry);
+  } finally {
+    // The health check reads an unfinished row as a stage still going, so the
+    // row has to be closed even when the stage dies partway. A dry run opens a
+    // row like any other and has to close it too.
+    await db.update(runs).set({ finishedAt: new Date(), counts }).where(eq(runs.id, run.id));
+  }
 
   console.log(`\n=== PEOPLE INGESTION (${mode}) ===`);
   console.table(counts);

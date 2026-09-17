@@ -92,138 +92,144 @@ async function isSameCompany(
   const budget = await openBudget();
   const counts = { attempted: 0, resolved: 0, unresolved: 0, via_domain_guess: 0, via_search: 0, search_ambiguous: 0, search_rejected: 0, same_name_rejected: 0, via_context_search: 0 };
 
-  const resolveOne = async (c: any) => {
-    counts.attempted++;
-    // 1. Domain construction first: free, no external request beyond the
-    //    candidate fetch itself.
-    /*
-     * Everything known about what this company does, for the same-name check.
-     * Form D supplies an industry group; a news-discovered company has neither
-     * that nor a description, but it does have the sectors the classifier gave
-     * it and the headline that found it — which is what tells Aslan the
-     * defence-AI company from aslan.ai the Thai finance site.
-     */
-    const knownIndustry = [
-      (c.description ?? '').replace('Form D industry group: ', ''),
-      (c.sectors ?? []).join(' '),
-      c.scopeReason ?? '',
-    ].filter(Boolean).join(' ').trim() || null;
-    let r = await resolveWebsite(c.name, knownIndustry);
-    let searchNote = '';
+  try {
 
-    // 2. Fall back to web search, which returns mentions as well as the
-    //    company's own site - news, investor pages, directories. Those are
-    //    graph material in their own right (an investor host absent from
-    //    funds.ts).
-    if (!r) {
-      const research = await researchCompany(c.name);
-      if (research.looksAmbiguous) {
-        counts.search_ambiguous++;
-      } else if (research.website) {
-        /*
-         * A search hit is a candidate, not an answer. This used to assert
-         * `verified: true` on the search's own say-so, which is how AIR was
-         * recorded as air-burkina.com — the search path skipped the page check
-         * every guessed domain has to pass. Fetching it through tryDomain puts
-         * both routes behind the same bar.
-         */
-        const checked = await tryDomain(research.website.host, c.name);
-        if (checked?.verified) {
-          counts.via_search++;
-          searchNote = research.context.slice(0, 300);
-          r = { ...checked, verifyReason: `web search: ${research.website.why}; ${checked.verifyReason}` };
-        } else {
-          counts.search_rejected++;
-          console.log(`  ✗ ${c.name} -> ${research.website.host} rejected: ${checked?.verifyReason ?? 'page did not load'}`);
-          if (research.context) searchNote = research.context.slice(0, 400);
+    const resolveOne = async (c: any) => {
+      counts.attempted++;
+      // 1. Domain construction first: free, no external request beyond the
+      //    candidate fetch itself.
+      /*
+       * Everything known about what this company does, for the same-name check.
+       * Form D supplies an industry group; a news-discovered company has neither
+       * that nor a description, but it does have the sectors the classifier gave
+       * it and the headline that found it — which is what tells Aslan the
+       * defence-AI company from aslan.ai the Thai finance site.
+       */
+      const knownIndustry = [
+        (c.description ?? '').replace('Form D industry group: ', ''),
+        (c.sectors ?? []).join(' '),
+        c.scopeReason ?? '',
+      ].filter(Boolean).join(' ').trim() || null;
+      let r = await resolveWebsite(c.name, knownIndustry);
+      let searchNote = '';
+
+      // 2. Fall back to web search, which returns mentions as well as the
+      //    company's own site - news, investor pages, directories. Those are
+      //    graph material in their own right (an investor host absent from
+      //    funds.ts).
+      if (!r) {
+        const research = await researchCompany(c.name);
+        if (research.looksAmbiguous) {
+          counts.search_ambiguous++;
+        } else if (research.website) {
+          /*
+           * A search hit is a candidate, not an answer. This used to assert
+           * `verified: true` on the search's own say-so, which is how AIR was
+           * recorded as air-burkina.com — the search path skipped the page check
+           * every guessed domain has to pass. Fetching it through tryDomain puts
+           * both routes behind the same bar.
+           */
+          const checked = await tryDomain(research.website.host, c.name);
+          if (checked?.verified) {
+            counts.via_search++;
+            searchNote = research.context.slice(0, 300);
+            r = { ...checked, verifyReason: `web search: ${research.website.why}; ${checked.verifyReason}` };
+          } else {
+            counts.search_rejected++;
+            console.log(`  ✗ ${c.name} -> ${research.website.host} rejected: ${checked?.verifyReason ?? 'page did not load'}`);
+            if (research.context) searchNote = research.context.slice(0, 400);
+          }
+        } else if (research.context) {
+          // No website found, but real context exists. Record it: the assessment
+          // can use a description even without a domain.
+          searchNote = research.context.slice(0, 400);
         }
-      } else if (research.context) {
-        // No website found, but real context exists. Record it: the assessment
-        // can use a description even without a domain.
-        searchNote = research.context.slice(0, 400);
-      }
-      if (research.investorHosts.length) {
-        console.log(`      investors seen: ${research.investorHosts.map((h) => h.host).join(', ')}`);
-      }
-    } else counts.via_domain_guess++;
+        if (research.investorHosts.length) {
+          console.log(`      investors seen: ${research.investorHosts.map((h) => h.host).join(', ')}`);
+        }
+      } else counts.via_domain_guess++;
 
-    /*
-     * A one-word name that got past the stem check still has to be the right
-     * company. Keyword corroboration cannot settle these — "Finance ·
-     * Intelligence · Daily" on a Thai stock site reads as AI to any pattern
-     * loose enough to catch real AI companies — and 151 of the 272 companies
-     * needing a website have one-word names, so this is the common case rather
-     * than the edge.
-     */
-    /*
-     * A one-word name needs more than a domain that spells it.
-     *
-     * Domain guessing is right often enough to try first and free to run, but
-     * for a one-word name it only proves somebody owns the word: aslan.ai is a
-     * Thai finance site, kepler.org an African education charity. So the guess
-     * is treated as ONE candidate rather than the answer, and the sector — which
-     * is already known here — buys a second opinion from search before any model
-     * call is made. "Aslan defence software ai software" ranks
-     * aslanintelligence.com; the bare name never would, which is why the plain
-     * search in step 2 is no help for these.
-     *
-     * Sectors only, not the whole of `knownIndustry`. A search query is not a
-     * prompt: adding the discovering headline returned zero results, because a
-     * keyword index scores on every term and no page matches a sentence of prose.
-     *
-     * Candidates are then checked in order and the first that survives both the
-     * page check and the same-name check wins. Multi-word names skip all of
-     * this — matching every token of "Celera Semiconductor" is already
-     * distinctive.
-     */
-    const oneWord = !c.name.trim().includes(' ');
-    const searchContext = (c.sectors ?? []).join(' ');
-    if (oneWord && searchContext) {
-      const candidates: Array<{ host: string; why: string }> = [];
-      if (r) candidates.push({ host: r.domain, why: 'domain guess' });
-      for (const cand of await findCompanyWebsiteWithContext(c.name, searchContext)) {
-        if (!candidates.some((x) => x.host === cand.host)) candidates.push(cand);
+      /*
+       * A one-word name that got past the stem check still has to be the right
+       * company. Keyword corroboration cannot settle these — "Finance ·
+       * Intelligence · Daily" on a Thai stock site reads as AI to any pattern
+       * loose enough to catch real AI companies — and 151 of the 272 companies
+       * needing a website have one-word names, so this is the common case rather
+       * than the edge.
+       */
+      /*
+       * A one-word name needs more than a domain that spells it.
+       *
+       * Domain guessing is right often enough to try first and free to run, but
+       * for a one-word name it only proves somebody owns the word: aslan.ai is a
+       * Thai finance site, kepler.org an African education charity. So the guess
+       * is treated as ONE candidate rather than the answer, and the sector — which
+       * is already known here — buys a second opinion from search before any model
+       * call is made. "Aslan defence software ai software" ranks
+       * aslanintelligence.com; the bare name never would, which is why the plain
+       * search in step 2 is no help for these.
+       *
+       * Sectors only, not the whole of `knownIndustry`. A search query is not a
+       * prompt: adding the discovering headline returned zero results, because a
+       * keyword index scores on every term and no page matches a sentence of prose.
+       *
+       * Candidates are then checked in order and the first that survives both the
+       * page check and the same-name check wins. Multi-word names skip all of
+       * this — matching every token of "Celera Semiconductor" is already
+       * distinctive.
+       */
+      const oneWord = !c.name.trim().includes(' ');
+      const searchContext = (c.sectors ?? []).join(' ');
+      if (oneWord && searchContext) {
+        const candidates: Array<{ host: string; why: string }> = [];
+        if (r) candidates.push({ host: r.domain, why: 'domain guess' });
+        for (const cand of await findCompanyWebsiteWithContext(c.name, searchContext)) {
+          if (!candidates.some((x) => x.host === cand.host)) candidates.push(cand);
+        }
+
+        r = null;
+        for (const cand of candidates) {
+          const checked = await tryDomain(cand.host, c.name);
+          if (!checked?.verified) continue;
+          if (!(await isSameCompany(c.name, knownIndustry, checked, budget, counts)).ok) continue;
+          if (cand.why !== 'domain guess') counts.via_context_search++;
+          r = { ...checked, verifyReason: `${cand.why}; ${checked.verifyReason}` };
+          break;
+        }
       }
 
-      r = null;
-      for (const cand of candidates) {
-        const checked = await tryDomain(cand.host, c.name);
-        if (!checked?.verified) continue;
-        if (!(await isSameCompany(c.name, knownIndustry, checked, budget, counts)).ok) continue;
-        if (cand.why !== 'domain guess') counts.via_context_search++;
-        r = { ...checked, verifyReason: `${cand.why}; ${checked.verifyReason}` };
-        break;
+      if (r) {
+        counts.resolved++;
+        console.log(`  ✓ ${c.name} -> ${r.domain}`);
+        console.log(`      ${(r.description ?? r.title ?? '').slice(0, 100)}`);
+        if (!dry) {
+          // Store the site description so the assessment reads real copy rather
+          // than a bare name. The prefix keeps its provenance visible.
+          const blurb = [r.title, r.description].filter(Boolean).join(' — ').slice(0, 500);
+          await db.update(companies).set({
+            website: r.domain,
+            description: blurb ? `Website: ${blurb}` : undefined,
+          }).where(eq(companies.id, c.id));
+        }
+      } else {
+        counts.unresolved++;
+        console.log(`  ✗ ${c.name}${searchNote ? ' (context only, no site)' : ''}`);
+        if (searchNote && !dry) {
+          await db.update(companies)
+            .set({ description: `Web search: ${searchNote}` })
+            .where(eq(companies.id, c.id));
+        }
       }
-    }
+    };
 
-    if (r) {
-      counts.resolved++;
-      console.log(`  ✓ ${c.name} -> ${r.domain}`);
-      console.log(`      ${(r.description ?? r.title ?? '').slice(0, 100)}`);
-      if (!dry) {
-        // Store the site description so the assessment reads real copy rather
-        // than a bare name. The prefix keeps its provenance visible.
-        const blurb = [r.title, r.description].filter(Boolean).join(' — ').slice(0, 500);
-        await db.update(companies).set({
-          website: r.domain,
-          description: blurb ? `Website: ${blurb}` : undefined,
-        }).where(eq(companies.id, c.id));
-      }
-    } else {
-      counts.unresolved++;
-      console.log(`  ✗ ${c.name}${searchNote ? ' (context only, no site)' : ''}`);
-      if (searchNote && !dry) {
-        await db.update(companies)
-          .set({ description: `Web search: ${searchNote}` })
-          .where(eq(companies.id, c.id));
-      }
-    }
-  };
-
-  await pool(list, workers, resolveOne, () => budget.halted);
-
-  await budget.done();
-  if (!dry) await db.update(runs).set({ finishedAt: new Date(), counts }).where(eq(runs.id, run.id));
+    await pool(list, workers, resolveOne, () => budget.halted);
+  } finally {
+    // The health check reads an unfinished row as a stage still going, so the
+    // row has to be closed even when the stage dies partway. A dry run opens a
+    // row like any other and has to close it too.
+    await budget.done();
+    await db.update(runs).set({ finishedAt: new Date(), counts }).where(eq(runs.id, run.id));
+  }
   console.log('');
   console.table(counts);
 })();

@@ -217,190 +217,195 @@ type Assessment = {
   const counts = { batches: 0, batches_failed: 0, assessed: 0, sector_assigned: 0, no_sector: 0, unmatched: 0, vanished: 0 };
   const results: Array<Assessment & { id: number }> = [];
 
-  /*
-   * Batches run several at a time.
-   *
-   * Every limit is per KEY — lib/llm.ts throttles per key for the same reason —
-   * so twenty-two keys carry twenty-two separate RPM allowances, and running
-   * one batch at a time left twenty-one of them idle. A run that took three
-   * hours was waiting on rate limits it was not actually hitting.
-   *
-   * Kept well below the key count. Each worker walks the same chain in the same
-   * order, so more workers than keys would have them queueing behind the first
-   * few rather than spreading out, and a burst large enough to trip a provider
-   * costs more than it saves.
-   */
-  const batches: typeof targets[] = [];
-  for (let i = 0; i < targets.length; i += batchSize) batches.push(targets.slice(i, i + batchSize));
+  try {
 
-  const runBatch = async (batch: typeof targets) => {
-    // The standing judgment and what has been learned since. Each run revises
-    // rather than replaces, so a band moves on accumulated evidence and a quiet
-    // week leaves it where it was.
-    const priors = new Map<number, any>();
-    const evidence = new Map<number, string[]>();
-    for (const c of batch) {
-      const [p]: any = await sqlc`
-        select target_priority, singapore_fit, potential_contribution,
-               apac_footprint, prior_expansions, financial_health,
-               confidence, rationale, assessed_at
-        from company_assessments where company_id = ${c.id}
-        order by assessed_at desc limit 1`;
-      if (p) priors.set(c.id, p);
+    /*
+     * Batches run several at a time.
+     *
+     * Every limit is per KEY — lib/llm.ts throttles per key for the same reason —
+     * so twenty-two keys carry twenty-two separate RPM allowances, and running
+     * one batch at a time left twenty-one of them idle. A run that took three
+     * hours was waiting on rate limits it was not actually hitting.
+     *
+     * Kept well below the key count. Each worker walks the same chain in the same
+     * order, so more workers than keys would have them queueing behind the first
+     * few rather than spreading out, and a burst large enough to trip a provider
+     * costs more than it saves.
+     */
+    const batches: typeof targets[] = [];
+    for (let i = 0; i < targets.length; i += batchSize) batches.push(targets.slice(i, i + batchSize));
 
-      const sig: any = await sqlc`
-        select why, expansion, momentum, partnership, week_of
-        from company_signals where company_id = ${c.id}
-        order by week_of desc limit 4`;
-      const jobs: any = await sqlc`
-        select total_jobs, non_us_jobs, apac_jobs, snapshot_at
-        from job_snapshots where company_id = ${c.id}
-        order by snapshot_at desc limit 1`;
+    const runBatch = async (batch: typeof targets) => {
+      // The standing judgment and what has been learned since. Each run revises
+      // rather than replaces, so a band moves on accumulated evidence and a quiet
+      // week leaves it where it was.
+      const priors = new Map<number, any>();
+      const evidence = new Map<number, string[]>();
+      for (const c of batch) {
+        const [p]: any = await sqlc`
+          select target_priority, singapore_fit, potential_contribution,
+                 apac_footprint, prior_expansions, financial_health,
+                 confidence, rationale, assessed_at
+          from company_assessments where company_id = ${c.id}
+          order by assessed_at desc limit 1`;
+        if (p) priors.set(c.id, p);
 
-      const ev: string[] = [];
-      for (const x of sig) {
-        ev.push(`week of ${x.week_of}: expansion ${x.expansion}, momentum ${x.momentum}, partnership ${x.partnership} — ${String(x.why).split(' · ').join('; ')}`);
-      }
-      if (jobs[0]) {
-        ev.push(`hiring: ${jobs[0].total_jobs} open roles, ${jobs[0].non_us_jobs} outside the US, ${jobs[0].apac_jobs} in APAC`);
-      }
-      if (ev.length) evidence.set(c.id, ev);
-    }
+        const sig: any = await sqlc`
+          select why, expansion, momentum, partnership, week_of
+          from company_signals where company_id = ${c.id}
+          order by week_of desc limit 4`;
+        const jobs: any = await sqlc`
+          select total_jobs, non_us_jobs, apac_jobs, snapshot_at
+          from job_snapshots where company_id = ${c.id}
+          order by snapshot_at desc limit 1`;
 
-    const user = buildAssessmentPrompt(batch.map((c) => ({
-      name: c.name,
-      industry: (c.description ?? '').replace('Form D industry group: ', '') || null,
-      state: c.hqState, website: c.website,
-      prior: priors.get(c.id) ? {
-        targetPriority: priors.get(c.id).target_priority,
-        singaporeFit: priors.get(c.id).singapore_fit,
-        potentialContribution: priors.get(c.id).potential_contribution,
-        apacFootprint: priors.get(c.id).apac_footprint,
-        priorExpansions: priors.get(c.id).prior_expansions,
-        financialHealth: priors.get(c.id).financial_health,
-        confidence: priors.get(c.id).confidence,
-        rationale: priors.get(c.id).rationale,
-        assessedAt: priors.get(c.id).assessed_at ? new Date(priors.get(c.id).assessed_at) : null,
-      } : null,
-      evidence: evidence.get(c.id) ?? [],
-    })));
-
-    // Numbered by completion, not by position: with several workers the order
-    // is not the order the batches were taken in, and a number that implies one
-    // is worse than a count.
-    counts.batches++;
-    console.log(`  batch ${counts.batches}/${batches.length}: ${batch.length} companies...`);
-
-    const res = await callJson<{ assessments: Assessment[] }>({
-      system: COMPANY_ASSESSMENT_SYSTEM,
-      user,
-      model: env.groqModelScoring(),
-      budget,
-      temperature: 0.1,
-      schema: ASSESSMENT_SCHEMA,
-    });
-
-    if (!res.ok || !res.data?.assessments) {
-      // Logged and skipped; the other workers carry on.
-      counts.batches_failed++;
-      console.warn(`    FAILED: ${res.error}`);
-      return;
-    }
-
-    for (const a of res.data.assessments) {
-      // Match back by name; the model is told to echo it exactly.
-      const target = batch.find((c) => c.name === a.name)
-        ?? batch.find((c) => c.name.toLowerCase() === String(a.name ?? '').toLowerCase());
-      if (!target) { counts.unmatched++; continue; }
-
-      // Scope only. Sectors are classified by scripts/classify-sectors.ts
-      // against lib/subsectors.ts; an assessment that also wrote them would
-      // overwrite that taxonomy with whatever this prompt happened to return.
-      const inScope = (a as any).in_scope === true;
-      const bands = {
-        targetPriority: isBand(a.target_priority) ? a.target_priority : 'unknown',
-        singaporeFit: isBand(a.singapore_fit) ? a.singapore_fit : 'unknown',
-        potentialContribution: isBand(a.potential_contribution) ? a.potential_contribution : 'unknown',
-        // 'none' is a finding for footprint, distinct from 'unknown'.
-        apacFootprint: (isBand(a.apac_footprint) || a.apac_footprint === 'none') ? a.apac_footprint : 'unknown',
-        apacFootprintDetail: (a.apac_footprint_detail ?? '').slice(0, 200) || null,
-        priorExpansions: isBand(a.prior_expansions) ? a.prior_expansions : 'unknown',
-        priorExpansionsDetail: (a.prior_expansions_detail ?? '').slice(0, 200) || null,
-        financialHealth: isBand(a.financial_health) ? a.financial_health : 'unknown',
-        financialHealthDetail: (a.financial_health_detail ?? '').slice(0, 200) || null,
-        revisionNote: (a.revision_note ?? '').slice(0, 300) || null,
-        // Which dimensions drive the band. Constrained to the known set so the
-        // stats page can count them; anything else the model invents is dropped.
-        contributionDrivers: Array.isArray(a.contribution_drivers)
-          ? a.contribution_drivers
-              .filter((d): d is string => typeof d === 'string')
-              .filter((d) => CONTRIBUTION_DRIVERS.includes(d as never))
-              .slice(0, 2)
-          : [],
-        confidence: isBand(a.confidence) ? a.confidence : 'low',
-      };
-
-      results.push({ ...a, id: target.id, sectors: [] });
-      counts.assessed++;
-      if (inScope) counts.sector_assigned++; else counts.no_sector++;
-
-      if (!dry) {
-        /*
-         * Retried: Neon's HTTP endpoint drops a connection under load, and an
-         * unretried write ended a run at batch nine, losing every company after
-         * it. A dropped connection is not a reason to abandon the batch.
-         *
-         * A vanished company is not either. The target list is read once at
-         * startup and the run takes hours, so a merge or a cleanup elsewhere
-         * can delete a row this batch is still holding — the foreign key then
-         * fails the insert and, unguarded, killed the whole stage seventeen
-         * batches in. The company is gone; there is nothing to assess and
-         * nothing to fix, so it is counted and stepped over.
-         */
-        try {
-          await withRetry(() => db.insert(companyAssessments).values({
-            companyId: target.id, ...bands,
-            rationale: a.rationale ?? null,
-            priorityReason: a.priority_reason ?? null,
-            singaporeFitReason: a.singapore_fit_reason ?? null,
-            contributionReason: a.contribution_reason ?? null,
-            confidenceReason: a.confidence_reason ?? null,
-            model: res.model, rubricVersion: COMPANY_RUBRIC_VERSION,
-          }));
-        } catch (e) {
-          const msg = (e as Error).message ?? '';
-          if (!/foreign key|companies_id_fk/i.test(msg)) throw e;
-          counts.vanished++;
-          counts.assessed--;
-          console.warn(`    ${target.name} was deleted mid-run; skipped`);
-          continue;
+        const ev: string[] = [];
+        for (const x of sig) {
+          ev.push(`week of ${x.week_of}: expansion ${x.expansion}, momentum ${x.momentum}, partnership ${x.partnership} — ${String(x.why).split(' · ').join('; ')}`);
         }
-        // Out of scope is recorded; in scope leaves scope_status alone, since
-        // the sector itself is not this script's to write.
-        if (!inScope) {
-          await withRetry(() => db.update(companies)
-            .set({ scopeStatus: 'out_of_scope', scopeReason: `assessment ${COMPANY_RUBRIC_VERSION}: not in scope` })
-            .where(eq(companies.id, target.id)));
+        if (jobs[0]) {
+          ev.push(`hiring: ${jobs[0].total_jobs} open roles, ${jobs[0].non_us_jobs} outside the US, ${jobs[0].apac_jobs} in APAC`);
+        }
+        if (ev.length) evidence.set(c.id, ev);
+      }
+
+      const user = buildAssessmentPrompt(batch.map((c) => ({
+        name: c.name,
+        industry: (c.description ?? '').replace('Form D industry group: ', '') || null,
+        state: c.hqState, website: c.website,
+        prior: priors.get(c.id) ? {
+          targetPriority: priors.get(c.id).target_priority,
+          singaporeFit: priors.get(c.id).singapore_fit,
+          potentialContribution: priors.get(c.id).potential_contribution,
+          apacFootprint: priors.get(c.id).apac_footprint,
+          priorExpansions: priors.get(c.id).prior_expansions,
+          financialHealth: priors.get(c.id).financial_health,
+          confidence: priors.get(c.id).confidence,
+          rationale: priors.get(c.id).rationale,
+          assessedAt: priors.get(c.id).assessed_at ? new Date(priors.get(c.id).assessed_at) : null,
+        } : null,
+        evidence: evidence.get(c.id) ?? [],
+      })));
+
+      // Numbered by completion, not by position: with several workers the order
+      // is not the order the batches were taken in, and a number that implies one
+      // is worse than a count.
+      counts.batches++;
+      console.log(`  batch ${counts.batches}/${batches.length}: ${batch.length} companies...`);
+
+      const res = await callJson<{ assessments: Assessment[] }>({
+        system: COMPANY_ASSESSMENT_SYSTEM,
+        user,
+        model: env.groqModelScoring(),
+        budget,
+        temperature: 0.1,
+        schema: ASSESSMENT_SCHEMA,
+      });
+
+      if (!res.ok || !res.data?.assessments) {
+        // Logged and skipped; the other workers carry on.
+        counts.batches_failed++;
+        console.warn(`    FAILED: ${res.error}`);
+        return;
+      }
+
+      for (const a of res.data.assessments) {
+        // Match back by name; the model is told to echo it exactly.
+        const target = batch.find((c) => c.name === a.name)
+          ?? batch.find((c) => c.name.toLowerCase() === String(a.name ?? '').toLowerCase());
+        if (!target) { counts.unmatched++; continue; }
+
+        // Scope only. Sectors are classified by scripts/classify-sectors.ts
+        // against lib/subsectors.ts; an assessment that also wrote them would
+        // overwrite that taxonomy with whatever this prompt happened to return.
+        const inScope = (a as any).in_scope === true;
+        const bands = {
+          targetPriority: isBand(a.target_priority) ? a.target_priority : 'unknown',
+          singaporeFit: isBand(a.singapore_fit) ? a.singapore_fit : 'unknown',
+          potentialContribution: isBand(a.potential_contribution) ? a.potential_contribution : 'unknown',
+          // 'none' is a finding for footprint, distinct from 'unknown'.
+          apacFootprint: (isBand(a.apac_footprint) || a.apac_footprint === 'none') ? a.apac_footprint : 'unknown',
+          apacFootprintDetail: (a.apac_footprint_detail ?? '').slice(0, 200) || null,
+          priorExpansions: isBand(a.prior_expansions) ? a.prior_expansions : 'unknown',
+          priorExpansionsDetail: (a.prior_expansions_detail ?? '').slice(0, 200) || null,
+          financialHealth: isBand(a.financial_health) ? a.financial_health : 'unknown',
+          financialHealthDetail: (a.financial_health_detail ?? '').slice(0, 200) || null,
+          revisionNote: (a.revision_note ?? '').slice(0, 300) || null,
+          // Which dimensions drive the band. Constrained to the known set so the
+          // stats page can count them; anything else the model invents is dropped.
+          contributionDrivers: Array.isArray(a.contribution_drivers)
+            ? a.contribution_drivers
+                .filter((d): d is string => typeof d === 'string')
+                .filter((d) => CONTRIBUTION_DRIVERS.includes(d as never))
+                .slice(0, 2)
+            : [],
+          confidence: isBand(a.confidence) ? a.confidence : 'low',
+        };
+
+        results.push({ ...a, id: target.id, sectors: [] });
+        counts.assessed++;
+        if (inScope) counts.sector_assigned++; else counts.no_sector++;
+
+        if (!dry) {
+          /*
+           * Retried: Neon's HTTP endpoint drops a connection under load, and an
+           * unretried write ended a run at batch nine, losing every company after
+           * it. A dropped connection is not a reason to abandon the batch.
+           *
+           * A vanished company is not either. The target list is read once at
+           * startup and the run takes hours, so a merge or a cleanup elsewhere
+           * can delete a row this batch is still holding — the foreign key then
+           * fails the insert and, unguarded, killed the whole stage seventeen
+           * batches in. The company is gone; there is nothing to assess and
+           * nothing to fix, so it is counted and stepped over.
+           */
+          try {
+            await withRetry(() => db.insert(companyAssessments).values({
+              companyId: target.id, ...bands,
+              rationale: a.rationale ?? null,
+              priorityReason: a.priority_reason ?? null,
+              singaporeFitReason: a.singapore_fit_reason ?? null,
+              contributionReason: a.contribution_reason ?? null,
+              confidenceReason: a.confidence_reason ?? null,
+              model: res.model, rubricVersion: COMPANY_RUBRIC_VERSION,
+            }));
+          } catch (e) {
+            const msg = (e as Error).message ?? '';
+            if (!/foreign key|companies_id_fk/i.test(msg)) throw e;
+            counts.vanished++;
+            counts.assessed--;
+            console.warn(`    ${target.name} was deleted mid-run; skipped`);
+            continue;
+          }
+          // Out of scope is recorded; in scope leaves scope_status alone, since
+          // the sector itself is not this script's to write.
+          if (!inScope) {
+            await withRetry(() => db.update(companies)
+              .set({ scopeStatus: 'out_of_scope', scopeReason: `assessment ${COMPANY_RUBRIC_VERSION}: not in scope` })
+              .where(eq(companies.id, target.id)));
+          }
         }
       }
-    }
-  };
+    };
 
-  /*
-   * A fixed pool: each worker takes the next batch as it frees up, so a slow
-   * batch does not hold the others behind it the way a chunked split would.
-   */
-  let next = 0;
-  await Promise.all(Array.from({ length: Math.min(concurrency, batches.length) }, async () => {
-    for (;;) {
-      const mine = batches[next++];
-      if (!mine) return;
-      if (budget.halted) return;
-      await runBatch(mine);
-    }
-  }));
+    /*
+     * A fixed pool: each worker takes the next batch as it frees up, so a slow
+     * batch does not hold the others behind it the way a chunked split would.
+     */
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(concurrency, batches.length) }, async () => {
+      for (;;) {
+        const mine = batches[next++];
+        if (!mine) return;
+        if (budget.halted) return;
+        await runBatch(mine);
+      }
+    }));
 
-  if (!dry) {
+  } finally {
+    // The health check reads an unfinished row as a stage still going, so the
+    // row has to be closed even when the stage dies partway. A dry run opens a
+    // row like any other and has to close it too.
     await budget.done();
     await db.update(runs).set({
       finishedAt: new Date(), counts,

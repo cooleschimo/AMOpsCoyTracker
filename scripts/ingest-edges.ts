@@ -98,46 +98,51 @@ const BATCH = 12;
     written: 0,
   };
 
-  const runBatch = async (batch: typeof candidates) => {
-    counts.batches++;
-    const { edges, failed } = await extractEdges(batch, { budget });
-    if (failed) { counts.failed_batches++; return; }
-    counts.extracted += edges.length;
+  try {
 
-    for (const e of edges) {
-      const item = batch[e.n - 1];
-      if (!item) continue;
-      const a = byNorm.get(normalizeCompanyName(e.from));
-      const b = byNorm.get(normalizeCompanyName(e.to));
-      // Both sides must already be in the graph: an edge to a company nothing
-      // else tracks leads nowhere, which is what it means not to be a path.
-      if (!a || !b) { counts.unresolved_name++; continue; }
+    const runBatch = async (batch: typeof candidates) => {
+      counts.batches++;
+      const { edges, failed } = await extractEdges(batch, { budget });
+      if (failed) { counts.failed_batches++; return; }
+      counts.extracted += edges.length;
 
-      const canon = canonicalEdge(a, b, e.relation);
-      if (!canon) { counts.self_edge++; continue; }
+      for (const e of edges) {
+        const item = batch[e.n - 1];
+        if (!item) continue;
+        const a = byNorm.get(normalizeCompanyName(e.from));
+        const b = byNorm.get(normalizeCompanyName(e.to));
+        // Both sides must already be in the graph: an edge to a company nothing
+        // else tracks leads nowhere, which is what it means not to be a path.
+        if (!a || !b) { counts.unresolved_name++; continue; }
 
-      console.log(`  ${e.from} --${e.relation}--> ${e.to}${e.why ? `  (${e.why})` : ''}`);
-      if (dry) { counts.written++; continue; }
+        const canon = canonicalEdge(a, b, e.relation);
+        if (!canon) { counts.self_edge++; continue; }
 
-      await withRetry(() => db.insert(companyEdges).values({
-        ...canon,
-        relation: e.relation,
-        announcedDate: item.publishedAt ? item.publishedAt.slice(0, 10) : null,
-        source: 'news',
-        sourceUrl: item.url,
-      }).onConflictDoNothing({
-        target: [companyEdges.fromCompanyId, companyEdges.toCompanyId, companyEdges.relation],
-      }));
-      counts.written++;
-    }
-  };
+        console.log(`  ${e.from} --${e.relation}--> ${e.to}${e.why ? `  (${e.why})` : ''}`);
+        if (dry) { counts.written++; continue; }
 
-  await pool(batched(candidates, BATCH), workers, runBatch, () => budget.halted);
+        await withRetry(() => db.insert(companyEdges).values({
+          ...canon,
+          relation: e.relation,
+          announcedDate: item.publishedAt ? item.publishedAt.slice(0, 10) : null,
+          source: 'news',
+          sourceUrl: item.url,
+        }).onConflictDoNothing({
+          target: [companyEdges.fromCompanyId, companyEdges.toCompanyId, companyEdges.relation],
+        }));
+        counts.written++;
+      }
+    };
 
-  await db.update(runs).set({
-    finishedAt: new Date(), counts,
-    tokensIn: budget.tokensIn, tokensOut: budget.tokensOut,
-  }).where(eq(runs.id, run.id));
+    await pool(batched(candidates, BATCH), workers, runBatch, () => budget.halted);
+  } finally {
+    // The health check reads an unfinished row as a stage still going, so the
+    // row has to be closed even when the stage dies partway.
+    await db.update(runs).set({
+      finishedAt: new Date(), counts,
+      tokensIn: budget.tokensIn, tokensOut: budget.tokensOut,
+    }).where(eq(runs.id, run.id));
+  }
 
   console.log(`\ncounts: ${JSON.stringify(counts)}`);
   if (dry) console.log('DRY RUN — nothing written');

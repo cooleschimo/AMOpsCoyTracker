@@ -186,7 +186,10 @@ const arg = (n: string, d?: string) => {
     }
   }
 
-  if (!dry) await db.update(runs).set({ finishedAt: new Date(), counts }).where(eq(runs.id, run.id));
+  // The health check reads an unfinished row as a stage still going, so the
+  // row has to be closed whichever way the run ends. A dry run opens a row
+  // like any other and has to close it too.
+  await db.update(runs).set({ finishedAt: new Date(), counts }).where(eq(runs.id, run.id));
   console.log('\n=== PORTFOLIO INGESTION ===');
   console.table(counts);
   if (failures.length) {

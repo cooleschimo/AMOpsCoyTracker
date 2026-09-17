@@ -128,159 +128,165 @@ function parseHq(hq: string | null | undefined) {
     created: 0, below_floor: 0, on_guard_list: 0, already_exists: 0,
   };
 
-  /**
-   * Every candidate is confirmed by the model, including the ones the fundraise
-   * regex found. The regex reads the grammatical subject, which is usually the
-   * company and sometimes "Sources:", "Harvard Law dropout" or a private equity
-   * firm raising a fund. The model also returns the headquarters, which decides
-   * whether the company is in scope at all — and nothing else in this route
-   * knows where a company is.
-   */
-  if (found.length) {
-    const asItems = found.map((c) => ({ id: c.itemId, title: c.title, source: c.source }));
-    const byItem = new Map(found.map((c) => [c.itemId, c]));
-    const confirmed: NewsCandidate[] = [];
-    const confirmBatch = async (batch: typeof asItems) => {
-      const res = await callJson<{ results?: Array<{ id?: number; company?: string | null; hq?: string | null }> }>({
-        system: EXTRACT_SYSTEM, user: buildExtractPrompt(batch), budget,
-      });
-      if (!res.ok || !res.data?.results) {
-        // Unconfirmed rather than rejected: the regex found something real, and
-        // a model failure is not evidence against it.
-        for (const b of batch) { const c = byItem.get(b.id); if (c) confirmed.push(c); }
-        return;
-      }
-      for (const r of res.data.results) {
-        const c = typeof r.id === 'number' ? byItem.get(r.id) : undefined;
-        if (!c) continue;
-        const name = (r.company ?? '').trim();
-        if (!name || name.toLowerCase() === 'null') { counts.fundraise_rejected++; continue; }
-        // The prompt asks for a name rather than a category; this is what makes
-        // it so. "Defense startup" collected 88 stories about a dozen firms.
-        if (isCategoryName(name)) { counts.category_rejected++; continue; }
-        confirmed.push({ ...c, name, hq: (r.hq ?? '').trim() || null });
-      }
-    };
+  try {
 
-    await pool(batched(asItems, batchSize), workers, confirmBatch, () => budget.halted);
-    found.length = 0;
-    found.push(...confirmed);
-  }
+    /**
+     * Every candidate is confirmed by the model, including the ones the fundraise
+     * regex found. The regex reads the grammatical subject, which is usually the
+     * company and sometimes "Sources:", "Harvard Law dropout" or a private equity
+     * firm raising a fund. The model also returns the headquarters, which decides
+     * whether the company is in scope at all — and nothing else in this route
+     * knows where a company is.
+     */
+    if (found.length) {
+      const asItems = found.map((c) => ({ id: c.itemId, title: c.title, source: c.source }));
+      const byItem = new Map(found.map((c) => [c.itemId, c]));
+      const confirmed: NewsCandidate[] = [];
+      const confirmBatch = async (batch: typeof asItems) => {
+        const res = await callJson<{ results?: Array<{ id?: number; company?: string | null; hq?: string | null }> }>({
+          system: EXTRACT_SYSTEM, user: buildExtractPrompt(batch), budget,
+        });
+        if (!res.ok || !res.data?.results) {
+          // Unconfirmed rather than rejected: the regex found something real, and
+          // a model failure is not evidence against it.
+          for (const b of batch) { const c = byItem.get(b.id); if (c) confirmed.push(c); }
+          return;
+        }
+        for (const r of res.data.results) {
+          const c = typeof r.id === 'number' ? byItem.get(r.id) : undefined;
+          if (!c) continue;
+          const name = (r.company ?? '').trim();
+          if (!name || name.toLowerCase() === 'null') { counts.fundraise_rejected++; continue; }
+          // The prompt asks for a name rather than a category; this is what makes
+          // it so. "Defense startup" collected 88 stories about a dozen firms.
+          if (isCategoryName(name)) { counts.category_rejected++; continue; }
+          confirmed.push({ ...c, name, hq: (r.hq ?? '').trim() || null });
+        }
+      };
 
-  /**
-   * The other event types, read by the model. It answers with a company or
-   * null, and null is the common and correct answer — most headlines in a wire
-   * feed are about a market, a government or a person.
-   */
-  if (!noEvents) {
-    const events = eventCandidates(rows);
-    counts.event_headlines = events.length;
-    console.log(`${events.length} more are other events, read by the model\n`);
-
-    const eventBatch = async (batch: typeof events) => {
-      counts.event_batches++;
-      const res = await callJson<{ results?: Array<{ id?: number; company?: string | null; hq?: string | null; event?: string }> }>({
-        system: EXTRACT_SYSTEM,
-        user: buildExtractPrompt(batch.map((b) => ({ id: b.id, title: b.title, source: b.source }))),
-        budget,
-      });
-      if (!res.ok || !res.data?.results) { console.warn(`  batch ${counts.event_batches}: ${res.error ?? 'no results'}`); return; }
-
-      const byId = new Map(batch.map((b) => [b.id, b]));
-      for (const r of res.data.results) {
-        const it = typeof r.id === 'number' ? byId.get(r.id) : undefined;
-        if (!it) continue;
-        const name = (r.company ?? '').trim();
-        if (!name || name.toLowerCase() === 'null') { counts.event_rejected++; continue; }
-        if (isCategoryName(name)) { counts.category_rejected++; continue; }
-        if (knownSet.has(normalizeCompanyName(name))) continue;
-        counts.event_named++;
-        found.push({
-          name, round: null, amountUsd: null, valuationUsd: null,
-          hq: (r.hq ?? '').trim() || null,
-          itemId: it.id, title: it.title, source: it.source, url: it.url,
-        } as NewsCandidate);
-      }
-    };
-
-    await pool(batched(events, batchSize), workers, eventBatch, () => budget.halted);
-  }
-  console.log('');
-
-  for (const c of found) {
-    const norm = normalizeCompanyName(c.name);
-
-    // §4's guard table: stale references keep exited companies circulating, and
-    // a discovery route is exactly where they re-enter.
-    if (excludedSet.has(norm)) {
-      counts.on_guard_list++;
-      console.log(`  skip  ${c.name} — on the exclusion list`);
-      continue;
-    }
-    if (knownSet.has(norm)) { counts.already_exists++; continue; }
-    if (c.amountUsd !== null && c.amountUsd < minUsd) {
-      counts.below_floor++;
-      console.log(`  skip  ${c.name} — $${(c.amountUsd / 1e6).toFixed(1)}M is below the floor`);
-      continue;
+      await pool(batched(asItems, batchSize), workers, confirmBatch, () => budget.halted);
+      found.length = 0;
+      found.push(...confirmed);
     }
 
-    console.log(`  NEW   ${c.name.padEnd(24)} ${(c.round ?? 'round unstated').padEnd(15)}`
-      + `${c.amountUsd ? `$${(c.amountUsd / 1e6).toFixed(0)}M` : ''}`
-      + `${c.valuationUsd ? ` at $${(c.valuationUsd / 1e9).toFixed(1)}B` : ''}  [${c.source}]`);
+    /**
+     * The other event types, read by the model. It answers with a company or
+     * null, and null is the common and correct answer — most headlines in a wire
+     * feed are about a market, a government or a person.
+     */
+    if (!noEvents) {
+      const events = eventCandidates(rows);
+      counts.event_headlines = events.length;
+      console.log(`${events.length} more are other events, read by the model\n`);
 
-    if (!dry) {
-      const [created] = await withRetry(() => db.insert(companies).values({
-        name: c.name,
-        normalizedName: norm,
-        // Sectors are classified separately; nothing here knows them.
-        sectors: [],
-        roundStage: c.round,
-        roundAmountMusd: c.amountUsd ? Math.round(c.amountUsd / 1e6) : null,
-        // Millions, like the line above and like every other writer of this
-        // column. The headline parser yields dollars.
-        valuationEst: c.valuationUsd ? String(Math.round(c.valuationUsd / 1e6)) : null,
-        valuationSource: c.valuationUsd ? `${c.source}, ${c.title}`.slice(0, 300) : null,
-        ...parseHq(c.hq),
-        discoveredVia: 'news',
-        // Nothing has judged this company. 'unknown' is the honest value, and
-        // assess-companies picks it up from there.
-        scopeStatus: 'unknown',
-        scopeReason: `found in ${c.source}: ${c.title}`.slice(0, 300),
-      }).onConflictDoNothing({ target: companies.normalizedName })
-        .returning({ id: companies.id }));
+      const eventBatch = async (batch: typeof events) => {
+        counts.event_batches++;
+        const res = await callJson<{ results?: Array<{ id?: number; company?: string | null; hq?: string | null; event?: string }> }>({
+          system: EXTRACT_SYSTEM,
+          user: buildExtractPrompt(batch.map((b) => ({ id: b.id, title: b.title, source: b.source }))),
+          budget,
+        });
+        if (!res.ok || !res.data?.results) { console.warn(`  batch ${counts.event_batches}: ${res.error ?? 'no results'}`); return; }
 
-      // Attach the item that surfaced it, so the claim is checkable and the
-      // company arrives with its own why-now rather than an empty week.
-      if (created) {
-        await withRetry(() => db.update(items)
-          .set({ companyId: created.id, status: 'kept', droppedReason: 'discovered_company' })
-          .where(eq(items.id, c.itemId)));
-      }
+        const byId = new Map(batch.map((b) => [b.id, b]));
+        for (const r of res.data.results) {
+          const it = typeof r.id === 'number' ? byId.get(r.id) : undefined;
+          if (!it) continue;
+          const name = (r.company ?? '').trim();
+          if (!name || name.toLowerCase() === 'null') { counts.event_rejected++; continue; }
+          if (isCategoryName(name)) { counts.category_rejected++; continue; }
+          if (knownSet.has(normalizeCompanyName(name))) continue;
+          counts.event_named++;
+          found.push({
+            name, round: null, amountUsd: null, valuationUsd: null,
+            hq: (r.hq ?? '').trim() || null,
+            itemId: it.id, title: it.title, source: it.source, url: it.url,
+          } as NewsCandidate);
+        }
+      };
+
+      await pool(batched(events, batchSize), workers, eventBatch, () => budget.halted);
     }
-    knownSet.add(norm);
-    kept.push(c);
-    counts.created++;
+    console.log('');
+
+    for (const c of found) {
+      const norm = normalizeCompanyName(c.name);
+
+      // §4's guard table: stale references keep exited companies circulating, and
+      // a discovery route is exactly where they re-enter.
+      if (excludedSet.has(norm)) {
+        counts.on_guard_list++;
+        console.log(`  skip  ${c.name} — on the exclusion list`);
+        continue;
+      }
+      if (knownSet.has(norm)) { counts.already_exists++; continue; }
+      if (c.amountUsd !== null && c.amountUsd < minUsd) {
+        counts.below_floor++;
+        console.log(`  skip  ${c.name} — $${(c.amountUsd / 1e6).toFixed(1)}M is below the floor`);
+        continue;
+      }
+
+      console.log(`  NEW   ${c.name.padEnd(24)} ${(c.round ?? 'round unstated').padEnd(15)}`
+        + `${c.amountUsd ? `$${(c.amountUsd / 1e6).toFixed(0)}M` : ''}`
+        + `${c.valuationUsd ? ` at $${(c.valuationUsd / 1e9).toFixed(1)}B` : ''}  [${c.source}]`);
+
+      if (!dry) {
+        const [created] = await withRetry(() => db.insert(companies).values({
+          name: c.name,
+          normalizedName: norm,
+          // Sectors are classified separately; nothing here knows them.
+          sectors: [],
+          roundStage: c.round,
+          roundAmountMusd: c.amountUsd ? Math.round(c.amountUsd / 1e6) : null,
+          // Millions, like the line above and like every other writer of this
+          // column. The headline parser yields dollars.
+          valuationEst: c.valuationUsd ? String(Math.round(c.valuationUsd / 1e6)) : null,
+          valuationSource: c.valuationUsd ? `${c.source}, ${c.title}`.slice(0, 300) : null,
+          ...parseHq(c.hq),
+          discoveredVia: 'news',
+          // Nothing has judged this company. 'unknown' is the honest value, and
+          // assess-companies picks it up from there.
+          scopeStatus: 'unknown',
+          scopeReason: `found in ${c.source}: ${c.title}`.slice(0, 300),
+        }).onConflictDoNothing({ target: companies.normalizedName })
+          .returning({ id: companies.id }));
+
+        // Attach the item that surfaced it, so the claim is checkable and the
+        // company arrives with its own why-now rather than an empty week.
+        if (created) {
+          await withRetry(() => db.update(items)
+            .set({ companyId: created.id, status: 'kept', droppedReason: 'discovered_company' })
+            .where(eq(items.id, c.itemId)));
+        }
+      }
+      knownSet.add(norm);
+      kept.push(c);
+      counts.created++;
+    }
+
+    // The candidate list, written whether or not it was inserted, so a dry run
+    // leaves something to read rather than only something to scroll.
+    if (kept.length) {
+      const esc = (v: string) => `"${String(v ?? '').replace(/"/g, '""').replace(/\s+/g, ' ').trim()}"`;
+      writeFileSync(csvOut, ['name,hq,round,amount_usd,valuation_usd,source,headline,url']
+        .concat(kept.map((c) => [
+          esc(c.name), esc(c.hq ?? ''), c.round ?? '', c.amountUsd ?? '', c.valuationUsd ?? '',
+          esc(c.source), esc(c.title), esc(c.url),
+        ].join(',')))
+        .join('\n') + '\n');
+      console.log(`\nwrote ${csvOut}`);
+    }
+
+  } finally {
+    // The health check reads an unfinished row as a stage still going, so the
+    // row has to be closed even when the stage dies partway.
+    await budget.done();
+    await db.update(runs).set({
+      finishedAt: new Date(), counts,
+      tokensIn: budget.tokensIn, tokensOut: budget.tokensOut,
+    }).where(eq(runs.id, run.id));
   }
 
-  // The candidate list, written whether or not it was inserted, so a dry run
-  // leaves something to read rather than only something to scroll.
-  if (kept.length) {
-    const esc = (v: string) => `"${String(v ?? '').replace(/"/g, '""').replace(/\s+/g, ' ').trim()}"`;
-    writeFileSync(csvOut, ['name,hq,round,amount_usd,valuation_usd,source,headline,url']
-      .concat(kept.map((c) => [
-        esc(c.name), esc(c.hq ?? ''), c.round ?? '', c.amountUsd ?? '', c.valuationUsd ?? '',
-        esc(c.source), esc(c.title), esc(c.url),
-      ].join(',')))
-      .join('\n') + '\n');
-    console.log(`\nwrote ${csvOut}`);
-  }
-
-  await budget.done();
-
-  await db.update(runs).set({
-    finishedAt: new Date(), counts,
-    tokensIn: budget.tokensIn, tokensOut: budget.tokensOut,
-  }).where(eq(runs.id, run.id));
   console.log(`\ncounts: ${JSON.stringify(counts)}`);
   if (dry) console.log('DRY RUN — nothing written');
   else if (counts.created) console.log(`\n${counts.created} new companies. Assess them: npx tsx scripts/assess-companies.ts`);
