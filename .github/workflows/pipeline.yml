@@ -91,11 +91,21 @@ jobs:
       # fails every time the chain reaches it.
       # lib/budget.ts marks a key exhausted when its own cap reports, so a spent
       # one is skipped rather than retried.
-      # Names every key that is wired up below. A key absent from the chain is
-      # still appended after it, but naming them keeps the interleaving
-      # deliberate: the providers alternate so one provider's bad minute does
-      # not stall several calls in a row.
-      LLM_CHAIN: gemini,groq,openrouter,gemini2,groq2,openrouter2,gemini3,groq3,openrouter3,gemini4,groq4,openrouter4,gemini5,groq5,openrouter5,gemini6,groq6,openrouter6,groq7,openrouter7,groq8,openrouter8
+      # Ordered by what a key can actually do in a day, not by vendor.
+      #
+      # Each Groq key allows 1,000 requests and the funded OpenRouter account
+      # another 1,000; the seven free OpenRouter keys carry 50 each. Gemini
+      # allows 20 per key per day — six of them are 120 requests, against a
+      # chain that can do nearly 9,400 — and filter alone asks for 321 in one
+      # stage. Leading with them meant every stage opened by spending its first
+      # calls on keys that were empty before the stage was half done, then
+      # walking the 429s to reach the keys that could work.
+      #
+      # Groq and OpenRouter alternate so consecutive calls do not land on one
+      # vendor: a bad minute at either costs one call rather than a run of them.
+      # Gemini sits last, where 120 requests is a genuine reserve from a third
+      # vendor rather than a toll on every call.
+      LLM_CHAIN: groq,openrouter,groq2,openrouter2,groq3,openrouter3,groq4,openrouter4,groq5,openrouter5,groq6,openrouter6,groq7,openrouter7,groq8,openrouter8,gemini,gemini2,gemini3,gemini4,gemini5,gemini6
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
       GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}

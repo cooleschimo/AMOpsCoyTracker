@@ -70,7 +70,21 @@ export type LlmProvider = {
   label?: string;
 };
 
-export const DEFAULT_LLM_CHAIN = 'gemini,groq,gemini2,groq2,openrouter,gemini3,groq3,gemini4,groq4';
+/**
+ * The failover order when LLM_CHAIN is unset.
+ *
+ * Ordered by daily capacity rather than by vendor. A Groq key allows a
+ * thousand requests a day and the funded OpenRouter account another thousand,
+ * where a Gemini key allows twenty — so a chain that opens with Gemini spends
+ * the start of every stage on keys that empty before the stage does, and pays
+ * a 429 to learn it each time. Groq and OpenRouter alternate so one vendor's
+ * bad minute costs a single call; Gemini sits at the back as a reserve.
+ *
+ * Only the first few labels of each provider are named here, since this is the
+ * fallback for an environment that has not said what it wants. Anything keyed
+ * but unnamed is appended after, so a key is never silently dropped.
+ */
+export const DEFAULT_LLM_CHAIN = 'groq,openrouter,groq2,openrouter2,groq3,openrouter3,groq4,openrouter4,gemini,gemini2';
 
 type KeySlot = { apiKey: string; label: string };
 
