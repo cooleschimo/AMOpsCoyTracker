@@ -199,6 +199,28 @@ async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider)
           await sleep(waitMs);
           continue;
         }
+        /*
+         * A rejected key is not a spent key.
+         *
+         * 401, 403, and Gemini's 400 "Invalid Auth key." all mean the
+         * credential is wrong — revoked, mistyped, or from another project.
+         * Marked as capacity exhaustion it would be written to
+         * provider_exhaustion as though it had spent a daily cap, and the next
+         * run would start by skipping a key that is never coming back. That is
+         * how five stale CI secrets read as five keys that had merely run out
+         * for the day, every day.
+         *
+         * `transient` keeps it out of the exhaustion record. The call still
+         * moves to the next provider, and the key still fails every time it is
+         * tried — which is noisy, and the noise is the point: a dead key should
+         * look dead rather than look like a quota.
+         */
+        const badKey = res.status === 401 || res.status === 403
+          || (res.status === 400 && /invalid auth|api key not valid|invalid api key|unauthenticated/i.test(detail));
+        if (badKey) {
+          console.warn(`[llm] ${provider.label ?? provider.name}: credential rejected — check the key, not the quota`);
+          return { error: `HTTP ${res.status} bad credential: ${detail.slice(0, 200)}`, transient: true };
+        }
         return { error: `HTTP ${res.status}: ${detail.slice(0, 300)}` };
       }
 

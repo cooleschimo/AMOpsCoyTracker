@@ -149,6 +149,25 @@ jobs:
             exit 1
           fi
 
+          # How many keys actually arrived, per provider.
+          #
+          # The check above only asks whether ONE key of each family is set, so
+          # a secret set that has fallen behind the developer's .env passes it
+          # silently — and the run then spends its night failing on revoked
+          # credentials while the chain names keys that were never wired up.
+          # Counting is the cheapest way to make that visible in the log.
+          count() {
+            n=0
+            for v in "$@"; do [ -n "$v" ] && n=$((n + 1)); done
+            echo "$n"
+          }
+          G=$(count "$GEMINI_API_KEY" "$GEMINI_API_KEY_2" "$GEMINI_API_KEY_3" "$GEMINI_API_KEY_4" "$GEMINI_API_KEY_5")
+          Q=$(count "$GROQ_API_KEY" "$GROQ_API_KEY_2" "$GROQ_API_KEY_3" "$GROQ_API_KEY_4" "$GROQ_API_KEY_5")
+          R=$(count "$OPENROUTER_API_KEY" "$OPENROUTER_API_KEY_2" "$OPENROUTER_API_KEY_3" "$OPENROUTER_API_KEY_4" "$OPENROUTER_API_KEY_5")
+          echo "LLM keys wired up: gemini=$G groq=$Q openrouter=$R (total $((G + Q + R)))"
+          echo "LLM_CHAIN names: $(echo "$LLM_CHAIN" | tr ',' '\n' | grep -c .)"
+          echo "A chain naming more keys than are wired up will fail on the ones that are missing."
+
       # Two schedules land in this one workflow, so a scheduled run has to know
       # WHICH it is — and it cannot ask the clock. GitHub's scheduler runs late
       # under load, and not by minutes: the 22:00 cron fired at 00:00 on the
