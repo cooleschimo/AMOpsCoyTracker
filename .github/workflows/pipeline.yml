@@ -91,18 +91,26 @@ jobs:
       # fails every time the chain reaches it.
       # lib/budget.ts marks a key exhausted when its own cap reports, so a spent
       # one is skipped rather than retried.
-      LLM_CHAIN: gemini,groq,openrouter,gemini2,groq2,openrouter2,gemini3,groq3,openrouter3,gemini4,groq4,openrouter4,groq5,openrouter5
+      # Names every key that is wired up below. A key absent from the chain is
+      # still appended after it, but naming them keeps the interleaving
+      # deliberate: the providers alternate so one provider's bad minute does
+      # not stall several calls in a row.
+      LLM_CHAIN: gemini,groq,openrouter,gemini2,groq2,openrouter2,gemini3,groq3,openrouter3,gemini4,groq4,openrouter4,gemini5,groq5,openrouter5,gemini6,groq6,openrouter6,groq7,openrouter7,groq8,openrouter8
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
       GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
       GEMINI_API_KEY_4: ${{ secrets.GEMINI_API_KEY_4 }}
       GEMINI_API_KEY_5: ${{ secrets.GEMINI_API_KEY_5 }}
+      GEMINI_API_KEY_6: ${{ secrets.GEMINI_API_KEY_6 }}
       GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.6-flash' }}
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
       GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
       GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
       GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
+      GROQ_API_KEY_6: ${{ secrets.GROQ_API_KEY_6 }}
+      GROQ_API_KEY_7: ${{ secrets.GROQ_API_KEY_7 }}
+      GROQ_API_KEY_8: ${{ secrets.GROQ_API_KEY_8 }}
       GROQ_MODEL_SCORING: ${{ vars.GROQ_MODEL_SCORING || 'openai/gpt-oss-120b' }}
       GROQ_MODEL_DRAFTING: ${{ vars.GROQ_MODEL_DRAFTING || 'openai/gpt-oss-120b' }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -110,6 +118,9 @@ jobs:
       OPENROUTER_API_KEY_3: ${{ secrets.OPENROUTER_API_KEY_3 }}
       OPENROUTER_API_KEY_4: ${{ secrets.OPENROUTER_API_KEY_4 }}
       OPENROUTER_API_KEY_5: ${{ secrets.OPENROUTER_API_KEY_5 }}
+      OPENROUTER_API_KEY_6: ${{ secrets.OPENROUTER_API_KEY_6 }}
+      OPENROUTER_API_KEY_7: ${{ secrets.OPENROUTER_API_KEY_7 }}
+      OPENROUTER_API_KEY_8: ${{ secrets.OPENROUTER_API_KEY_8 }}
       OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'openrouter/free' }}
       # The one funded key uses a paid model; see lib/env.ts for why the free
       # alias left its balance untouched.
@@ -161,9 +172,9 @@ jobs:
             for v in "$@"; do [ -n "$v" ] && n=$((n + 1)); done
             echo "$n"
           }
-          G=$(count "$GEMINI_API_KEY" "$GEMINI_API_KEY_2" "$GEMINI_API_KEY_3" "$GEMINI_API_KEY_4" "$GEMINI_API_KEY_5")
-          Q=$(count "$GROQ_API_KEY" "$GROQ_API_KEY_2" "$GROQ_API_KEY_3" "$GROQ_API_KEY_4" "$GROQ_API_KEY_5")
-          R=$(count "$OPENROUTER_API_KEY" "$OPENROUTER_API_KEY_2" "$OPENROUTER_API_KEY_3" "$OPENROUTER_API_KEY_4" "$OPENROUTER_API_KEY_5")
+          G=$(count "$GEMINI_API_KEY" "$GEMINI_API_KEY_2" "$GEMINI_API_KEY_3" "$GEMINI_API_KEY_4" "$GEMINI_API_KEY_5" "$GEMINI_API_KEY_6")
+          Q=$(count "$GROQ_API_KEY" "$GROQ_API_KEY_2" "$GROQ_API_KEY_3" "$GROQ_API_KEY_4" "$GROQ_API_KEY_5" "$GROQ_API_KEY_6" "$GROQ_API_KEY_7" "$GROQ_API_KEY_8")
+          R=$(count "$OPENROUTER_API_KEY" "$OPENROUTER_API_KEY_2" "$OPENROUTER_API_KEY_3" "$OPENROUTER_API_KEY_4" "$OPENROUTER_API_KEY_5" "$OPENROUTER_API_KEY_6" "$OPENROUTER_API_KEY_7" "$OPENROUTER_API_KEY_8")
           echo "LLM keys wired up: gemini=$G groq=$Q openrouter=$R (total $((G + Q + R)))"
           echo "LLM_CHAIN names: $(echo "$LLM_CHAIN" | tr ',' '\n' | grep -c .)"
           echo "A chain naming more keys than are wired up will fail on the ones that are missing."
