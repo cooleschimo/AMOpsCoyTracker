@@ -72,13 +72,31 @@ type Problem = { severity: 'error' | 'warn'; what: string };
     });
   }
 
+  const live = llmProviders().length - (spent as any[]).length;
+
   const done = new Set((finishedToday as any[]).map((r) => String(r.stage)));
   const wanted = daily ? STAGES.filter((s) => !s.weeklyOnly) : STAGES;
   const missing = wanted.filter((s) => !done.has(s.runStage)).map((s) => s.name);
   if (missing.length) {
+    /*
+     * Counting the missing stages says how much did not happen, not whether
+     * anything is broken. A run that spends its allowance and skips the rest
+     * leaves twelve stages missing and is working as designed — the backlog is
+     * capped per stage and the next run picks it up. Calling that an error
+     * turns the schedule red every morning for a quota that resets on its own,
+     * and a red that means nothing is a red nobody reads.
+     *
+     * So the count decides the severity only while there is allowance left to
+     * have used. With none, the missing stages are the symptom and the spent
+     * chain below is the cause.
+     */
+    const llmMissing = missing.length && wanted
+      .filter((s) => missing.includes(s.name))
+      .every((s) => s.cost === 'llm');
     problems.push({
-      severity: missing.length > 3 ? 'error' : 'warn',
-      what: `${missing.length} stage${missing.length === 1 ? '' : 's'} have not run today: ${missing.join(', ')}`,
+      severity: missing.length > 3 && !(live === 0 && llmMissing) ? 'error' : 'warn',
+      what: `${missing.length} stage${missing.length === 1 ? '' : 's'} have not run today: ${missing.join(', ')}`
+        + (live === 0 && llmMissing ? ' — every LLM key was spent before the run started' : ''),
     });
   }
 
@@ -89,7 +107,6 @@ type Problem = { severity: 'error' | 'warn'; what: string };
     });
   }
 
-  const live = llmProviders().length - (spent as any[]).length;
   if (live === 0) {
     problems.push({
       severity: 'warn',

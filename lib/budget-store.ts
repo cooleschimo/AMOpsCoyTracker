@@ -11,9 +11,13 @@
  * Gemini's twenty requests, OpenRouter's fifty, Groq's token allowance — and
  * they reset at UTC midnight, so a row is stamped with the UTC day it was
  * learned on and only that day's rows are read back. A key spent yesterday is
- * simply not returned today; nothing has to clear it, and a run that starts at
- * 23:59 and ends at 00:01 reads the day it started, which is the day whose
- * allowance it was spending.
+ * simply not returned today; nothing has to clear it.
+ *
+ * A run that crosses midnight stamps its rows with the day it STARTED, which is
+ * the day whose allowance it was spending. The day is fixed when the budget
+ * opens and carried through to the write — asking the clock again at write time
+ * files the evening's exhaustion under tomorrow, and tomorrow then starts with
+ * a chain it believes is already spent and skips every LLM stage.
  *
  * Old rows are deleted opportunistically rather than on a schedule: the table
  * is tiny, and a cleanup that only happens when something is already writing
@@ -60,11 +64,10 @@ export async function spentToday(): Promise<Array<[string, string]>> {
  * Also never throws. Failing to write it costs the next run some 429s; failing
  * the run over it would cost the whole stage.
  */
-export async function recordSpent(spent: Array<[string, string]>): Promise<void> {
+export async function recordSpent(spent: Array<[string, string]>, day = capDay()): Promise<void> {
   try {
     await ensureTable();
     const sql = getSql();
-    const day = capDay();
     for (const [provider, reason] of spent) {
       await sql`
         insert into provider_exhaustion (provider, cap_day, reason)
@@ -88,8 +91,9 @@ export async function recordSpent(spent: Array<[string, string]>): Promise<void>
  */
 export async function openBudget(priorTokensToday = 0) {
   const { Budget } = await import('./budget');
+  const day = capDay();
   const budget = new Budget(priorTokensToday, await spentToday());
   return Object.assign(budget, {
-    done: () => recordSpent(budget.spentProviders()),
+    done: () => recordSpent(budget.spentProviders(), day),
   });
 }
