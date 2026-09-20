@@ -170,8 +170,21 @@ async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider)
             exhausted: true,
           };
         }
+        /*
+         * The header is capped like the computed backoff is.
+         *
+         * Retry-After is the provider's number, and on a daily cap it is the
+         * seconds until UTC midnight — twenty-two hours, inside a setTimeout,
+         * in a worker the pool cannot interrupt because `stop` is only read
+         * between items. The job is killed at six hours with that worker still
+         * asleep, and the stage neither errors nor finishes; it just runs a
+         * quarter short for the rest of the night. Waiting a minute and moving
+         * down the chain is what the chain is for.
+         */
         const ra = Number(res.headers.get('retry-after'));
-        const waitMs = Number.isFinite(ra) && ra > 0 ? ra * 1000 : Math.min(60_000, 2 ** attempt * 2_000);
+        const waitMs = Number.isFinite(ra) && ra > 0
+          ? Math.min(60_000, ra * 1000)
+          : Math.min(60_000, 2 ** attempt * 2_000);
         console.warn(`[llm] ${provider.label ?? provider.name} 429 (attempt ${attempt + 1}/${maxRetries + 1}); backing off ${Math.round(waitMs / 1000)}s`);
         await sleep(waitMs);
         continue;

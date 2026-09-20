@@ -237,7 +237,14 @@ jobs:
           # fire by accident — and everything else is the pipeline. Monday from
           # 12:00 UTC to the end of the day, on the real clock rather than the
           # shifted one: a send is never something yesterday was owed.
-          if [ "$DAY" = "1" ] && [ "$H" -ge 12 ]; then
+          # The window ends before the 22:00 pipeline slot. Monday from 12:00
+          # to the end of the day also covers the night's own cron, and a
+          # Monday 22:00 run was reading as a send: the pipeline steps skipped,
+          # Form D skipped, and the health check is guarded `kind != send` so
+          # nothing reported it. One night in seven did no work and said so
+          # nowhere. The send fires at 12:00 and a late one is still a send;
+          # 20:00 is past any plausible lag and clear of the pipeline.
+          if [ "$DAY" = "1" ] && [ "$H" -ge 12 ] && [ "$H" -lt 20 ]; then
             KIND=send
           else
             KIND=pipeline
