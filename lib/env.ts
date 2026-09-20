@@ -207,6 +207,19 @@ export function llmProviders(): LlmProvider[] {
         if (labelOf(p) === want && !picked.includes(p)) picked.push(p);
       }
     }
+    /*
+     * A label named in the chain with no key behind it is said out loud.
+     *
+     * Dropping it silently made the stated order partly fiction: unsetting
+     * GROQ_API_KEY_7 removes groq7 from the chain and the only symptom is a
+     * quieter run. The workflow counts the keys that arrived; this names the
+     * ones that were asked for and did not.
+     */
+    const absent = order.filter((want) => !withKeys.some((p) => labelOf(p) === want));
+    if (absent.length) {
+      console.warn(`[env] LLM_CHAIN names ${absent.length} key${absent.length === 1 ? '' : 's'} `
+        + `with nothing wired up: ${absent.join(', ')}`);
+    }
     const leftover = withKeys.filter((p) => !picked.includes(p));
     return [...picked, ...leftover];
   };

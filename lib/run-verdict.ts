@@ -55,12 +55,18 @@ const RANK: Record<Verdict, number> = {
  * Exit is the maximum over everything found, so a warn-level verdict still
  * reds the run when something else did. That is the guarantee severity-first
  * was reaching for, without letting it choose the name.
+ *
+ * Severity still breaks ties WITHIN a category, because two findings can share
+ * one and only the louder explains the exit: a feed that has been down for
+ * days and seventeen stages that did not run are both `broken`, and naming the
+ * feed leaves the morning reading a warning where the error was.
  */
 export function worst(found: VerdictReason[]): VerdictReason {
   if (!found.length) {
     return { verdict: 'healthy', what: 'every stage ran', code: 'healthy', exit: 0 };
   }
-  const named = [...found].sort((a, b) => RANK[a.verdict] - RANK[b.verdict])[0];
+  const named = [...found].sort((a, b) =>
+    (RANK[a.verdict] - RANK[b.verdict]) || (b.exit - a.exit))[0];
   const exit = found.some((f) => f.exit === 1) ? 1 : 0;
   return { ...named, exit };
 }

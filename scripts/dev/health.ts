@@ -42,9 +42,18 @@ type Problem = { severity: 'error' | 'warn'; what: string; verdict?: Verdict; co
         from runs where finished_at is null
           and started_at < now() - make_interval(mins => ${STRANDED_MIN})
         order by started_at`,
+    /*
+     * Eighteen hours, matching resume-point.ts.
+     *
+     * The window has to be long enough to hold a run that started at 22:00 and
+     * its resumes, and short enough that last night's stages are never counted
+     * as tonight's. Twenty reached back far enough that a health check running
+     * at the end of a six-hour night could see the PREVIOUS run's rows and
+     * report every stage as having run on a night when none of them did.
+     */
     sql`select distinct stage from runs
         where finished_at is not null and error is null
-          and started_at > now() - interval '20 hours'`,
+          and started_at > now() - interval '18 hours'`,
     sql`select count(*)::int c from items where status = 'fetched'`,
     sql`select count(distinct c.id)::int c from companies c
         join items i on i.company_id = c.id and i.status = 'kept'
