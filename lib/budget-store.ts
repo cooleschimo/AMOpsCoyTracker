@@ -42,6 +42,60 @@ async function ensureTable() {
 }
 
 /**
+ * A key that was rejected rather than spent.
+ *
+ * Kept apart from provider_exhaustion on purpose. That table is stamped with a
+ * cap day because the caps reset; a revoked key does not reset, and filing it
+ * there would both clear it at midnight and tell the next run to skip a key it
+ * should be shouting about. lib/llm.ts marks the call `transient` for the same
+ * reason — but transient meant nothing survived the process, so a dead key was
+ * visible only as a warning in a log nobody reads until the morning.
+ *
+ * `noted_at` is refreshed on conflict: what matters is whether the key is still
+ * being rejected, not when it first was.
+ */
+async function ensureRejectedTable() {
+  const sql = getSql();
+  await sql`
+    create table if not exists provider_rejected (
+      provider text primary key,
+      reason text,
+      noted_at timestamptz default now())`;
+}
+
+/** Record a credential the provider refused. Never throws; this is a report, not a gate. */
+export async function recordRejected(provider: string, reason: string): Promise<void> {
+  try {
+    await ensureRejectedTable();
+    await getSql()`
+      insert into provider_rejected (provider, reason)
+      values (${provider}, ${reason.slice(0, 200)})
+      on conflict (provider) do update set reason = excluded.reason, noted_at = now()`;
+  } catch { /* a report, not a requirement */ }
+}
+
+/** A key that answered again is no longer rejected. */
+export async function clearRejected(provider: string): Promise<void> {
+  try {
+    await ensureRejectedTable();
+    await getSql()`delete from provider_rejected where provider = ${provider}`;
+  } catch { /* as above */ }
+}
+
+/** Keys currently being refused, newest first. Never throws. */
+export async function rejectedKeys(): Promise<Array<[string, string]>> {
+  try {
+    await ensureRejectedTable();
+    const rows: any = await getSql()`
+      select provider, reason from provider_rejected
+      where noted_at > now() - interval '36 hours' order by noted_at desc`;
+    return rows.map((r: any) => [String(r.provider), String(r.reason ?? 'credential rejected')]);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Keys already known spent today, as Budget's constructor wants them.
  *
  * Never throws: this is an optimisation, and a run that cannot read it should

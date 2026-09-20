@@ -34,6 +34,7 @@
  */
 import '../lib/loadenv';
 import { spawn } from 'node:child_process';
+import { appendFileSync } from 'node:fs';
 
 import { STAGES, PHASE_WHAT, type Stage, type Cost, type Phase } from '../lib/stages';
 import { llmProviders } from '../lib/env';
@@ -262,11 +263,32 @@ function run(stage: Stage, dry: boolean): Promise<{ ok: boolean; ms: number; not
     console.log('Usually the daily LLM allowance: every provider spent before the run started.');
   }
 
+  /*
+   * What kind of night this was, for the step that reads it.
+   *
+   * The exit code cannot carry this: it has two values and three meanings —
+   * stopped at the deadline, genuinely failed, and did what it could afford.
+   * The first two both exit 1 and want opposite responses, so the category goes
+   * out beside the code rather than encoded in it.
+   */
+  const say = (verdict: string, code: string) => {
+    if (process.env.GITHUB_OUTPUT) {
+      appendFileSync(process.env.GITHUB_OUTPUT, `verdict=${verdict}\ncode=${code}\n`);
+    }
+    console.log(`\n  verdict: ${verdict} (${code})`);
+  };
+
   if (stoppedEarly) {
     console.log(`\nStopped at the deadline. Next stage: ${stoppedEarly}`);
+    say('deadline', 'deadline-stop');
     // Non-zero on purpose: a job that ends 0 concludes `success` and the
     // re-dispatch step never fires.
     process.exit(1);
   }
-  process.exit(failed.length || barren.length ? 1 : 0);
+  if (failed.length || barren.length) {
+    say('broken', failed.length ? 'stage-failed' : 'stage-barren');
+    process.exit(1);
+  }
+  say(noAllowance ? 'partial' : 'healthy', noAllowance ? 'allowance-exhausted' : 'healthy');
+  process.exit(0);
 })();

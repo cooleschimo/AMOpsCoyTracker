@@ -18,16 +18,18 @@
  * Usage: npx tsx scripts/dev/health.ts [--daily] [--quiet]
  */
 process.env.DOTENV_CONFIG_QUIET = 'true';
+import { appendFileSync } from 'node:fs';
 import '../../lib/loadenv';
 import { getSql } from '../../lib/db';
 import { STAGES } from '../../lib/stages';
-import { spentToday } from '../../lib/budget-store';
+import { spentToday, rejectedKeys } from '../../lib/budget-store';
 import { llmProviders } from '../../lib/env';
+import { worst, type Verdict, type VerdictReason } from '../../lib/run-verdict';
 
 /** Longer than the longest stage budget, so a slow run is not called dead. */
 const STRANDED_MIN = 120;
 
-type Problem = { severity: 'error' | 'warn'; what: string };
+type Problem = { severity: 'error' | 'warn'; what: string; verdict?: Verdict; code?: string };
 
 (async () => {
   const sql = getSql();
@@ -35,7 +37,7 @@ type Problem = { severity: 'error' | 'warn'; what: string };
   const quiet = process.argv.includes('--quiet');
   const problems: Problem[] = [];
 
-  const [stranded, finishedToday, [queue], [toScore], [toAssess], spent] = await Promise.all([
+  const [stranded, finishedToday, [queue], [toScore], [toAssess], spent, rejected, deadSources] = await Promise.all([
     sql`select id, stage, round(extract(epoch from (now() - started_at)) / 60) as age
         from runs where finished_at is null
           and started_at < now() - make_interval(mins => ${STRANDED_MIN})
@@ -59,6 +61,10 @@ type Problem = { severity: 'error' | 'warn'; what: string };
               and a.rubric_version = (select rubric_version from company_assessments
                                       order by assessed_at desc limit 1))`,
     spentToday(),
+    rejectedKeys(),
+    sql`select source, status, note from source_health
+        where status = 'down' and last_success_at < now() - interval '3 days'
+        order by last_success_at asc nulls first`,
   ]) as any;
 
   /*
@@ -68,7 +74,41 @@ type Problem = { severity: 'error' | 'warn'; what: string };
   for (const r of stranded as any[]) {
     problems.push({
       severity: 'error',
+      verdict: 'broken',
+      code: 'stranded-run',
       what: `run #${r.id} (${r.stage}) has been open ${r.age}m — the process is gone`,
+    });
+  }
+
+  /*
+   * A rejected key is not a spent one and does not come back on its own.
+   *
+   * Reported above the allowance check because it outranks it: a night where
+   * the caps were spent resolves itself at midnight, and a night where a
+   * credential was refused is the same night again tomorrow until someone
+   * replaces the key. DEBUGGING.md §2b used to send you to models.ts to tell
+   * these apart by hand; lib/llm.ts already knows, and now says so.
+   */
+  for (const [provider, reason] of rejected as Array<[string, string]>) {
+    problems.push({
+      severity: 'error',
+      verdict: 'credential',
+      code: 'credential-rejected',
+      what: `${provider}: credential rejected, not spent — ${reason.slice(0, 80)}`,
+    });
+  }
+
+  /*
+   * A feed that has not answered for three days has changed shape or gone, and
+   * the fix is a URL in lib/news-sources.ts rather than anything about tonight.
+   * Warn, not error: the run around it worked.
+   */
+  for (const r of deadSources as any[]) {
+    problems.push({
+      severity: 'warn',
+      verdict: 'broken',
+      code: 'source-down',
+      what: `source ${r.source} has been down for days — ${String(r.note ?? 'no successful fetch').slice(0, 60)}`,
     });
   }
 
@@ -93,16 +133,21 @@ type Problem = { severity: 'error' | 'warn'; what: string };
     const llmMissing = missing.length && wanted
       .filter((s) => missing.includes(s.name))
       .every((s) => s.cost === 'llm');
+    const excused = live === 0 && llmMissing;
     problems.push({
-      severity: missing.length > 3 && !(live === 0 && llmMissing) ? 'error' : 'warn',
+      severity: missing.length > 3 && !excused ? 'error' : 'warn',
+      verdict: excused ? 'partial' : 'broken',
+      code: excused ? 'allowance-exhausted' : 'stages-missing',
       what: `${missing.length} stage${missing.length === 1 ? '' : 's'} have not run today: ${missing.join(', ')}`
-        + (live === 0 && llmMissing ? ' — every LLM key was spent before the run started' : ''),
+        + (excused ? ' — every LLM key was spent before the run started' : ''),
     });
   }
 
   if (queue.c > 0) {
     problems.push({
       severity: 'warn',
+      verdict: 'partial',
+      code: 'queue-unjudged',
       what: `${queue.c.toLocaleString()} items are unjudged — scoring cannot see them until the filter runs`,
     });
   }
@@ -110,6 +155,8 @@ type Problem = { severity: 'error' | 'warn'; what: string };
   if (live === 0) {
     problems.push({
       severity: 'warn',
+      verdict: 'partial',
+      code: 'allowance-exhausted',
       what: 'every LLM key is spent — nothing that needs a model will progress until the caps reset',
     });
   }
@@ -121,11 +168,37 @@ type Problem = { severity: 'error' | 'warn'; what: string };
     console.log(`  live LLM keys      ${live}/${llmProviders().length}`);
   }
 
+  /*
+   * The verdict, for whatever acts on it.
+   *
+   * Exit stays 0 or 1, because that is what a workflow step reads and what
+   * decides whether the morning shows red: `partial` is deliberately green.
+   * The category rides alongside as a step output so the workflow and the
+   * digest can branch on a slug instead of matching this prose.
+   */
+  const found: VerdictReason[] = problems
+    .filter((p) => p.verdict)
+    .map((p) => ({
+      verdict: p.verdict!,
+      what: p.what,
+      code: p.code ?? p.verdict!,
+      exit: p.severity === 'error' ? 1 : 0,
+    }));
+  const decided = worst(found);
+  const exit = problems.some((p) => p.severity === 'error') ? 1 : 0;
+
+  if (process.env.GITHUB_OUTPUT) {
+    appendFileSync(process.env.GITHUB_OUTPUT,
+      `verdict=${decided.verdict}\ncode=${decided.code}\nreason=${decided.what.replace(/\n/g, ' ')}\n`);
+  }
+
   if (!problems.length) {
     console.log('  healthy');
+    console.log(`\n  verdict: ${decided.verdict} (${decided.code})`);
     return;
   }
   console.log('');
   for (const p of problems) console.log(`  ${p.severity === 'error' ? 'ERROR' : 'warn '}  ${p.what}`);
-  process.exit(problems.some((p) => p.severity === 'error') ? 1 : 0);
+  console.log(`\n  verdict: ${decided.verdict} (${decided.code})`);
+  process.exit(exit);
 })();

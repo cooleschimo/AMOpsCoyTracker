@@ -15,6 +15,7 @@
  */
 import { env, llmProviders, type LlmProvider } from './env';
 import { Budget, estimateTokens, LIMITS } from './budget';
+import { recordRejected, clearRejected } from './budget-store';
 
 export type LlmResult<T> = {
   ok: boolean;
@@ -219,6 +220,11 @@ async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider)
           || (res.status === 400 && /invalid auth|api key not valid|invalid api key|unauthenticated/i.test(detail));
         if (badKey) {
           console.warn(`[llm] ${provider.label ?? provider.name}: credential rejected — check the key, not the quota`);
+          // Recorded as well as warned: `transient` keeps this out of the
+          // exhaustion record, which also meant it left no trace at all, and a
+          // dead key was something you found out by reading the log.
+          void recordRejected(provider.label ?? provider.name,
+            `HTTP ${res.status}: ${detail.slice(0, 160)}`);
           return { error: `HTTP ${res.status} bad credential: ${detail.slice(0, 200)}`, transient: true };
         }
         return { error: `HTTP ${res.status}: ${detail.slice(0, 300)}` };
@@ -229,6 +235,8 @@ async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider)
       const inTok: number = json?.usage?.prompt_tokens ?? estimateTokens(system + opts.user);
       const outTok: number = json?.usage?.completion_tokens ?? estimateTokens(text);
       opts.budget?.record(inTok, outTok, provider.label ?? provider.name);
+      // A replaced key answers again, and nothing else would ever clear it.
+      void clearRejected(provider.label ?? provider.name);
       return { text, inTok, outTok, model };
     } catch (e) {
       const waitMs = Math.min(30_000, 2 ** attempt * 1_000);

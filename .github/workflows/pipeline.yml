@@ -160,11 +160,16 @@ jobs:
       # thousand lines into a stack trace. The workflow ran daily for a fortnight
       # failing in twenty seconds because DATABASE_URL was never set.
       - name: Check credentials
+        id: preflight
         run: |
           missing=""
           [ -z "$DATABASE_URL" ] && missing="$missing DATABASE_URL"
           [ -z "$GEMINI_API_KEY$GROQ_API_KEY$OPENROUTER_API_KEY" ] && missing="$missing (no LLM key)"
           if [ -n "$missing" ]; then
+            # The verdict goes out before the exit, or the summary step below
+            # reports a missing secret as an unexplained failure.
+            echo "verdict=config" >> "$GITHUB_OUTPUT"
+            echo "code=config-missing" >> "$GITHUB_OUTPUT"
             echo "::error::Missing repository secrets:$missing"
             echo "Set them with: gh secret set DATABASE_URL"
             exit 1
@@ -462,6 +467,7 @@ jobs:
       # skipped the very resume it was meant to inform. The log is still one
       # scroll away; a resume that never runs is not recoverable.
       - name: Check the pipeline actually progressed
+        id: health
         if: >-
           ${{ always() && steps.dow.outputs.kind != 'send'
               && (github.event.inputs.mode == ''
@@ -470,3 +476,43 @@ jobs:
           SCOPE=""
           if [ "${{ steps.dow.outputs.day }}" != "7" ]; then SCOPE="--daily"; fi
           npx tsx scripts/dev/health.ts $SCOPE
+
+      # ---- what kind of night it was ---------------------------------------
+      #
+      # The five in DEBUGGING.md §2, named rather than left to be recognised at
+      # eight in the morning from a red X and a thousand lines of log. Each one
+      # is decided where its facts are — health.ts from the database, weekly.ts
+      # from its own results, the preflight from the secrets it just checked —
+      # and arrives here as a slug.
+      #
+      # Nothing here changes whether the job is red. It says why it is.
+      - name: Say what kind of night it was
+        if: ${{ always() && steps.dow.outputs.kind != 'send' }}
+        run: |
+          VERDICT="${{ steps.health.outputs.verdict || steps.preflight.outputs.verdict || steps.pipeline_daily.outputs.verdict || steps.pipeline_weekly.outputs.verdict }}"
+          CODE="${{ steps.health.outputs.code || steps.preflight.outputs.code || steps.pipeline_daily.outputs.code || steps.pipeline_weekly.outputs.code }}"
+          REASON="${{ steps.health.outputs.reason }}"
+          [ -z "$VERDICT" ] && VERDICT=unknown && CODE=no-verdict
+
+          {
+            echo "### ${VERDICT}"
+            echo ""
+            echo "\`${CODE}\`${REASON:+ — ${REASON}}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          case "$VERDICT" in
+            partial)
+              echo "::notice::partial ($CODE) — the allowance ran out; the backlog carries to the next run" ;;
+            deadline)
+              echo "::notice::deadline ($CODE) — stopped at the time limit; the resume step picks it up" ;;
+            credential)
+              echo "::error::credential ($CODE) — a key is rejected, not spent. It will not come back on its own: $REASON" ;;
+            config)
+              echo "::error::config ($CODE) — a required secret is missing" ;;
+            broken)
+              echo "::error::broken ($CODE) — $REASON" ;;
+            healthy)
+              echo "::notice::healthy — every stage ran" ;;
+            *)
+              echo "::warning::no verdict was recorded; read the log" ;;
+          esac

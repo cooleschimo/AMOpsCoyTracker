@@ -66,7 +66,31 @@ unfinished row under one of those names is not a stage hanging now.
 
 ---
 
-## 2. The five failures you will actually see
+## 2. What kind of night it was
+
+Every run ends with a verdict, in the job summary and as a step annotation.
+It is decided from state — run rows, `provider_exhaustion`, `provider_rejected`,
+`source_health` — not by matching text in the log, and no model is involved:
+these are patterns worth writing down, and a grep against stdout breaks the
+first time a message is reworded.
+
+| verdict | means | exit | what to do |
+|---|---|---|---|
+| `healthy` | every stage ran | 0 | nothing |
+| `partial` | the allowance ran out; the rest waits for the caps | 0 | nothing — the backlog carries forward |
+| `deadline` | stopped at the time limit | 1 | nothing — the resume step re-dispatches |
+| `broken` | work that should have happened did not | 1 | read the reason; §3 below |
+| `credential` | a key is rejected, not spent | 1 | replace the key; it will not come back |
+| `config` | a required secret is absent | 1 | `gh secret set …` |
+
+`partial` is deliberately green. A run that spends its allowance and skips the
+rest is working as designed — each stage is `--limit` capped and picks up next
+run — and a red every morning for a quota that resets on its own is a red
+nobody reads.
+
+---
+
+## 3. The five failures you will actually see
 
 ### a. Daily token cap reached
 
@@ -89,7 +113,11 @@ halted: every provider exhausted: gemini, groq, gemini2, groq2, openrouter, ...
 ```
 
 **Self-heals** if it is the daily quota; **does not** if a key was revoked.
-Tell them apart:
+
+The run tells them apart itself. A rejected credential is recorded in
+`provider_rejected` and reported as `verdict: credential`, which exits 1 and
+annotates the job; a spent cap is `verdict: partial` and stays green. If you
+want to check a key by hand anyway:
 
 ```bash
 npx tsx scripts/dev/models.ts
@@ -143,7 +171,7 @@ error — the constraint name is in it.
 
 ---
 
-## 3. Re-running one stage by hand
+## 4. Re-running one stage by hand
 
 Locally, which is the usual case:
 
@@ -181,7 +209,7 @@ Run those locally.
 
 ---
 
-## 4. Pipeline health in one query
+## 5. Pipeline health in one query
 
 ```sql
 select started_at::date as day,
@@ -202,7 +230,7 @@ One row per stage per day. `unfinished > 0` on an old day is a killed stage;
 
 ---
 
-## 5. TypeScript for Python readers
+## 6. TypeScript for Python readers
 
 Only what this codebase uses.
 
@@ -253,7 +281,7 @@ came from the database or JSON. The types describe intent, not a guarantee.
 
 ---
 
-## 6. What is safe to touch
+## 7. What is safe to touch
 
 **Edit freely** — data and config, no control flow:
 
@@ -291,7 +319,7 @@ npx tsx tests/events-parse.test.ts
 
 ---
 
-## 7. Secrets live in two places
+## 8. Secrets live in two places
 
 GitHub repo secrets (the pipeline) and Vercel project env (the web app).
 Rotating a key is a **two-place operation**; changing one leaves the other
@@ -303,7 +331,7 @@ missing credential.
 
 ---
 
-## 8. Scheduled runs stop after 60 days
+## 9. Scheduled runs stop after 60 days
 
 GitHub disables scheduled workflows after 60 days of repository inactivity. The
 symptom is no runs at all and no failure anywhere. Push any commit, or press
