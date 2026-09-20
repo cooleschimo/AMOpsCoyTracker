@@ -103,6 +103,20 @@ export const companies = pgTable('companies', {
   cbiOrgId: integer('cbi_org_id'),
   atsType: text('ats_type'),
   atsSlug: text('ats_slug'),
+  /**
+   * When discovery last looked for a board and found none.
+   *
+   * A company with no ATS costs about seven probes and a careers-page read to
+   * establish that, and without a record it is re-established every night. The
+   * stage takes the first 250 companies by id, so the same failures were also
+   * what the window was spent on — companies further down the table were never
+   * reached at all.
+   *
+   * Null means never looked, which is not the same as looked and found
+   * nothing: the first is due, the second waits out ATS_RETRY_DAYS. A company
+   * that later starts posting is found when that expires.
+   */
+  atsMissingAt: timestamp('ats_missing_at', { withTimezone: true }),
   discoveredVia: text('discovered_via'),
   /**
    * Scope triage from the EDGAR industry group (lib/edgar-industry.ts).
