@@ -129,18 +129,36 @@ type Problem = { severity: 'error' | 'warn'; what: string; verdict?: Verdict; co
      * So the count decides the severity only while there is allowance left to
      * have used. With none, the missing stages are the symptom and the spent
      * chain below is the cause.
+     *
+     * Excused and unexcused are reported separately rather than together. An
+     * all-or-nothing test made one failed fetch stage disqualify the whole
+     * night: twelve stages skipped for a spent chain, correctly, plus `news`
+     * timing out, and every one of the thirteen was reported as an error
+     * because they were not all LLM stages. The fetch stage is the finding;
+     * the twelve are still working as designed.
      */
-    const llmMissing = missing.length && wanted
-      .filter((s) => missing.includes(s.name))
-      .every((s) => s.cost === 'llm');
-    const excused = live === 0 && llmMissing;
-    problems.push({
-      severity: missing.length > 3 && !excused ? 'error' : 'warn',
-      verdict: excused ? 'partial' : 'broken',
-      code: excused ? 'allowance-exhausted' : 'stages-missing',
-      what: `${missing.length} stage${missing.length === 1 ? '' : 's'} have not run today: ${missing.join(', ')}`
-        + (excused ? ' — every LLM key was spent before the run started' : ''),
-    });
+    const missingStages = wanted.filter((s) => missing.includes(s.name));
+    const excusedStages = live === 0 ? missingStages.filter((s) => s.cost === 'llm') : [];
+    const unexcused = missingStages.filter((s) => !excusedStages.includes(s));
+
+    if (excusedStages.length) {
+      problems.push({
+        severity: 'warn',
+        verdict: 'partial',
+        code: 'allowance-exhausted',
+        what: `${excusedStages.length} LLM stage${excusedStages.length === 1 ? '' : 's'} skipped: `
+          + `${excusedStages.map((s) => s.name).join(', ')} — every key was spent before the run started`,
+      });
+    }
+    if (unexcused.length) {
+      problems.push({
+        severity: unexcused.length > 3 ? 'error' : 'warn',
+        verdict: 'broken',
+        code: 'stages-missing',
+        what: `${unexcused.length} stage${unexcused.length === 1 ? '' : 's'} have not run today: `
+          + unexcused.map((s) => s.name).join(', '),
+      });
+    }
   }
 
   if (queue.c > 0) {

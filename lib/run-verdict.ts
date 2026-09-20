@@ -45,17 +45,24 @@ const RANK: Record<Verdict, number> = {
 /**
  * The worst of what was found, or healthy when nothing was.
  *
- * Severity first, category second. Two findings can share a category and not a
- * severity — a dead feed and a dozen stages that never ran are both `broken` —
- * and the one that decided the exit code is the one the verdict has to name,
- * or the summary explains a red morning with a warning.
+ * Category decides which finding is named; severity decides the exit code, and
+ * the two are answered separately because they disagree. Sorting on severity
+ * first buries the categories that matter most: a rejected key reported as a
+ * warning, beside a dozen stages that did not run, is a `credential` night
+ * reported as `broken` — and `broken` does not say the key will still be
+ * rejected tomorrow, which is the one thing that morning needed to know.
+ *
+ * Exit is the maximum over everything found, so a warn-level verdict still
+ * reds the run when something else did. That is the guarantee severity-first
+ * was reaching for, without letting it choose the name.
  */
 export function worst(found: VerdictReason[]): VerdictReason {
   if (!found.length) {
     return { verdict: 'healthy', what: 'every stage ran', code: 'healthy', exit: 0 };
   }
-  return [...found].sort((a, b) =>
-    (b.exit - a.exit) || (RANK[a.verdict] - RANK[b.verdict]))[0];
+  const named = [...found].sort((a, b) => RANK[a.verdict] - RANK[b.verdict])[0];
+  const exit = found.some((f) => f.exit === 1) ? 1 : 0;
+  return { ...named, exit };
 }
 
 /**

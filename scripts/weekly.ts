@@ -38,7 +38,7 @@ import { appendFileSync } from 'node:fs';
 
 import { STAGES, PHASE_WHAT, type Stage, type Cost, type Phase } from '../lib/stages';
 import { llmProviders } from '../lib/env';
-import { spentToday } from '../lib/budget-store';
+import { spentToday, capDay, RUN_DAY_ENV } from '../lib/budget-store';
 
 
 const argOf = (n: string, d?: string) => {
@@ -61,20 +61,52 @@ function run(stage: Stage, dry: boolean): Promise<{ ok: boolean; ms: number; not
     child.stdout.on('data', keep);
     child.stderr.on('data', keep);
 
+    /*
+     * Whether the timeout fired is remembered rather than inferred.
+     *
+     * `signal` on close is only set when the child itself died of an unhandled
+     * signal, and the child here is an npx wrapper: SIGTERM reaches it, it
+     * exits 143, and close reports a code with no signal. The stage then read
+     * as an ordinary failure, so a hang and a crash were indistinguishable in
+     * the summary and in whatever the resume step was told.
+     */
+    let timedOut = false;
     const killer = setTimeout(() => {
+      timedOut = true;
       child.kill('SIGTERM');
       // A stage that ignores SIGTERM would hold the whole run open.
       setTimeout(() => child.kill('SIGKILL'), 10_000);
     }, stage.timeoutMin * 60_000);
 
-    child.on('close', (code, signal) => {
+    /*
+     * A spawn that never starts still has to settle.
+     *
+     * `close` does not fire when the process could not be created — a missing
+     * npx, a bad PATH on the runner — and the promise would sit unresolved
+     * until the job itself was killed, which is the one failure the per-stage
+     * timeout cannot catch because the timeout is waiting on the same promise.
+     */
+    let settled = false;
+    const finish = (r: { ok: boolean; ms: number; note: string }) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(killer);
+      resolve(r);
+    };
+
+    child.on('error', (err) => {
+      finish({ ok: false, ms: Date.now() - started, note: `could not start: ${err.message}` });
+    });
+
+    child.on('close', (code, signal) => {
       const ms = Date.now() - started;
       const counts = tail.match(/counts?:\s*(\{[\s\S]*?\})/)?.[1]?.replace(/\s+/g, ' ').slice(0, 240);
-      resolve({
-        ok: code === 0,
+      finish({
+        ok: code === 0 && !timedOut,
         ms,
-        note: signal ? `timed out after ${stage.timeoutMin}m` : counts ?? (code === 0 ? '' : `exit ${code}`),
+        note: timedOut || signal
+          ? `timed out after ${stage.timeoutMin}m`
+          : counts ?? (code === 0 ? '' : `exit ${code}`),
       });
     });
   });
@@ -138,6 +170,18 @@ function run(stage: Stage, dry: boolean): Promise<{ ok: boolean; ms: number; not
   let stoppedEarly: string | null = null;
 
   /*
+   * The day whose allowance this run is spending, fixed here and inherited by
+   * every stage.
+   *
+   * A stage is a child process that opens its own budget, and the 22:00 run
+   * reaches the judge phase after midnight. Asking the clock there files the
+   * evening's exhaustion under tomorrow, and tomorrow starts against a chain it
+   * believes is already spent — twelve stages skipped three minutes in, on a
+   * night when every key still authenticates.
+   */
+  process.env[RUN_DAY_ENV] = capDay(new Date(startedAt));
+
+  /*
    * Is there any LLM allowance left at all?
    *
    * Asked once, before the stages run, because the answer is the same for all
@@ -176,11 +220,25 @@ function run(stage: Stage, dry: boolean): Promise<{ ok: boolean; ms: number; not
       results.push({ stage: stage.name, ok: true, ms: 0, note: 'skipped: no LLM allowance today' });
       continue;
     }
+    /*
+     * The stage about to start has to fit, not just the time already spent.
+     *
+     * `score` is allowed 75 minutes, so starting it at 289 puts the run at 364
+     * — past the 330 the job allows. That lands as `cancelled`, where every
+     * step reads `skipped`, the `if: failure()` resume never fires and nothing
+     * records where the work got to. Stopping a stage early leaves a resume
+     * point; being cancelled leaves nothing, which is the outcome this
+     * deadline exists to avoid.
+     */
     const elapsedMin = (Date.now() - startedAt) / 60_000;
-    if (deadlineMin > 0 && elapsedMin >= deadlineMin) {
+    const wouldEndAt = elapsedMin + stage.timeoutMin;
+    if (deadlineMin > 0 && (elapsedMin >= deadlineMin || wouldEndAt > deadlineMin)) {
       stoppedEarly = stage.name;
+      const why = elapsedMin >= deadlineMin
+        ? `${elapsedMin.toFixed(0)}m elapsed`
+        : `${elapsedMin.toFixed(0)}m elapsed and ${stage.name} may take ${stage.timeoutMin}m`;
       console.log(`\n${'='.repeat(70)}`);
-      console.log(`DEADLINE — ${elapsedMin.toFixed(0)}m elapsed, stopping before ${stage.name}`);
+      console.log(`DEADLINE — ${why}, stopping before ${stage.name}`);
       console.log(`Resume with: npx tsx scripts/weekly.ts --from ${stage.name}`);
       console.log(`${'='.repeat(70)}`);
       break;
