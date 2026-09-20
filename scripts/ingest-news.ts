@@ -38,8 +38,46 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Politeness delay between Google News queries. No documented limit; this is courtesy. */
-const NEWS_DELAY_MS = 1500;
+/**
+ * Delay between Google News queries.
+ *
+ * Google soft-blocks a caller that asks steadily for too long. Measured on the
+ * runner: the first 136 queries at 1.5s apart were served, then 503 for the
+ * next eight hundred, then service resumed — a rolling throttle rather than a
+ * daily cap. 1.5s is about forty requests a minute; four seconds is fifteen,
+ * which is the side of that line worth being on.
+ */
+const NEWS_DELAY_MS = 4000;
+
+/**
+ * How many nights it takes to check every company once.
+ *
+ * Asking about all eleven hundred every night was both the thing that tripped
+ * the throttle and largely wasted: a Google News feed carries a backlog, so a
+ * company visited on Thursday still yields Tuesday's story. What a cycle costs
+ * is time-to-first-sight — up to three days rather than one — and what it buys
+ * is a stage that finishes inside its budget without being refused.
+ */
+const COHORT_DAYS = 3;
+
+/**
+ * A company joins the rotation once it has been here a while.
+ *
+ * A company discovered last night is the one most likely to have news worth
+ * reading, and making it wait two days for its first look would undo the point
+ * of discovering it. Recent arrivals are queried every night until they settle.
+ */
+const COHORT_GRACE_DAYS = 7;
+
+/**
+ * Consecutive failures that mean the door has closed.
+ *
+ * A blocked run used to spend ninety minutes discovering the same 503 eight
+ * hundred times, which is what pushed the stage past its timeout and turned a
+ * working night red. Twenty in a row is far more than a flaky feed produces and
+ * unmistakable when the block is real.
+ */
+const BLOCK_AFTER_CONSECUTIVE_ERRORS = 20;
 
 /** Record a source-health row, so a feed returning zero is visible rather than silent. */
 async function markHealth(
@@ -132,8 +170,11 @@ async function insertItems(db: ReturnType<typeof getDb>, rows: PendingItem[]): P
 
   const [run] = await db.insert(runs).values({ stage: 'ingest_news' }).returning();
   const counts = {
+    companies_tracked: 0,
+    companies_in_cohort: 0,
     companies_queried: 0,
     company_feed_errors: 0,
+    blocked_early: 0,
     company_items_fetched: 0,
     wires_queried: 0,
     wire_errors: 0,
@@ -170,22 +211,67 @@ async function insertItems(db: ReturnType<typeof getDb>, rows: PendingItem[]): P
         // Read by lib/ambiguous.ts to narrow the query for a name that is also
         // an ordinary word.
         website: companies.website, hqCity: companies.hqCity, sectors: companies.sectors,
+        // Read by the cohort rule: a recent arrival skips the rotation.
+        createdAt: companies.createdAt,
       }).from(companies)
         .where(trackedCompanies(companies))
         .orderBy(companies.id);
 
-      const list = limit ? targets.slice(0, limit) : targets;
-      console.log(`Google News: ${list.length} companies in scope`);
+      /*
+       * Tonight's share of the rotation.
+       *
+       * The cohort is the company id modulo the cycle length, against the day
+       * number since the epoch — so the split is fixed, every company falls in
+       * exactly one cohort, and no state has to be carried between runs. A
+       * company that arrived within the grace period is queried regardless,
+       * since its first look is the one worth having promptly.
+       *
+       * --limit and --cohort-all both bypass it, for a manual run that wants
+       * the whole list.
+       */
+      counts.companies_tracked = targets.length;
+      const today = Math.floor(Date.now() / 86_400_000);
+      const graceMs = COHORT_GRACE_DAYS * 86_400_000;
+      const everyone = limit > 0 || flag('cohort-all');
+      const due = everyone ? targets : targets.filter((c) => {
+        const fresh = c.createdAt instanceof Date
+          && Date.now() - c.createdAt.getTime() < graceMs;
+        return fresh || c.id % COHORT_DAYS === today % COHORT_DAYS;
+      });
+      counts.companies_in_cohort = due.length;
+
+      const list = limit ? due.slice(0, limit) : due;
+      console.log(`Google News: ${targets.length} tracked, ${list.length} due tonight`
+        + `${everyone ? ' (whole list)' : ` (1 night in ${COHORT_DAYS}, plus arrivals under ${COHORT_GRACE_DAYS}d)`}`);
+
+      /*
+       * Stop when the door has closed.
+       *
+       * Every query after a block costs its full timeout and returns nothing,
+       * so continuing is not persistence, it is the stage spending its budget
+       * to learn the same fact repeatedly. The companies not reached keep their
+       * place in the rotation and come round again tomorrow.
+       */
+      let consecutiveErrors = 0;
+      let blocked = false;
 
       for (const [idx, c] of list.entries()) {
+        if (blocked) { counts.blocked_early++; continue; }
         const url = googleNewsUrl(c);
         const { items: feed, error } = await fetchFeed(url);
         counts.companies_queried++;
 
         if (error && feed.length === 0) {
           counts.company_feed_errors++;
+          consecutiveErrors++;
           console.warn(`  [${idx + 1}/${list.length}] ${c.name}: ${error}`);
+          if (consecutiveErrors >= BLOCK_AFTER_CONSECUTIVE_ERRORS) {
+            blocked = true;
+            console.warn(`\n  ${consecutiveErrors} consecutive failures — treating Google News as blocked`);
+            console.warn(`  ${list.length - idx - 1} companies left unqueried; they keep their turn tomorrow.`);
+          }
         } else {
+          consecutiveErrors = 0;
           console.log(`  [${idx + 1}/${list.length}] ${c.name}: ${feed.length} items`);
         }
 
@@ -208,12 +294,20 @@ async function insertItems(db: ReturnType<typeof getDb>, rows: PendingItem[]): P
         await sleep(NEWS_DELAY_MS);
       }
 
-      // One health row for the channel as a whole, plus the error rate.
+      /*
+       * One health row for the channel as a whole.
+       *
+       * A block says something different from a high error rate — it means the
+       * rest of the cohort was never asked — so it is named rather than left to
+       * be inferred from the ratio.
+       */
       await markHealth(
         db, 'google_news_company', 'news', counts.company_items_fetched,
-        counts.company_feed_errors
-          ? `${counts.company_feed_errors}/${counts.companies_queried} company queries failed`
-          : null,
+        blocked
+          ? `blocked after ${counts.companies_queried} queries; ${counts.blocked_early} companies not reached`
+          : counts.company_feed_errors
+            ? `${counts.company_feed_errors}/${counts.companies_queried} company queries failed`
+            : null,
       );
     }
 
