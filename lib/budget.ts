@@ -78,11 +78,24 @@ export class Budget {
   halted = false;
   haltReason: string | null = null;
 
+  /**
+   * Keys this budget was handed rather than spent itself.
+   *
+   * They are skipped like any other spent key, but they are not this budget's
+   * finding and spentProviders() does not report them back. Writing them again
+   * copies an inherited set forward under whatever day the write lands on,
+   * which is how one night's exhaustion becomes the next night's empty chain.
+   */
+  private seeded = new Set<string>();
+
   constructor(private priorTokensToday = 0, spentToday: Iterable<[string, string]> = []) {
     // Keys already known spent today, from a previous run. Without this every
     // process starts blind and rediscovers each one with a wasted 429 — twelve
     // of them, on every call, once a day's capacity is mostly gone.
-    for (const [name, reason] of spentToday) this.slot(name).exhausted = reason;
+    for (const [name, reason] of spentToday) {
+      this.slot(name).exhausted = reason;
+      this.seeded.add(name);
+    }
   }
 
   private slot(name: string): Spend {
@@ -131,10 +144,16 @@ export class Budget {
     s.tokensIn += inTok; s.tokensOut += outTok; s.requests++;
   }
 
-  /** Which providers this run found spent, for the next run to start from. */
+  /**
+   * Which providers this run found spent, for the next run to start from.
+   *
+   * What it was seeded with is left out: that is already on the record, and
+   * re-reporting it writes an inherited set under a day this budget may not
+   * have started in.
+   */
   spentProviders(): Array<[string, string]> {
     return [...this.byProvider.entries()]
-      .filter(([, s]) => s.exhausted)
+      .filter(([name, s]) => s.exhausted && !this.seeded.has(name))
       .map(([name, s]) => [name, s.exhausted as string]);
   }
 

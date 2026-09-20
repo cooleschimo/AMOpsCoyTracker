@@ -25,9 +25,23 @@
  */
 import { getSql } from './db';
 
-/** The UTC day a cap belongs to. Providers reset at UTC midnight. */
-export function capDay(d: Date = new Date()): string {
-  return d.toISOString().slice(0, 10);
+/**
+ * The UTC day a cap belongs to. Providers reset at UTC midnight.
+ *
+ * The clock is only asked when the run has not already answered. A stage is a
+ * separate process, so the answer travels as an environment variable that the
+ * runner sets once and every child inherits — the day belongs to the run, and
+ * a stage that opens its budget at 01:30 is still spending the evening's
+ * allowance.
+ */
+export const RUN_DAY_ENV = 'PIPELINE_CAP_DAY';
+
+export function capDay(d?: Date): string {
+  if (!d) {
+    const fromRun = process.env[RUN_DAY_ENV];
+    if (fromRun && /^\d{4}-\d{2}-\d{2}$/.test(fromRun)) return fromRun;
+  }
+  return (d ?? new Date()).toISOString().slice(0, 10);
 }
 
 async function ensureTable() {
@@ -128,7 +142,14 @@ export async function recordSpent(spent: Array<[string, string]>, day = capDay()
         values (${provider}, ${day}::date, ${reason.slice(0, 200)})
         on conflict (provider, cap_day) do nothing`;
     }
-    await sql`delete from provider_exhaustion where cap_day < ${day}::date`;
+    /*
+     * Keep a day either side of this one. A run that starts at 22:00 writes
+     * against the day it started while the clock has already moved on, so
+     * "older than today" is not the same question as "no longer any day's
+     * business" — and deleting the run's own rows out from under it is how the
+     * evidence for a spent evening disappears.
+     */
+    await sql`delete from provider_exhaustion where cap_day < ${day}::date - 1`;
   } catch { /* an optimisation, not a requirement */ }
 }
 
