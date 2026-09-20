@@ -223,7 +223,12 @@ async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider)
           // Recorded as well as warned: `transient` keeps this out of the
           // exhaustion record, which also meant it left no trace at all, and a
           // dead key was something you found out by reading the log.
-          void recordRejected(provider.label ?? provider.name,
+          //
+          // Awaited, not fired and forgotten. A rejection usually surfaces on
+          // the call that runs into a stage's timeout, and weekly.ts SIGKILLs
+          // ten seconds later — so the unawaited write was lost exactly when
+          // it mattered, leaving the dead key with no trace at all again.
+          await recordRejected(provider.label ?? provider.name,
             `HTTP ${res.status}: ${detail.slice(0, 160)}`);
           return { error: `HTTP ${res.status} bad credential: ${detail.slice(0, 200)}`, transient: true };
         }
@@ -236,7 +241,12 @@ async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider)
       const outTok: number = json?.usage?.completion_tokens ?? estimateTokens(text);
       opts.budget?.record(inTok, outTok, provider.label ?? provider.name);
       // A replaced key answers again, and nothing else would ever clear it.
-      void clearRejected(provider.label ?? provider.name);
+      //
+      // Only on a reply that actually carried content: a 200 with an empty
+      // choices array proves nothing about the credential, and clearing on it
+      // would retract the one alert that says a key is dead and will still be
+      // dead tomorrow.
+      if (text) await clearRejected(provider.label ?? provider.name);
       return { text, inTok, outTok, model };
     } catch (e) {
       const waitMs = Math.min(30_000, 2 ** attempt * 1_000);

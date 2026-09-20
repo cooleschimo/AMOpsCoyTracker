@@ -107,7 +107,20 @@ export class Budget {
       return false;
     }
     if (lim.tpd !== undefined && s.tokensIn + s.tokensOut + estimatedTokens > lim.tpd) {
-      this.markExhausted(provider, `token cap approached (${s.tokensIn + s.tokensOut}/${lim.tpd})`);
+      /*
+       * One oversized call is not a spent key.
+       *
+       * Retiring on the estimate meant a slot with 1,500 of 180,000 tokens
+       * spent was barred for the rest of the run by a single large prompt —
+       * and, because spentProviders() feeds recordSpent(), written to
+       * provider_exhaustion so every other stage today started with it already
+       * skipped. Only what has actually been spent retires a key; anything
+       * else just declines this call and lets a smaller one through.
+       */
+      const spent = s.tokensIn + s.tokensOut;
+      if (spent >= lim.tpd) {
+        this.markExhausted(provider, `token cap reached (${spent}/${lim.tpd})`);
+      }
       return false;
     }
     return true;

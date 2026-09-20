@@ -468,8 +468,13 @@ jobs:
       # scroll away; a resume that never runs is not recoverable.
       - name: Check the pipeline actually progressed
         id: health
+        # `kind != ''` because dow runs AFTER the credential check: a preflight
+        # that exits on a missing secret never reaches it, and an empty kind
+        # passes `!= 'send'`. Without this the health check opens a database
+        # connection with the URL that was just reported absent, and reports a
+        # second failure on top of the clear one.
         if: >-
-          ${{ always() && steps.dow.outputs.kind != 'send'
+          ${{ always() && steps.dow.outputs.kind != '' && steps.dow.outputs.kind != 'send'
               && (github.event.inputs.mode == ''
                   || contains(fromJSON('["daily","weekly","resume"]'), github.event.inputs.mode)) }}
         run: |
@@ -489,8 +494,13 @@ jobs:
       - name: Say what kind of night it was
         if: ${{ always() && steps.dow.outputs.kind != 'send' }}
         run: |
-          VERDICT="${{ steps.health.outputs.verdict || steps.preflight.outputs.verdict || steps.pipeline_daily.outputs.verdict || steps.pipeline_weekly.outputs.verdict }}"
-          CODE="${{ steps.health.outputs.code || steps.preflight.outputs.code || steps.pipeline_daily.outputs.code || steps.pipeline_weekly.outputs.code }}"
+          # Cause before symptom. health.ts sees that stages are missing; the
+          # step that stopped knows WHY they are — a deadline stop the resume
+          # step is already handling, or a secret that was never set. Reading
+          # health first reported every deadline night as `broken`, and the
+          # deadline arm below could not be reached on the one night it is for.
+          VERDICT="${{ steps.preflight.outputs.verdict || steps.pipeline_daily.outputs.verdict || steps.pipeline_weekly.outputs.verdict || steps.resume_stage.outputs.verdict || steps.health.outputs.verdict }}"
+          CODE="${{ steps.preflight.outputs.code || steps.pipeline_daily.outputs.code || steps.pipeline_weekly.outputs.code || steps.resume_stage.outputs.code || steps.health.outputs.code }}"
           REASON="${{ steps.health.outputs.reason }}"
           [ -z "$VERDICT" ] && VERDICT=unknown && CODE=no-verdict
 
