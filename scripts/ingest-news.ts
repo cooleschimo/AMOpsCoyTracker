@@ -29,6 +29,7 @@ import {
 } from '../lib/news-sources';
 import { canonicalizeUrl, splitGoogleTitle } from '../lib/news-ingest';
 import { trackedCompanies } from '../lib/scope';
+import { STAGES } from '../lib/stages';
 
 const arg = (n: string, d?: string) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -68,6 +69,30 @@ const COHORT_DAYS = 3;
  * of discovering it. Recent arrivals are queried every night until they settle.
  */
 const COHORT_GRACE_DAYS = 7;
+
+/**
+ * How many companies fit in the stage's budget, at the delay we query them.
+ *
+ * The delay and the timeout are set in two files and drifted apart the moment
+ * one of them moved: at four seconds a 1,190-company list needs 79 minutes and
+ * the stage is given 40, so it is killed halfway through and the wire loop
+ * after it never runs at all. The cohort was meant to prevent that and cannot,
+ * because the grace clause has no ceiling under it — a busy discovery night
+ * makes most of the list fresh and the split stops bounding anything.
+ *
+ * So the ceiling is computed from the two numbers that decide it rather than
+ * chosen. `LEAVE_FOR_WIRES` is what the rest of the stage needs once the
+ * company loop is done; the rest divides by what a query costs, counting the
+ * request alongside the sleep.
+ */
+const LEAVE_FOR_WIRES_MS = 5 * 60_000;
+const PER_QUERY_MS = NEWS_DELAY_MS + 500;
+
+function cohortCeiling(): number {
+  const stage = STAGES.find((s) => s.script === 'ingest-news.ts');
+  const budgetMs = (stage?.timeoutMin ?? 40) * 60_000;
+  return Math.max(50, Math.floor((budgetMs - LEAVE_FOR_WIRES_MS) / PER_QUERY_MS));
+}
 
 /**
  * Consecutive failures that mean the door has closed.
@@ -172,6 +197,8 @@ async function insertItems(db: ReturnType<typeof getDb>, rows: PendingItem[]): P
   const counts = {
     companies_tracked: 0,
     companies_in_cohort: 0,
+    /** Due tonight but past what the stage's budget covers; first in line tomorrow. */
+    companies_over_ceiling: 0,
     companies_queried: 0,
     company_feed_errors: 0,
     blocked_early: 0,
@@ -233,12 +260,31 @@ async function insertItems(db: ReturnType<typeof getDb>, rows: PendingItem[]): P
       const today = Math.floor(Date.now() / 86_400_000);
       const graceMs = COHORT_GRACE_DAYS * 86_400_000;
       const everyone = limit > 0 || flag('cohort-all');
-      const due = everyone ? targets : targets.filter((c) => {
-        const fresh = c.createdAt instanceof Date
-          && Date.now() - c.createdAt.getTime() < graceMs;
-        return fresh || c.id % COHORT_DAYS === today % COHORT_DAYS;
-      });
+      const isFresh = (c: typeof targets[number]) => c.createdAt instanceof Date
+        && Date.now() - c.createdAt.getTime() < graceMs;
+      const picked = everyone ? targets : targets.filter(
+        (c) => isFresh(c) || c.id % COHORT_DAYS === today % COHORT_DAYS);
+
+      /*
+       * Fresh first, then the night's third of the list.
+       *
+       * The ceiling can cut this short, and what it cuts matters: a company
+       * discovered last night is the one most likely to be carrying the story
+       * worth reading, while a rotation company missed tonight comes round
+       * again in three. Sorting before the slice means the ceiling drops the
+       * cheaper half.
+       */
+      const ceiling = cohortCeiling();
+      const ordered = everyone ? picked
+        : [...picked].sort((a, b) => Number(isFresh(b)) - Number(isFresh(a)));
+      const due = everyone ? ordered : ordered.slice(0, ceiling);
       counts.companies_in_cohort = due.length;
+      counts.companies_over_ceiling = ordered.length - due.length;
+      if (due.length < ordered.length) {
+        console.log(`${ordered.length} due tonight, ${ceiling} fit the ${
+          STAGES.find((s) => s.script === 'ingest-news.ts')?.timeoutMin ?? 40}m budget `
+          + `at ${NEWS_DELAY_MS}ms — ${ordered.length - due.length} wait for tomorrow`);
+      }
 
       const list = limit ? due.slice(0, limit) : due;
       console.log(`Google News: ${targets.length} tracked, ${list.length} due tonight`
