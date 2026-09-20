@@ -36,13 +36,33 @@ async function secFetch(url: string, tries = 3): Promise<string> {
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     lastFetch = Date.now();
 
-    const res = await fetch(url, {
-      headers: {
-        // SEC requires a descriptive UA of the form "Name email@domain".
-        'User-Agent': env.secUserAgent(),
-        'Accept-Encoding': 'gzip, deflate',
-      },
-    });
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: {
+          // SEC requires a descriptive UA of the form "Name email@domain".
+          'User-Agent': env.secUserAgent(),
+          'Accept-Encoding': 'gzip, deflate',
+        },
+        /*
+         * A connection that opens and then stalls is the one failure the retry
+         * loop cannot see: without a deadline `fetch` waits as long as the
+         * socket stays open, and the stage sits there until its own timeout
+         * SIGKILLs it — no error, no health row, nothing to resume from. Every
+         * other fetcher here carries the same 25s ceiling.
+         */
+        signal: AbortSignal.timeout(25_000),
+      });
+    } catch (e) {
+      // A stall or a dropped socket is retried like a 429: the attempts exist
+      // for a flaky connection, and throwing out of the loop on the first one
+      // spends none of them.
+      const backoff = 2 ** attempt * 2000;
+      console.warn(`[edgar] ${(e as Error).message} on ${url}; retrying in ${backoff}ms`);
+      if (attempt === tries - 1) throw e;
+      await new Promise((r) => setTimeout(r, backoff));
+      continue;
+    }
     if (res.status === 429 || res.status === 403) {
       const backoff = 2 ** attempt * 2000;
       console.warn(`[edgar] ${res.status} on ${url}; backing off ${backoff}ms`);

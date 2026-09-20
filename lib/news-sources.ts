@@ -207,7 +207,7 @@ export function parseVcNewsDaily(html: string): FeedItem[] {
 /** Fetch a page-based source, in the shape fetchFeed returns. */
 export async function fetchScraped(
   url: string, how: 'vcnewsdaily',
-): Promise<{ items: FeedItem[]; error: string | null }> {
+): Promise<{ items: FeedItem[]; error: string | null; reached?: boolean }> {
   try {
     const res = await fetch(url, {
       headers: { 'User-Agent': UA, Accept: 'text/html,*/*' },
@@ -216,13 +216,14 @@ export async function fetchScraped(
     });
     if (!res.ok) return { items: [], error: `HTTP ${res.status}` };
     const items = how === 'vcnewsdaily' ? parseVcNewsDaily(await res.text()) : [];
-    return { items, error: items.length ? null : 'page parsed to zero items' };
+    // `reached`: the page answered, so a zero parse is a selector problem.
+    return { items, error: items.length ? null : 'page parsed to zero items', reached: true };
   } catch (e) {
     return { items: [], error: (e as Error).message };
   }
 }
 
-export async function fetchFeed(url: string): Promise<{ items: FeedItem[]; error: string | null }> {
+export async function fetchFeed(url: string): Promise<{ items: FeedItem[]; error: string | null; reached?: boolean }> {
   try {
     const res = await fetch(url, {
       headers: { 'User-Agent': UA, Accept: 'application/rss+xml, application/xml, text/xml, */*' },
@@ -232,8 +233,15 @@ export async function fetchFeed(url: string): Promise<{ items: FeedItem[]; error
     if (!res.ok) return { items: [], error: `HTTP ${res.status}` };
     const xml = await res.text();
     const items = parseFeed(xml);
-    // An empty parse is a source-health event rather than a silent skip.
-    return { items, error: items.length ? null : 'feed parsed to zero items' };
+    /*
+     * An empty parse is a source-health event rather than a silent skip — but
+     * it is not the same event as a feed that could not be reached. The host
+     * answered; the shape it answered with is what produced nothing, and the
+     * fix is a selector rather than a URL. Reported as `reached` so a caller
+     * can tell them apart without matching on this sentence: two sector feeds
+     * sat at `down` for weeks reading as outages when they were parse misses.
+     */
+    return { items, error: items.length ? null : 'feed parsed to zero items', reached: true };
   } catch (e) {
     return { items: [], error: (e as Error).message };
   }

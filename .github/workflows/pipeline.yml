@@ -381,14 +381,35 @@ jobs:
           # would skip them permanently, and the digest would never be rendered
           # for that week. 7 is Sunday under `date -u +%u`, matching the run
           # steps above.
+          # A resume already knows its scope and must not re-derive it: the day
+          # is read from the clock at THIS moment, and a Sunday weekly run that
+          # deadlines and resumes after midnight reads Monday, silently becomes
+          # --daily, and drops the digest for that week permanently. The scope
+          # travels with the chain; only a first dispatch asks the calendar.
+          IN_SCOPE="${{ github.event.inputs.scope }}"
           SCOPE=""
-          if [ "${{ github.event.inputs.mode }}" = "daily" ] || [ "${{ steps.dow.outputs.day }}" != "7" ]; then
+          if [ -n "$IN_SCOPE" ]; then
+            [ "$IN_SCOPE" != "weekly" ] && SCOPE="--daily"
+          elif [ "${{ github.event.inputs.mode }}" = "daily" ] || [ "${{ steps.dow.outputs.day }}" != "7" ]; then
             SCOPE="--daily"
           fi
           NEXT=$(npx tsx scripts/dev/resume-point.ts $SCOPE 2>/dev/null | tail -1)
           if [ -z "$NEXT" ]; then
             echo "Every stage finished; nothing to resume."
             exit 0
+          fi
+          # Resuming from the stage that was just asked for is not a resume.
+          #
+          # The depth guard bounds how many times this fires; it does not
+          # require any of them to get further. A stage that fails the moment
+          # it starts — a bad credential, a schema it cannot read — returns the
+          # same NEXT every time, and the chain spends its three attempts
+          # re-running one stage and reports a deadline each time. Standing
+          # still is a different failure from running out of time, and it stops
+          # here rather than after three identical nights.
+          if [ "$NEXT" = "${{ github.event.inputs.from }}" ]; then
+            echo "::error::Resume would restart at $NEXT, the stage this run was already resuming from — it is failing immediately rather than running out of time. Not re-dispatching."
+            exit 1
           fi
           DEPTH=$(( ${{ github.event.inputs.depth || 0 }} + 1 ))
           echo "::notice::Resuming from $NEXT (attempt $DEPTH)"

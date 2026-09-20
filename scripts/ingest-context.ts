@@ -90,7 +90,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
       // A source that declares a scraper reads its page; the rest read a feed.
       // Both return the same shape, so everything downstream is unchanged.
-      const { items: feed, error } = src.scrape
+      const { items: feed, error, reached } = src.scrape
         ? await fetchScraped(src.url, src.scrape)
         : await fetchFeed(src.url);
       counts.sources++;
@@ -123,7 +123,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
       if (!dry && rows.length) await insertItems(db, rows, counts);
 
-      await markHealth(db, src.id, src.kind, feed.length, error);
+      await markHealth(db, src.id, src.kind, feed.length, error, null, reached);
       await sleep(1200);
     }
 
@@ -175,12 +175,15 @@ const STALE_DAYS = 30;
 async function markHealth(
   db: ReturnType<typeof getDb>,
   source: string, kind: string, count: number, error: string | null | undefined,
-  newest?: Date | null,
+  newest?: Date | null, reached = false,
 ) {
   const now = new Date();
   const ageDays = newest ? Math.floor((now.getTime() - newest.getTime()) / 86400_000) : null;
   const stale = ageDays !== null && ageDays > STALE_DAYS;
-  const status = error ? 'down'
+  // A source that answered and parsed to nothing is not down: the host is
+  // reachable and the selector is what missed. Two sector feeds read as
+  // outages for weeks on that conflation.
+  const status = error && !reached ? 'down'
     : count === 0 ? 'zero_volume'
     : stale ? 'stale'
     : 'ok';
@@ -189,7 +192,7 @@ async function markHealth(
   }
   await withRetry(() => db.insert(sourceHealth).values({
     source, sourceType: `context:${kind}`, lastRunAt: now,
-    lastSuccessAt: error ? undefined : now,
+    lastSuccessAt: error && !reached ? undefined : now,
     lastCount: count, status,
     note: error ?? (stale ? `newest item is ${ageDays} days old` : null),
   }).onConflictDoUpdate({

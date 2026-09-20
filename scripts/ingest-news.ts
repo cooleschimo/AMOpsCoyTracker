@@ -108,18 +108,27 @@ const BLOCK_AFTER_CONSECUTIVE_ERRORS = 20;
 async function markHealth(
   db: ReturnType<typeof getDb>,
   source: string, sourceType: string, count: number, error: string | null,
+  reached = false,
 ) {
   const now = new Date();
-  const status = error ? 'down' : count === 0 ? 'zero_volume' : 'ok';
+  /*
+   * `down` means the source could not be read. A feed that answered and parsed
+   * to nothing is `zero_volume` — the note still says what happened, but the
+   * fix is a selector rather than a URL, and two sector feeds sat at `down` for
+   * weeks reading as outages when nothing was unreachable.
+   */
+  const status = error && !reached ? 'down' : count === 0 ? 'zero_volume' : 'ok';
   await withRetry(() => db.insert(sourceHealth).values({
     source, sourceType, lastRunAt: now,
-    lastSuccessAt: error ? undefined : now,
+    // Reaching the source IS the success this column records; whether it
+    // parsed to anything is what lastCount and status say.
+    lastSuccessAt: error && !reached ? undefined : now,
     lastCount: count, status, note: error,
   }).onConflictDoUpdate({
     target: sourceHealth.source,
     set: {
       lastRunAt: now, lastCount: count, status, note: error, sourceType,
-      ...(error ? {} : { lastSuccessAt: now }),
+      ...(error && !reached ? {} : { lastSuccessAt: now }),
     },
   }));
 }
@@ -366,7 +375,7 @@ async function insertItems(db: ReturnType<typeof getDb>, rows: PendingItem[]): P
           await markHealth(db, src.id, 'wire', 0, src.note ?? 'disabled');
           continue;
         }
-        const { items: feed, error } = await fetchFeed(src.url);
+        const { items: feed, error, reached } = await fetchFeed(src.url);
         counts.wires_queried++;
         if (error && feed.length === 0) counts.wire_errors++;
         console.log(`  ${src.name}: ${feed.length} items${error ? ` (${error})` : ''}`);
@@ -388,7 +397,7 @@ async function insertItems(db: ReturnType<typeof getDb>, rows: PendingItem[]): P
           counts.inserted += n;
           counts.duplicates_skipped += rows.length - n;
         }
-        await markHealth(db, src.id, 'wire', feed.length, error);
+        await markHealth(db, src.id, 'wire', feed.length, error, reached);
       }
     }
 
