@@ -41,6 +41,21 @@ export type Stage = {
   /** Skipped by --daily: what it reads does not change overnight. */
   weeklyOnly?: boolean;
   /**
+   * The night depends on this one finishing.
+   *
+   * A failed stage used to red the run whatever it was, so a night where
+   * eighteen of nineteen stages worked and `bios` found nothing reported the
+   * same as a night where `filter` never ran. The two want opposite responses:
+   * one is looked at in the morning, the other tonight.
+   *
+   * Critical means what it produces is read by something else that cannot do
+   * without it, or is the product itself — the judge phase, the news that
+   * feeds it, and the digest. Everything else adds detail to a night that is
+   * still worth having without it, and its failure is named in the summary
+   * rather than turning the job red.
+   */
+  critical?: boolean;
+  /**
    * What this stage writes into `runs.stage`, which is not its name here.
    * A run row is named after the script — `filter` records `filter_score`,
    * `websites` records `enrich_web` — so anything reading run history back has
@@ -85,7 +100,7 @@ export const STAGES: Stage[] = [
     why: 'the untargeted feeds: policy, sector moves, and the trade press discovery reads' },
   { name: 'discover', runStage: 'discover_news', script: 'discover-news.ts', timeoutMin: 30, phase: 'gather', cost: 'llm',
     why: 'companies named in untargeted news that we do not track yet' },
-  { name: 'news', runStage: 'ingest_news', script: 'ingest-news.ts', timeoutMin: 40, phase: 'gather', cost: 'fetch',
+  { name: 'news', critical: true, runStage: 'ingest_news', script: 'ingest-news.ts', timeoutMin: 40, phase: 'gather', cost: 'fetch',
     why: 'Google News per company, including the ones just discovered' },
   /*
    * Enrichment, in dependency order and placed after discovery so a company
@@ -171,23 +186,23 @@ export const STAGES: Stage[] = [
    */
   { name: 'ats', runStage: 'ingest_ats', script: 'ingest-ats.ts', args: ['--limit', '250'], timeoutMin: 35, phase: 'enrich', cost: 'fetch',
     why: 'job boards; the hiring snapshot score-companies reads' },
-  { name: 'filter', runStage: 'filter_score', script: 'filter-score.ts', timeoutMin: 60, phase: 'judge', cost: 'llm',
+  { name: 'filter', critical: true, runStage: 'filter_score', script: 'filter-score.ts', timeoutMin: 60, phase: 'judge', cost: 'llm',
     why: 'canonicalise, drop, cluster, score the items' },
   // After filter: it reads what the filter kept, and only the residue the
   // ambiguity rules could not settle.
-  { name: 'ambiguous', runStage: 'adjudicate_ambiguous', script: 'adjudicate-ambiguous.ts', timeoutMin: 25, phase: 'judge', cost: 'llm',
+  { name: 'ambiguous', critical: true, runStage: 'adjudicate_ambiguous', script: 'adjudicate-ambiguous.ts', timeoutMin: 25, phase: 'judge', cost: 'llm',
     why: 'headlines about the word, not the company, that no rule can separate' },
-  { name: 'rescue', runStage: 'rescue_mismatch', script: 'rescue-mismatch.ts', timeoutMin: 25, phase: 'judge', cost: 'llm',
+  { name: 'rescue', critical: true, runStage: 'rescue_mismatch', script: 'rescue-mismatch.ts', timeoutMin: 25, phase: 'judge', cost: 'llm',
     why: 'items the name filter dropped that are about the company after all' },
   /*
    * After the filter, because it reads kept items: an edge asserted from a
    * headline the filter went on to drop would outlive the item it came from.
    */
-  { name: 'edges', runStage: 'ingest_edges', script: 'ingest-edges.ts', args: ['--limit', '800'], timeoutMin: 15, phase: 'judge', cost: 'llm',
+  { name: 'edges', critical: true, runStage: 'ingest_edges', script: 'ingest-edges.ts', args: ['--limit', '800'], timeoutMin: 15, phase: 'judge', cost: 'llm',
     why: 'acquisitions and partnerships between companies we track, which paths read as warm' },
-  { name: 'score', runStage: 'score_companies', script: 'score-companies.ts', timeoutMin: 75, phase: 'judge', cost: 'llm',
+  { name: 'score', critical: true, runStage: 'score_companies', script: 'score-companies.ts', timeoutMin: 75, phase: 'judge', cost: 'llm',
     why: 'the three axes per company for this week' },
-  { name: 'assess', runStage: 'assess', script: 'assess-companies.ts', timeoutMin: 50, phase: 'judge', cost: 'llm',
+  { name: 'assess', critical: true, runStage: 'assess', script: 'assess-companies.ts', timeoutMin: 50, phase: 'judge', cost: 'llm',
     why: 'accumulative judgment: prior assessment plus what arrived since' },
   { name: 'review', runStage: 'review_dashboard', script: 'review-dashboard.ts', timeoutMin: 4, phase: 'publish', cost: 'llm',
     why: 'the set is only checkable once placement has decided what is in it' },
@@ -196,7 +211,7 @@ export const STAGES: Stage[] = [
   // write — it finished, correctly, and was killed and reported as a timeout
   // for taking the time it needs. This is the last stage of the weekly run, so
   // the headroom costs nothing any other stage was waiting for.
-  { name: 'digest', runStage: 'render_digest', script: 'render-digest.ts', args: ['--save'], timeoutMin: 15, phase: 'publish', cost: 'llm',
+  { name: 'digest', critical: true, runStage: 'render_digest', script: 'render-digest.ts', args: ['--save'], timeoutMin: 15, phase: 'publish', cost: 'llm',
     weeklyOnly: true,
     why: 'placement matrix and the rendered digest' },
 ];

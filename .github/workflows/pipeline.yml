@@ -529,18 +529,36 @@ jobs:
           # deadline arm below could not be reached on the one night it is for.
           VERDICT="${{ steps.preflight.outputs.verdict || steps.pipeline_daily.outputs.verdict || steps.pipeline_weekly.outputs.verdict || steps.resume_stage.outputs.verdict || steps.health.outputs.verdict }}"
           CODE="${{ steps.preflight.outputs.code || steps.pipeline_daily.outputs.code || steps.pipeline_weekly.outputs.code || steps.resume_stage.outputs.code || steps.health.outputs.code }}"
-          REASON="${{ steps.health.outputs.reason }}"
+          # The reason has to come from whichever step gave the verdict, not
+          # always from health: a run whose digest failed was annotated
+          # "broken (stage-failed) — source venturebeat has been down", pairing
+          # one step's code with another step's sentence. Health's reason is
+          # only used when health's verdict is the one being reported.
+          PIPE_VERDICT="${{ steps.preflight.outputs.verdict || steps.pipeline_daily.outputs.verdict || steps.pipeline_weekly.outputs.verdict || steps.resume_stage.outputs.verdict }}"
+          if [ -n "$PIPE_VERDICT" ]; then
+            REASON="${{ steps.preflight.outputs.reason || steps.pipeline_daily.outputs.reason || steps.pipeline_weekly.outputs.reason || steps.resume_stage.outputs.reason }}"
+          else
+            REASON="${{ steps.health.outputs.reason }}"
+          fi
+          # Health still gets a line of its own when it found something the
+          # pipeline step could not see — a dead source, a stranded run.
+          HEALTH_NOTE="${{ steps.health.outputs.reason }}"
           [ -z "$VERDICT" ] && VERDICT=unknown && CODE=no-verdict
 
           {
             echo "### ${VERDICT}"
             echo ""
             echo "\`${CODE}\`${REASON:+ — ${REASON}}"
+            # What health saw, when it is not already the headline.
+            if [ -n "$HEALTH_NOTE" ] && [ "$HEALTH_NOTE" != "$REASON" ]; then
+              echo ""
+              echo "health: ${HEALTH_NOTE}"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
           case "$VERDICT" in
             partial)
-              echo "::notice::partial ($CODE) — the allowance ran out; the backlog carries to the next run" ;;
+              echo "::notice::partial ($CODE) — ${REASON:-the backlog carries to the next run}" ;;
             deadline)
               echo "::notice::deadline ($CODE) — stopped at the time limit; the resume step picks it up" ;;
             credential)

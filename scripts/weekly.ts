@@ -305,8 +305,15 @@ function run(stage: Stage, dry: boolean): Promise<{ ok: boolean; ms: number; not
       + `before re-running: one spent or rejected key fails all of them the same way.`);
   }
   const failed = results.filter((r) => !r.ok);
+  const isCritical = (name: string) => Boolean(STAGES.find((s) => s.name === name)?.critical);
+  const failedCritical = failed.filter((f) => isCritical(f.stage));
   if (failed.length) {
     console.log(`\n${failed.length} stage${failed.length === 1 ? '' : 's'} failed: ${failed.map((f) => f.stage).join(', ')}`);
+    if (failedCritical.length) {
+      console.log(`The night depends on: ${failedCritical.map((f) => f.stage).join(', ')}`);
+    } else {
+      console.log('None of them is one the night depends on; the rest of the run stands.');
+    }
     console.log(`Rerun from the first failure: npx tsx scripts/weekly.ts --from ${failed[0].stage}`);
   }
 
@@ -345,23 +352,45 @@ function run(stage: Stage, dry: boolean): Promise<{ ok: boolean; ms: number; not
    * The first two both exit 1 and want opposite responses, so the category goes
    * out beside the code rather than encoded in it.
    */
-  const say = (verdict: string, code: string) => {
+  const say = (verdict: string, code: string, reason = '') => {
     if (process.env.GITHUB_OUTPUT) {
-      appendFileSync(process.env.GITHUB_OUTPUT, `verdict=${verdict}\ncode=${code}\n`);
+      appendFileSync(process.env.GITHUB_OUTPUT,
+        `verdict=${verdict}\ncode=${code}\nreason=${reason.replace(/\n/g, ' ')}\n`);
     }
-    console.log(`\n  verdict: ${verdict} (${code})`);
+    console.log(`\n  verdict: ${verdict} (${code})${reason ? ` — ${reason}` : ''}`);
   };
 
   if (stoppedEarly) {
     console.log(`\nStopped at the deadline. Next stage: ${stoppedEarly}`);
-    say('deadline', 'deadline-stop');
+    say('deadline', 'deadline-stop', `stopped before ${stoppedEarly}; the resume step picks it up`);
     // Non-zero on purpose: a job that ends 0 concludes `success` and the
     // re-dispatch step never fires.
     process.exit(1);
   }
-  if (failed.length || barren.length) {
-    say('broken', failed.length ? 'stage-failed' : 'stage-barren');
+  /*
+   * Red for what the night depended on, not for any failure at all.
+   *
+   * Eighteen stages worked and `digest` did not, and the run reported exactly
+   * what a night where `filter` never ran reports. A red that fires for a
+   * hiccup in one enrichment stage is the same red nobody reads that spending
+   * the allowance used to produce.
+   *
+   * A barren critical stage still counts: a scoring stage that scored nothing
+   * is a failure wearing an exit code of 0, which is what the barren check
+   * exists to catch.
+   */
+  const barrenCritical = barren.filter((b) => isCritical(b.stage));
+  if (failedCritical.length || barrenCritical.length) {
+    const who = [...failedCritical.map((f) => f.stage), ...barrenCritical.map((b) => b.stage)];
+    say('broken', failedCritical.length ? 'stage-failed' : 'stage-barren',
+      `${who.join(', ')} — the night depends on ${who.length === 1 ? 'it' : 'them'}`);
     process.exit(1);
+  }
+  if (failed.length || barren.length) {
+    const who = [...failed.map((f) => f.stage), ...barren.map((b) => b.stage)];
+    say('partial', 'stage-degraded',
+      `${who.join(', ')} did not finish; everything the night depends on did`);
+    process.exit(0);
   }
   say(noAllowance ? 'partial' : 'healthy', noAllowance ? 'allowance-exhausted' : 'healthy');
   process.exit(0);
