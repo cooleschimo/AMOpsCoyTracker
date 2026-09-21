@@ -303,6 +303,28 @@ type Assessment = {
       });
 
       if (!res.ok || !res.data?.assessments) {
+        /*
+         * Ask for less before giving up.
+         *
+         * Eleven assessments in one reply is about 21,000 output tokens, which
+         * is where gpt-oss stops mid-object: the JSON is unparseable because
+         * the model ran out of room, not because it misunderstood. Skipping
+         * cost eighteen companies in one night and left them for the next run
+         * to hit the same ceiling with the same batch size.
+         *
+         * Halving and re-asking is the one retry that changes the question.
+         * Each half goes through this same path, so a batch that is still too
+         * large splits again, down to a single company — and one company that
+         * genuinely cannot be parsed is skipped alone rather than taking ten
+         * others with it.
+         */
+        if (batch.length > 1) {
+          const mid = Math.ceil(batch.length / 2);
+          console.warn(`    ${res.error} — splitting ${batch.length} into ${mid} + ${batch.length - mid}`);
+          await runBatch(batch.slice(0, mid));
+          await runBatch(batch.slice(mid));
+          return;
+        }
         // Logged and skipped; the other workers carry on.
         counts.batches_failed++;
         console.warn(`    FAILED: ${res.error}`);

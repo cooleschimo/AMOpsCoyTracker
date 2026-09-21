@@ -25,6 +25,14 @@ export type LlmResult<T> = {
   tokensIn: number;
   tokensOut: number;
   model: string;
+  /**
+   * The reply hit the completion ceiling rather than being wrong.
+   *
+   * A caller that batches can halve the batch and ask again; re-sending the
+   * same prompt is truncated at the same place, so this is the one parse
+   * failure that retrying unchanged cannot fix.
+   */
+  truncated?: boolean;
 };
 
 const lastCallTimes = new Map<string, number[]>();
@@ -97,7 +105,7 @@ type CallOpts = {
   reasoningEffort?: 'low' | 'medium' | 'high';
 };
 
-type RawOk = { text: string; inTok: number; outTok: number; model: string };
+type RawOk = { text: string; inTok: number; outTok: number; model: string; truncated?: boolean };
 type RawErr = { error: string; exhausted?: boolean; transient?: boolean };
 
 async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider): Promise<RawOk | RawErr> {
@@ -250,6 +258,16 @@ async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider)
 
       const json = await res.json();
       const text: string = json?.choices?.[0]?.message?.content ?? '';
+      /*
+       * A reply the model stopped writing is not a reply it got wrong.
+       *
+       * `finish_reason: 'length'` means the completion ceiling cut it off
+       * mid-structure, and the JSON is unparseable for a reason no amount of
+       * "respond with one valid object" can fix — the stricter retry re-asks
+       * the same oversized question and is truncated at the same place. Said
+       * plainly here so the caller can shrink the ask instead.
+       */
+      const truncated = json?.choices?.[0]?.finish_reason === 'length';
       const inTok: number = json?.usage?.prompt_tokens ?? estimateTokens(system + opts.user);
       const outTok: number = json?.usage?.completion_tokens ?? estimateTokens(text);
       opts.budget?.record(inTok, outTok, provider.label ?? provider.name);
@@ -260,7 +278,7 @@ async function rawCall(opts: CallOpts, stricter: boolean, provider: LlmProvider)
       // would retract the one alert that says a key is dead and will still be
       // dead tomorrow.
       if (text) await clearRejected(provider.label ?? provider.name);
-      return { text, inTok, outTok, model };
+      return { text, inTok, outTok, model, truncated };
     } catch (e) {
       const waitMs = Math.min(30_000, 2 ** attempt * 1_000);
       console.warn(`[llm] ${provider.label ?? provider.name} network error: ${(e as Error).message}; retrying in ${waitMs}ms`);
@@ -393,6 +411,23 @@ export async function callJson<T = unknown>(opts: CallOpts): Promise<LlmResult<T
     } catch { /* fall through to the single stricter retry */ }
   }
 
+  /*
+   * A truncated reply is not re-asked, it is reported.
+   *
+   * The stricter instruction addresses a model that wrapped its JSON in prose;
+   * it does nothing for one that ran out of room mid-object, and spending a
+   * second full-size call to be cut off at the same point wastes the allowance
+   * twice over. The caller is told to ask for less instead.
+   */
+  if (res.truncated) {
+    console.warn('[llm] reply hit the completion ceiling; asking for a smaller batch');
+    return {
+      ok: false, data: null, raw: res.text, truncated: true,
+      error: 'reply truncated at the completion ceiling',
+      tokensIn: res.inTok, tokensOut: res.outTok, model,
+    };
+  }
+
   // Attempt 2: one stricter instruction, per the brief.
   console.warn('[llm] JSON parse failed; one stricter retry');
   if (budget?.halted) {
@@ -414,7 +449,7 @@ export async function callJson<T = unknown>(opts: CallOpts): Promise<LlmResult<T
   // Logged and skipped. The caller continues with the rest of the run.
   console.error('[llm] malformed JSON after stricter retry; skipping this batch');
   return {
-    ok: false, data: null, raw: res2.text,
+    ok: false, data: null, raw: res2.text, truncated: res2.truncated,
     error: 'malformed JSON after stricter retry (logged and skipped)',
     tokensIn: res.inTok + res2.inTok, tokensOut: res.outTok + res2.outTok, model,
   };
