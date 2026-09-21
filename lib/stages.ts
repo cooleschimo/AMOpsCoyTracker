@@ -191,7 +191,12 @@ export const STAGES: Stage[] = [
     why: 'accumulative judgment: prior assessment plus what arrived since' },
   { name: 'review', runStage: 'review_dashboard', script: 'review-dashboard.ts', timeoutMin: 4, phase: 'publish', cost: 'llm',
     why: 'the set is only checkable once placement has decided what is in it' },
-  { name: 'digest', runStage: 'render_digest', script: 'render-digest.ts', args: ['--save'], timeoutMin: 4, phase: 'publish', cost: 'llm',
+  // 15, because four was never enough: the placement matrix is a model call per
+  // company in the set and the first full week's digest took 9.2 minutes to
+  // write — it finished, correctly, and was killed and reported as a timeout
+  // for taking the time it needs. This is the last stage of the weekly run, so
+  // the headroom costs nothing any other stage was waiting for.
+  { name: 'digest', runStage: 'render_digest', script: 'render-digest.ts', args: ['--save'], timeoutMin: 15, phase: 'publish', cost: 'llm',
     weeklyOnly: true,
     why: 'placement matrix and the rendered digest' },
 ];

@@ -101,12 +101,28 @@ function run(stage: Stage, dry: boolean): Promise<{ ok: boolean; ms: number; not
     child.on('close', (code, signal) => {
       const ms = Date.now() - started;
       const counts = tail.match(/counts?:\s*(\{[\s\S]*?\})/)?.[1]?.replace(/\s+/g, ' ').slice(0, 240);
+      /*
+       * A stage that finished its work is not a failure, whatever the clock
+       * said while it was doing it.
+       *
+       * SIGTERM is a request, and a stage in the middle of a write completes
+       * it and exits 0 — digest ran 9.2 minutes against a four-minute budget,
+       * wrote both files, saved its row, and was reported FAIL for taking the
+       * time it needs. The timeout is still recorded, because a budget that is
+       * wrong should be visible rather than silently exceeded; it just no
+       * longer overrides the stage's own verdict.
+       */
+      const overran = timedOut || Boolean(signal);
       finish({
-        ok: code === 0 && !timedOut,
+        ok: code === 0,
         ms,
-        note: timedOut || signal
-          ? `timed out after ${stage.timeoutMin}m`
-          : counts ?? (code === 0 ? '' : `exit ${code}`),
+        note: code === 0
+          ? (overran
+            ? `${counts ?? 'done'} (over its ${stage.timeoutMin}m budget)`
+            : counts ?? '')
+          : overran
+            ? `timed out after ${stage.timeoutMin}m`
+            : `exit ${code}`,
       });
     });
   });
