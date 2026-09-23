@@ -18,8 +18,12 @@
  * link is an account for whoever received it. Single use and the same expiry
  * either way, so a leak costs one seat rather than the batch.
  *
+ * The link is built from APP_BASE_URL, which is localhost in a development
+ * env. A link is refused rather than printed in that case — see below.
+ *
  * Usage: npx tsx scripts/invite.ts <email> [--name "Chimin"] [--admin]
  *        npx tsx scripts/invite.ts --open [--count 11] [--admin]
+ *        APP_BASE_URL=https://amcoy.vercel.app npx tsx scripts/invite.ts --open --count 11
  */
 import '../lib/loadenv';
 import { createInvite } from '../lib/session';
@@ -42,6 +46,26 @@ const flag = (n: string) => process.argv.includes(`--${n}`);
 
   const role = flag('admin') ? 'admin' : 'member';
   const base = (optional('APP_BASE_URL') ?? 'http://localhost:3000').replace(/\/$/, '');
+
+  /*
+   * A link nobody else can open is worse than no link.
+   *
+   * APP_BASE_URL is localhost in a development .env, which is right for every
+   * other use of it and wrong for the one thing this script produces: the
+   * invite reaches someone else's machine, where localhost is their machine.
+   * The row is written either way, so the mistake is only visible when the
+   * person says the link does not work — by which time the token has been
+   * handed out and has to be revoked rather than corrected.
+   *
+   * --local is the escape hatch for testing the join page by hand.
+   */
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(base) && !flag('local')) {
+    console.error(`\nAPP_BASE_URL is ${base}, so these links would only work on this machine.`);
+    console.error('\nEither set APP_BASE_URL to the deployed URL, or pass it for one run:');
+    console.error('  APP_BASE_URL=https://amcoy.vercel.app npx tsx scripts/invite.ts --open --count 11');
+    console.error('\nPass --local if you meant to test against a dev server.\n');
+    process.exit(1);
+  }
 
   if (!open) {
     const token = await createInvite(email, arg('name') ?? null, role);
