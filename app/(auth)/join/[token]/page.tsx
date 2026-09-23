@@ -4,6 +4,11 @@
  * The email is shown but not editable: it is fixed at the moment the invite is
  * made, so a forwarded link cannot become an account under a different address.
  *
+ * An open invite is the exception and asks for one, because it was issued
+ * without knowing who would use it. The link is what identifies the person, so
+ * whoever opens it makes the account — which is why the field is a plain input
+ * here and a read-only one above.
+ *
  * A spent or unknown token says so plainly rather than rendering a form that
  * cannot succeed. An invite is single use, so this is the ordinary result of
  * opening the link twice — including by pressing back after signing up — and it
@@ -59,15 +64,25 @@ export default async function JoinPage({
 
       <AuthForm action={signUpAction} submitLabel="Create account">
         <input type="hidden" name="token" value={token} />
-        <Field
-          label="Email"
-          name="email"
-          type="email"
-          defaultValue={invite.email}
-          readOnly
-          required={false}
-          hint="Set by the invitation."
-        />
+        {invite.email === null ? (
+          <Field
+            label="Email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            hint="Use whichever address you want to sign in with."
+          />
+        ) : (
+          <Field
+            label="Email"
+            name="email"
+            type="email"
+            defaultValue={invite.email}
+            readOnly
+            required={false}
+            hint="Set by the invitation."
+          />
+        )}
         <Field
           label="Your name"
           name="name"

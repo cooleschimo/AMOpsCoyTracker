@@ -31,10 +31,13 @@ export async function signUpAction(
   const name = String(formData.get('name') ?? '');
   const password = String(formData.get('password') ?? '');
   const confirm = String(formData.get('confirm') ?? '');
+  // Read on every signup, ignored unless the invite is open: whether the form
+  // may set the address is the invite's business, not the form's.
+  const email = String(formData.get('email') ?? '');
 
   if (password !== confirm) return { error: 'The two passwords are different.' };
 
-  const res = await signUpWithInvite(token, name, password);
+  const res = await signUpWithInvite(token, name, password, email);
   if (!res.ok) return { error: res.error };
 
   await createSession(res.userId);

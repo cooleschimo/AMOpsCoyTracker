@@ -141,18 +141,25 @@ export async function endSession(): Promise<void> {
   jar.delete(SESSION_COOKIE);
 }
 
-export type Invite = { email: string; name: string | null; role: Role };
+/** `email` is null on an open invite, where the address is chosen at signup. */
+export type Invite = { email: string | null; name: string | null; role: Role };
 
-/** Create an invite and return its token. The caller builds the URL. */
+/**
+ * Create an invite and return its token. The caller builds the URL.
+ *
+ * A null email makes it OPEN: the address is chosen at signup, so the link
+ * makes an account for whoever opens it rather than for one named person. See
+ * the note on `invites` in lib/schema.ts for what that gives up.
+ */
 export async function createInvite(
-  email: string, name: string | null, role: Role = 'member',
+  email: string | null, name: string | null, role: Role = 'member',
 ): Promise<string> {
   const sql = getSql();
   const token = randomBytes(24).toString('base64url');
   const expires = new Date(Date.now() + INVITE_DAYS * 86400_000);
   await sql`
     insert into invites (token, email, name, role, expires_at)
-    values (${token}, ${email.trim().toLowerCase()}, ${name}, ${role}, ${expires.toISOString()})`;
+    values (${token}, ${email ? email.trim().toLowerCase() : null}, ${name}, ${role}, ${expires.toISOString()})`;
   return token;
 }
 
@@ -166,7 +173,7 @@ export async function inviteForToken(token: string): Promise<Invite | null> {
   const i = rows[0];
   if (!i) return null;
   return {
-    email: String(i.email),
+    email: i.email === null ? null : String(i.email),
     name: (i.name as string | null) ?? null,
     role: i.role === 'admin' ? 'admin' : 'member',
   };
@@ -185,7 +192,7 @@ export type SignUpResult =
  * cannot both produce an account.
  */
 export async function signUpWithInvite(
-  token: string, name: string, password: string,
+  token: string, name: string, password: string, offeredEmail?: string,
 ): Promise<SignUpResult> {
   if (password.length < 10) {
     return { ok: false, error: 'Password must be at least 10 characters.' };
@@ -194,16 +201,46 @@ export async function signUpWithInvite(
   if (!trimmed) return { ok: false, error: 'Name is required.' };
 
   const sql = getSql();
-  // Claim the invite first. If this returns nothing the link was already used,
-  // expired, or never existed, and no account is created.
+  /*
+   * Read before claiming, so an open invite is not spent on a bad address.
+   *
+   * A bound invite can be claimed first because nothing the form says can stop
+   * it. An open one takes an address from the form, and burning a single-use
+   * link on a typo or an address that already has an account would cost the
+   * person their seat for a mistake they could have corrected.
+   */
+  const pending: any = await sql`
+    select email from invites
+     where token = ${token} and used_at is null and expires_at > now()
+     limit 1`;
+  if (!pending.length) return { ok: false, error: 'This invite is no longer valid.' };
+  const isOpen = pending[0].email === null;
+
+  let email: string;
+  if (isOpen) {
+    email = (offeredEmail ?? '').trim().toLowerCase();
+    // Deliberately loose. This checks the address is shaped like one, not that
+    // it is reachable — nothing here sends mail, so a stricter rule would only
+    // reject valid addresses it had not heard of.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { ok: false, error: 'Enter a valid email address.' };
+    }
+    if (email.length > 254) return { ok: false, error: 'That email address is too long.' };
+    const taken: any = await sql`select id from users where lower(email) = ${email} limit 1`;
+    if (taken.length) return { ok: false, error: 'An account already exists for this address.' };
+  } else {
+    email = String(pending[0].email).trim().toLowerCase();
+  }
+
+  // Claim it. If this returns nothing the link was used between the read above
+  // and here, which is two people opening one link at once; no account is made.
   const claimed: any = await sql`
     update invites set used_at = now()
      where token = ${token} and used_at is null and expires_at > now()
-     returning email, role`;
+     returning role`;
   const invite = claimed[0];
   if (!invite) return { ok: false, error: 'This invite is no longer valid.' };
 
-  const email = String(invite.email).trim().toLowerCase();
   const existing: any = await sql`select id from users where lower(email) = ${email} limit 1`;
   if (existing.length) return { ok: false, error: 'An account already exists for this address.' };
 

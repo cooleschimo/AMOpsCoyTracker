@@ -575,11 +575,22 @@ export const sessions = pgTable('sessions', {
  *
  * The email is fixed at issue rather than chosen at signup, so forwarding an
  * invite cannot create an account under a different address.
+ *
+ * An OPEN invite is the exception, and it is one on purpose. `email` is null,
+ * the address is chosen at signup, and the link therefore makes an account for
+ * whoever opens it — so a forwarded one is an account for the person it was
+ * forwarded to. It exists for handing links to people whose addresses are not
+ * known in advance, and the person issuing it is accepting that trade; a link
+ * that leaks costs the seat it was meant for.
+ *
+ * Everything else is unchanged: single use, the same expiry, the same password
+ * rules. A bound invite is still bound.
  */
 export const invites = pgTable('invites', {
   id: serial('id').primaryKey(),
   token: text('token').notNull(),
-  email: text('email').notNull(),
+  /** Null on an open invite, where the address is chosen at signup. */
+  email: text('email'),
   name: text('name'),
   role: text('role').notNull().default('member'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
