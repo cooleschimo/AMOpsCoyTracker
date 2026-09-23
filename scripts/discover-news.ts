@@ -244,6 +244,10 @@ function parseHq(hq: string | null | undefined) {
           valuationSource: c.valuationUsd ? `${c.source}, ${c.title}`.slice(0, 300) : null,
           ...parseHq(c.hq),
           discoveredVia: 'news',
+          // Which article, not just which channel: 'news' is ninety-six feeds,
+          // and the question asked when one of them starts failing is what it
+          // was finding.
+          discoveredItemId: c.itemId,
           // Nothing has judged this company. 'unknown' is the honest value, and
           // assess-companies picks it up from there.
           scopeStatus: 'unknown',

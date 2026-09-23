@@ -119,6 +119,20 @@ export const companies = pgTable('companies', {
   atsMissingAt: timestamp('ats_missing_at', { withTimezone: true }),
   discoveredVia: text('discovered_via'),
   /**
+   * The article that first named this company, when news is what found it.
+   *
+   * `discovered_via` says which channel — news, portfolio, form_d — and that is
+   * as far as it goes: 'news' is ninety-six feeds, so it cannot answer which of
+   * them is worth keeping. The question is asked whenever a source starts
+   * failing, and the only available answer was to correlate a company's
+   * created_at against every item fetched near it, which credits every source
+   * that mentioned the company that hour rather than the one that surfaced it.
+   *
+   * Null for companies found any other way, and for everything discovered
+   * before this was recorded.
+   */
+  discoveredItemId: integer('discovered_item_id'),
+  /**
    * Scope triage from the EDGAR industry group (lib/edgar-industry.ts).
    *   in_scope     — a sector match, or pending the company-level assessment
    *   out_of_scope — confidently outside the four sectors; the row is kept so
