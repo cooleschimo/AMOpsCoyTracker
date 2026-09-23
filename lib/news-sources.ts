@@ -84,6 +84,25 @@ export type FeedItem = {
 const UA = 'Mozilla/5.0 (compatible; AMOpsCoyTracker/1.0; +research)';
 
 /**
+ * A page that asks the caller to be a browser.
+ *
+ * Cloudflare, Vercel and the rest answer a non-browser with an HTML challenge
+ * and no consistent status: VentureBeat returns 429, techfundingnews 403, and
+ * two others 200 with the challenge in the body. So the status cannot classify
+ * it — a 429 reads as a rate limit and gets backed off and retried all night
+ * against a guard that will never clear, and a 200 is parsed as a feed and
+ * reported as a selector that stopped matching.
+ *
+ * Nothing here defeats the challenge; it names it, so a blocked source is
+ * disabled deliberately rather than rediscovered every run.
+ */
+export function isBotChallenge(body: string): boolean {
+  if (!body || body.length > 200_000) return false;
+  if (/<(rss|feed|channel)[\s>]/i.test(body)) return false;     // a real feed
+  return /Security Checkpoint|Just a moment\.\.\.|Enable JavaScript (?:and cookies )?to continue|cf-browser-verification|Attention Required!|Checking your browser before/i.test(body);
+}
+
+/**
  * Decode HTML entities once.
  * `&amp;` is decoded LAST: doing it first would turn `&amp;lt;` into `&lt;` and
  * then into `<`, inventing markup that was never in the source.
@@ -207,15 +226,19 @@ export function parseVcNewsDaily(html: string): FeedItem[] {
 /** Fetch a page-based source, in the shape fetchFeed returns. */
 export async function fetchScraped(
   url: string, how: 'vcnewsdaily',
-): Promise<{ items: FeedItem[]; error: string | null; reached?: boolean }> {
+): Promise<{ items: FeedItem[]; error: string | null; reached?: boolean; blocked?: boolean }> {
   try {
     const res = await fetch(url, {
       headers: { 'User-Agent': UA, Accept: 'text/html,*/*' },
       redirect: 'follow',
       signal: AbortSignal.timeout(25000),
     });
+    const body = await res.text().catch(() => '');
+    if (isBotChallenge(body)) {
+      return { items: [], error: `bot challenge (HTTP ${res.status}); JavaScript required`, reached: true, blocked: true };
+    }
     if (!res.ok) return { items: [], error: `HTTP ${res.status}` };
-    const items = how === 'vcnewsdaily' ? parseVcNewsDaily(await res.text()) : [];
+    const items = how === 'vcnewsdaily' ? parseVcNewsDaily(body) : [];
     // `reached`: the page answered, so a zero parse is a selector problem.
     return { items, error: items.length ? null : 'page parsed to zero items', reached: true };
   } catch (e) {
@@ -223,15 +246,23 @@ export async function fetchScraped(
   }
 }
 
-export async function fetchFeed(url: string): Promise<{ items: FeedItem[]; error: string | null; reached?: boolean }> {
+export async function fetchFeed(url: string): Promise<{ items: FeedItem[]; error: string | null; reached?: boolean; blocked?: boolean }> {
   try {
     const res = await fetch(url, {
       headers: { 'User-Agent': UA, Accept: 'application/rss+xml, application/xml, text/xml, */*' },
       redirect: 'follow',
       signal: AbortSignal.timeout(25000),
     });
+    // The body decides, not the status: a challenge arrives as 429, 403 and
+    // 200 depending on the vendor, so reading it is the only way to tell a
+    // bot guard from a rate limit or a working feed.
+    const body = await res.text().catch(() => '');
+    const challenge = isBotChallenge(body);
+    if (challenge) {
+      return { items: [], error: `bot challenge (HTTP ${res.status}); JavaScript required`, reached: true, blocked: true };
+    }
     if (!res.ok) return { items: [], error: `HTTP ${res.status}` };
-    const xml = await res.text();
+    const xml = body;
     const items = parseFeed(xml);
     /*
      * An empty parse is a source-health event rather than a silent skip — but
@@ -915,7 +946,9 @@ export const CONTEXT_SOURCES: ContextSource[] = [
     url: 'https://techfundingnews.com/feed/',
     kind: 'trade',
     sectors: [],
-    enabled: true,
+    // Cloudflare challenge since 2026-09-22: 403 with a JavaScript interstitial.
+    enabled: false,
+    note: 'Cloudflare bot challenge 2026-09-22',
   },
   {
     id: 'biopharma_dive',
@@ -995,7 +1028,13 @@ export const CONTEXT_SOURCES: ContextSource[] = [
     url: 'https://venturebeat.com/feed/',
     kind: 'trade',
     sectors: ['ai'],
-    enabled: true,
+    // Behind a Vercel bot challenge since 2026-09-02 — 429 with an HTML
+    // "Security Checkpoint" page that needs JavaScript, on every User-Agent
+    // tried. Nothing a fetcher can do clears it. Its coverage still arrives:
+    // 89 of the 102 VentureBeat items held came through the per-company
+    // Google News path rather than this feed.
+    enabled: false,
+    note: 'Vercel bot challenge 2026-09-02; coverage still arrives via Google News',
   },
   {
     id: 'tech_eu',

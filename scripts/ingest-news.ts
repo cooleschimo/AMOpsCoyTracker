@@ -108,7 +108,7 @@ const BLOCK_AFTER_CONSECUTIVE_ERRORS = 20;
 async function markHealth(
   db: ReturnType<typeof getDb>,
   source: string, sourceType: string, count: number, error: string | null,
-  reached = false,
+  reached = false, blocked = false,
 ) {
   const now = new Date();
   /*
@@ -117,7 +117,7 @@ async function markHealth(
    * fix is a selector rather than a URL, and two sector feeds sat at `down` for
    * weeks reading as outages when nothing was unreachable.
    */
-  const status = error && !reached ? 'down' : count === 0 ? 'zero_volume' : 'ok';
+  const status = blocked ? 'blocked' : error && !reached ? 'down' : count === 0 ? 'zero_volume' : 'ok';
   await withRetry(() => db.insert(sourceHealth).values({
     source, sourceType, lastRunAt: now,
     // Reaching the source IS the success this column records; whether it
@@ -375,7 +375,7 @@ async function insertItems(db: ReturnType<typeof getDb>, rows: PendingItem[]): P
           await markHealth(db, src.id, 'wire', 0, src.note ?? 'disabled');
           continue;
         }
-        const { items: feed, error, reached } = await fetchFeed(src.url);
+        const { items: feed, error, reached, blocked } = await fetchFeed(src.url);
         counts.wires_queried++;
         if (error && feed.length === 0) counts.wire_errors++;
         console.log(`  ${src.name}: ${feed.length} items${error ? ` (${error})` : ''}`);
@@ -397,7 +397,7 @@ async function insertItems(db: ReturnType<typeof getDb>, rows: PendingItem[]): P
           counts.inserted += n;
           counts.duplicates_skipped += rows.length - n;
         }
-        await markHealth(db, src.id, 'wire', feed.length, error, reached);
+        await markHealth(db, src.id, 'wire', feed.length, error, reached, blocked);
       }
     }
 
