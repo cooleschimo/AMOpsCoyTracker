@@ -54,7 +54,7 @@ export function ControlBar({
    * Who is reading, or null for a guest. Passed down rather than read here:
    * this is a client component and the session lives on the server.
    */
-  user?: { name: string } | null;
+  user?: { name: string; role?: string | null } | null;
   /** Title and week. Stays visible in both states — it is what the page IS. */
   masthead: React.ReactNode;
   /** The week's numbers. Shown open, dropped when the bar shrinks. */
@@ -128,6 +128,15 @@ export function ControlBar({
       { href: '/awaiting-assessment', label: 'Awaiting', count: counts.awaiting },
     ] : []),
     { href: '/graph', label: 'Connections', count: undefined as number | undefined },
+    /*
+     * Admin only, and last: it is about the pipeline rather than the week, so
+     * it sits after the things a reader came here for. Everyone else never
+     * sees it — the page guards itself, but a link to a door you cannot open
+     * is the same disclosure the member links above are conditional for.
+     */
+    ...(user?.role === 'admin' ? [
+      { href: '/admin/analytics', label: 'Analytics', count: undefined as number | undefined },
+    ] : []),
     // An icon rather than a word: this is the way back from a misclick, not a
     // fourth way to read the week, and naming it would give it the same weight
     // as the sections that carry the work.
