@@ -200,7 +200,24 @@ export const STAGES: Stage[] = [
    */
   { name: 'edges', critical: true, runStage: 'ingest_edges', script: 'ingest-edges.ts', args: ['--limit', '800'], timeoutMin: 15, phase: 'judge', cost: 'llm',
     why: 'acquisitions and partnerships between companies we track, which paths read as warm' },
-  { name: 'score', critical: true, runStage: 'score_companies', script: 'score-companies.ts', timeoutMin: 75, phase: 'judge', cost: 'llm',
+  /*
+   * Capped, because the first run of a week is not the same job as the rest.
+   *
+   * A signal is stored per company per week, and the stage skips a company
+   * that already has one. On Saturday the week rolls over, nothing is cached,
+   * and every company with activity in the 30-day window becomes a target:
+   * 1,493 companies and 22,339 items against the 20-80 a weekday asks for.
+   * That ran 116 and 131 minutes on the two Saturdays measured, against a
+   * 75-minute budget, and on the second it took the run past its deadline so
+   * assess never started at all.
+   *
+   * 700 is 65 minutes at the 11 companies a minute the slow night managed,
+   * which leaves the budget some room. Targets are ordered by how many items
+   * a company has, so the cap keeps the companies with the most to say and
+   * the tail is picked up the next night — the same bargain sectors and
+   * websites already make.
+   */
+  { name: 'score', critical: true, runStage: 'score_companies', script: 'score-companies.ts', args: ['--limit', '700'], timeoutMin: 75, phase: 'judge', cost: 'llm',
     why: 'the three axes per company for this week' },
   { name: 'assess', critical: true, runStage: 'assess', script: 'assess-companies.ts', timeoutMin: 50, phase: 'judge', cost: 'llm',
     why: 'accumulative judgment: prior assessment plus what arrived since' },
